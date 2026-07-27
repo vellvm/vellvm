@@ -88,9 +88,9 @@ Section Refinement.
   Variant I2F_dvalue_bv {sz} : @dvalue_bv PInf sz -> @dvalue_bv PFin sz -> Prop :=
   | I2F_BYTE_I i :
     I2F_dvalue_bv (BYTE_I i) (BYTE_I i)
-  | I2F_BYTE_Pointer p p' :
+  | I2F_BYTE_Pointer p p' n:
     I2F_Addr p p' ->
-    I2F_dvalue_bv (@BYTE_Pointer PInf sz p) (@BYTE_Pointer PFin sz p')
+    I2F_dvalue_bv (@BYTE_Pointer PInf sz p n) (@BYTE_Pointer PFin sz p' n)
   | I2F_BYTE_Mixed bits bits':
     Forall2 I2F_memory_bit bits bits' ->      
     I2F_dvalue_bv (@BYTE_Mixed PInf sz bits) (@BYTE_Mixed PFin sz bits').
@@ -169,6 +169,35 @@ Section Refinement.
     | I2F_EOU_oom m s : I2F_EOU RR m (raise_oom s)
   .
 
+  (*  Variant MaybePoison (A : Type) : Type := | Pois | NoPois (a : A).
+  Arguments Pois {A}.
+  Arguments NoPois {A}.
+  Definition EOUP Z := EOU (MaybePoison Z).
+*)
+
+  Variant MaybePoisonRel {A1 A2} (RR : A1 -> A2 -> Prop) : MaybePoison A1 -> MaybePoison A2 -> Prop :=
+    | MaybePoison_NoPois a1 a2 : RR a1 a2 -> MaybePoisonRel RR (NoPois a1) (NoPois a2)
+    | MaybePoison_Pois : MaybePoisonRel RR (@Pois A1) (@Pois A2).
+
+  Variant I2F_EOUP {A1 A2} (RR : A1 -> A2 -> Prop) : EOUP A1 -> EOUP A2 -> Prop :=
+    | I2F_EOUP_ret a1 a2 : RR a1 a2 -> I2F_EOUP RR (raise_ret (NoPois a1)) (raise_ret (NoPois a2))
+    | I2F_EOUP_poison : I2F_EOUP RR (raise_ret (@Pois A1)) (raise_ret (@Pois A2))
+    | I2F_EOUP_error s1 s2 : I2F_EOUP RR (raise_error s1) (raise_error s2)
+    | I2F_EOUP_ub s m : I2F_EOUP RR (raise_ub s) m
+    | I2F_EOUP_oom m s : I2F_EOUP RR m (raise_oom s).
+
+  Lemma I2F_EOUP_EOU {A1 A2} (RR : A1 -> A2 -> Prop) (c1 : EOUP A1) (c2 : EOUP A2) :
+    I2F_EOUP RR c1 c2 ->
+    I2F_EOU (MaybePoisonRel RR) c1 c2.
+  Proof.
+    intros H.
+    inversion H; subst; constructor.
+    eapply MaybePoison_NoPois. auto.
+    apply MaybePoison_Pois.
+  Qed.
+
+
+  
   (** * Event relations, one per event family
 
       Two events are related when they are the same constructor, carrying
@@ -393,6 +422,7 @@ Hint Constructors I2F_memory_bit : core.
 Hint Constructors I2F_dvalue_base : core.
 Hint Constructors I2F_dvalue : core.
 Hint Constructors I2F_EOU : core.
+Hint Constructors I2F_EOUP : core.
 (* [dvp t] is a definition ([DVALUE_Poison (DTYPE_Base t)]), so [auto]'s
      [simple apply] does not see the constructor underneath; go through
      full [apply]. *)
@@ -474,6 +504,17 @@ Proof.
   intros [] KEQ; cbn; eauto.
 Qed.
 
+(** Compatibility of [I2F_EOUP] with the monadic structure of [EOUP]. *)
+Lemma I2F_EOUP_bind {A1 A2 B1 B2} (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop)
+  (m1 : EOUP A1) (m2 : EOUP A2) (k1 : A1 -> EOUP B1) (k2 : A2 -> EOUP B2) :
+  I2F_EOUP RA m1 m2 ->
+  (forall a1 a2, RA a1 a2 -> I2F_EOUP RB (k1 a1) (k2 a2)) ->
+  I2F_EOUP RB (bind m1 k1) (bind m2 k2).
+Proof.
+  intros [] KEQ; cbn; eauto.
+Qed.
+
+
 Lemma I2F_EOU_map_monad {A B1 B2} (RB : B1 -> B2 -> Prop)
   (f1 : A -> EOU B1) (f2 : A -> EOU B2) (l : list A) :
   (forall a, In a l -> I2F_EOU RB (f1 a) (f2 a)) ->
@@ -521,6 +562,23 @@ Proof.
   - eapply I2F_EOU_bind; [now apply HF|].
     intros b1 b2 HB.
     eapply I2F_EOU_bind; [apply IHF|].
+    intros bs1 bs2 HBS.
+    do 2 constructor; auto.
+Qed.
+
+(** [I2F_EOUP_map_monad] generalized to two [Forall2]-related lists. *)
+Lemma I2F_EOUP_map_monad2 {A1 A2 B1 B2} (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop)
+  (f1 : A1 -> EOUP B1) (f2 : A2 -> EOUP B2) :
+  forall l1 l2,
+    Forall2 RA l1 l2 ->
+    (forall a1 a2, RA a1 a2 -> I2F_EOUP RB (f1 a1) (f2 a2)) ->
+    I2F_EOUP (Forall2 RB) (map_monad f1 l1) (map_monad f2 l2).
+Proof.
+  intros l1 l2 F HF; induction F; cbn.
+  - do 2 constructor.
+  - eapply I2F_EOUP_bind; [now apply HF|].
+    intros b1 b2 HB.
+    eapply I2F_EOUP_bind; [apply IHF|].
     intros bs1 bs2 HBS.
     do 2 constructor; auto.
 Qed.

@@ -310,7 +310,7 @@ Section MemoryByte.
   Arguments Pois {A}.
   Arguments NoPois {A}.
   Definition EOUP Z := EOU (MaybePoison Z).
-  #[local] Instance EOUP_Monad : Monad EOUP :=
+  #[global] Instance EOUP_Monad : Monad EOUP :=
     {| ret _ a := ret (NoPois a) ;
       bind _ _ c k := 
         bind (m := EOU) c (fun pov => match pov with
@@ -359,116 +359,6 @@ Section MemoryByte.
       ret (concat_bits_Z vs).
   
 
-  (* Should probably not need this *)
-  (*
-  Definition dvalue_base_extract_byte (dv : dvalue_base) (idx : N) : EOUP Z :=
-    match dv with
-    | DVALUE_I sz x =>
-        ret (extract_byte_vint x idx)
-    | DVALUE_Iptr x =>
-        ret (extract_byte_Z (to_Z x) idx)
-    | DVALUE_Pointer ptr =>
-        (* Note: this throws away provenance *)
-        ret (extract_byte_Z (ptr_to_int ptr) idx)
-    | DVALUE_Float f =>
-        ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
-    | DVALUE_Double d =>
-        ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
-    | DVALUE_Poison dt => ret Pois
-    | DVALUE_None =>
-        (* TODO: Not sure if this should be an error, poison, or what. *)
-        raise_error "dvalue_extract_byte on DVALUE_None"
-    | DVALUE_B sz bits =>
-        dvalue_bv_extract_byte bits idx
-    end.
-   *)
-  (*
-  (* offset is the number of bytes indexed past so far *)
-  Fixpoint dvalue_extract_memory_byte (dv : dvalue) (dt : dtyp) (idx : N) {struct dv} : EOUP memory_byte  :=
-    let dvalue_extract_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> N -> EOUP memory_byte :=
-      fix loop fields types (offset : N) (idx : N) {struct fields} : EOUP Z :=
-        match fields, types with
-        | [], [] =>
-            (* Handle padding at the end of the structure *)
-            let padding :=
-              match pad with
-              | Some max_pad
-                => Sizeof.pad_amount max_pad offset
-              | None =>
-                  0%N
-              end
-            in
-            if N.ltb idx padding
-            then
-              (* Indexing into padding bytes *)
-              (* TODO: currently we just pad with 0 bytes. This *)
-      (*            prevents storing data in padding, though, which is *)
-      (*            technically allowed *)
-              ret 0%Z
-            else
-              raise_error "No fields left for byte-indexing..."
-        | f::fs, dt::dts =>
-            let padding :=
-              if pad
-              then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
-              else 0%N
-            in
-            let sz := sizeof_dtyp dt in
-            if N.ltb idx padding
-            then
-              (* Indexing into padding bytes *)
-              (* TODO: currently we just pad with 0 bytes. This *)
-      (*            prevents storing data in padding, though, which is *)
-      (*            technically allowed *)
-              ret 0%Z
-            else
-              let offset' := (offset + padding)%N in
-              let idx' := (idx - padding)%N in
-              if N.ltb idx' sz
-              then dvalue_extract_byte f dt idx'
-              else loop fs dts (offset' + sz)%N (idx' - sz)%N
-        | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
-        end
-    in
-
-    let dvalue_extract_array_bytes :=
-      fix loop (elts : list dvalue) dt (idx : N) {struct elts}  :=
-        match elts with
-        | [] => raise_error "No fields left for byte-indexing..."
-        | e::es =>
-            let sz := sizeof_dtyp dt in
-            if N.ltb idx sz
-            then dvalue_extract_byte e dt idx
-            else loop es dt (idx - sz)%N
-        end
-    in
-    match dv with
-    | DVALUE_Base dv => dvalue_base_extract_byte dv idx
-    | DVALUE_Struct false fields =>
-        match dt with
-        | DTYPE_Struct false dts =>
-            dvalue_extract_struct_bytes (Some (max_preferred_dtyp_alignment dts)) fields dts 0 idx
-        | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
-        end
-
-    | DVALUE_Struct true fields =>
-        match dt with
-        | DTYPE_Struct true dts =>
-            dvalue_extract_struct_bytes None fields dts 0 idx
-        | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
-        end
-
-    | DVALUE_Array v _ elts =>
-        match dt with
-        | DTYPE_Array _ sz dt =>
-            dvalue_extract_array_bytes elts dt idx
-        | _ =>
-            raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
-        end
-    end.
-   *)
-
-
   #[local] Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
 
   Definition absorb_pois {A} dt (c : EOUP A) (k : A -> EOU dvalue_base) : EOU dvalue_base :=
@@ -477,52 +367,6 @@ Section MemoryByte.
     | Pois => ret (DVALUE_Poison dt)
     | NoPois v => k v
     end.
-
-  (*
-  (* returns true if and only if the sequence of memory bytes contain identical data but
-     increasing indices from idx to tgt.
-   *)
-  Fixpoint validate_sequence (dv : dvalue) (dt : dtyp) (dbs : list memory_byte) (idx:N) (tgt : N) : bool := 
-    match dbs with
-    | [] => N.eqb idx tgt  (* did we reach the target with none left *)
-    | (MByte dv' dt' idx') :: dbs' =>
-        (N.ltb idx tgt) &&  (* short circuit if the index is too big for tgt *)
-          (N.eqb idx idx') && (dvalue_eqb dv dv') && (dtyp_eqb dt dt') &&
-          validate_sequence dv dt dbs' (idx+1) tgt
-    end.
-
-  
-  (* There are only two ways that a sequence of memory bytes can have valid pointer
-     provenance:
-     They must be correctly sequenced indices into the _same_ [DVALUE_Pointer p] or
-     they must be correctly sequenced indices into the _same_ [DVALUE_B (BYTE_Pointer p] )
-     then the provenance is p's provenance.  Otherwise there is no provenance
-      (or the byte value containts poison bits)
-   *)
-  Definition get_provenance_from_memory_bytes (dbs : list memory_byte) : option prov :=
-    match dbs with
-    | [] => None
-    | v::rst =>
-        match v with
-        | MByte (DVALUE_Pointer p) dt _ =>
-            if validate_sequence (DVALUE_Pointer p) dt dbs 0 pointer_size then
-              Some (ptr_provenance p)
-            else None
-        | MByte (DVALUE_B sz (BYTE_Pointer p)) dt _ =>
-            if N.eqb (Npos sz) pointer_size then
-              if validate_sequence (DVALUE_Pointer p) dt dbs 0 pointer_size then
-                Some (ptr_provenance p)
-              else None
-            else
-              None
-        | _ => None
-        end
-    end.
-   *)
-
-
-  
-
   
   (* Recover a pointer from a byte representation for pointer p.
      The byte at index 0 <= i < pointer_size must be of the form:
@@ -547,7 +391,6 @@ Section MemoryByte.
           ret false
     | _ => ret Pois
     end.
-
   
   Definition valid_pointer_byte (p:ptr) (idx:N) (mb:memory_byte) : EOUP bool :=
     match mb with
@@ -575,28 +418,7 @@ Section MemoryByte.
     | _ => ret Pois
     end.
 
-  (*
-        let extra_bits := N.modulo (Npos bit_sz) 8 in
-        if negb (N.eqb extra_bits 0) && (N.eqb (idx + 1) (sizeof_dtyp (DTYPE_Base (DTYPE_I bit_sz))))  then
-          let pad_bits := 8 - extra_bits in
-          let pad := repeat Bit_psn (N.to_nat pad_bits) in
-          let mbits := map (fun i => Z_to_memory_bit (Z.of_N (extract_bit_N (Z.to_N (unsigned x)) i))) (Nseq (8 * idx) (N.to_nat extra_bits))
-          in
-          BYTE_Mixed 8 (mbits ++ pad)
-        else
-          BYTE_I (repr (extract_byte_vint x idx))
-
-Fixpoint concat_bytes_Z (bytes : list Z) : Z
-  := match bytes with
-     | [] => 0
-     | (byte::bytes) =>
-         byte + (Z.shiftl (concat_bytes_Z bytes) 8)
-     end.
-
-
-*)
-
-  (* A version of *)
+  (* A version of concat_bytes that trims extra bits from the last byte. *)
   Fixpoint concat_bytes_Z_mixed (extra:N) (acc:Z) (dbs : list memory_byte) : EOUP Z :=
     match dbs with
     | [] => ret acc

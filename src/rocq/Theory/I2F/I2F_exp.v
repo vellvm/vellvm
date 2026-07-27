@@ -1,6 +1,6 @@
 From Equations Require Import Equations.
 
-From Stdlib Require Import Lia.
+From Stdlib Require Import Lia Logic.ProofIrrelevance.
 
 From ExtLib Require Import Structures.Monads.
 
@@ -701,44 +701,31 @@ Qed.
 
 (** * Bitcast: relating the byte-serialization round-trip.
 
-      The byte-extraction side is parameter-free-valued
-      ([EOU (MaybePoison Z)]): related values expose *equal* bytes, since
-      the payloads are shared ([DVALUE_I], floats) or [to_Z]-equal
-      (intptrs, addresses --- provenance is discarded by design), and the
-      offset/padding arithmetic only reads the shared [dtyp]. *)
+*)
 
 (** The semantic relation on lazy memory bytes: equal byte values. *)
-Definition I2F_mbyte (b : @memory_byte PInf) (b' : @memory_byte PFin) : Prop :=
-  @memory_byte_value PInf b = @memory_byte_value PFin b'.
+Definition I2F_memory_byte (b : @memory_byte PInf) (b' : @memory_byte PFin) : Prop :=
+  I2F_dvalue_bv b b'.
 
 (* [EOUP]'s monad instance is local to [MemoryBytes.v]; re-register it
      so that [map_monad] at [EOUP] can be spoken about here. *)
 #[local] Existing Instance EOUP_Monad.
 
-(** Related bytes give literally equal byte-value streams. *)
-Lemma I2F_map_monad_memory_byte_value : forall dbs dbs',
-    Forall2 I2F_mbyte dbs dbs' ->
-    map_monad (m := EOUP) (@memory_byte_value PInf) dbs
-    = map_monad (@memory_byte_value PFin) dbs'.
-Proof.
-  intros dbs dbs' F; induction F; cbn; auto.
-  red in H; rewrite H, IHF; reflexivity.
-Qed.
 
 #[local] Arguments absorb_pois : simpl never.
 
-(** Once the byte streams are aligned (they are parameter-free), the
-      two sides of [absorb_pois] share their scrutinee: the poison
-      short-circuit is diagonal and only the continuations differ. *)
-Lemma I2F_absorb_pois {A} (dt : dtyp) (c : EOUP A)
-  (k1 : A -> EOU (@dvalue_base PInf)) (k2 : A -> EOU (@dvalue_base PFin)) :
-  (forall a, I2F_EOU I2F_dvalue_base (k1 a) (k2 a)) ->
-  I2F_EOU I2F_dvalue_base (@absorb_pois PInf A dt c k1) (@absorb_pois PFin A dt c k2).
+Lemma I2F_absorb_pois {A1 A2} (RR : A1 -> A2 -> Prop) (dt : dtyp) (c1 : EOUP A1) (c2 : EOUP A2)
+  (k1 : A1 -> EOU (@dvalue_base PInf)) (k2 : A2 -> EOU (@dvalue_base PFin)) :
+  I2F_EOUP RR c1 c2 ->
+  (forall a1 a2, RR a1 a2 -> I2F_EOU I2F_dvalue_base (k1 a1) (k2 a2)) ->
+  I2F_EOU I2F_dvalue_base (@absorb_pois PInf A1 dt c1 k1) (@absorb_pois PFin A2 dt c2 k2).
 Proof.
-  intros K; unfold absorb_pois.
-  eapply I2F_EOU_bind with (RA := Logic.eq); [apply I2F_EOU_refl|].
-  intros a ? <-; destruct a; cbn; [repeat constructor | apply K].
+  intros HC K; unfold absorb_pois.
+  eapply I2F_EOUP_EOU in HC.
+  eapply I2F_EOU_bind with (RA := (MaybePoisonRel RR)); auto.
+  intros a1 a2 H. inversion H; subst; [apply K;auto | repeat constructor].
 Qed.
+
 
 (* [break_match_goal], but refusing to destruct [EOU]-typed scrutinees
      opaquely: on those the two sides must be reduced in lockstep, either
@@ -762,51 +749,334 @@ Ltac i2f_in_range_case :=
   match goal with
   | B : ((_ <=? _)%Z && (_ >=? _)%Z)%bool = true |- _ =>
       apply andb_prop in B as [LE GE];
-      apply Z.leb_le in LE; apply Z.geb_le in GE;
-      first
-        [ (* an intptr value *)
-          do 2 constructor; red;
-          rewrite Integers.unsigned_repr; [reflexivity | now split]
-        | (* an address value *)
-          do 2 constructor; split;
-          [ red; rewrite Integers.unsigned_repr; [reflexivity | now split]
-          | reflexivity ]
-        | (* a bare address pair *)
-          do 2 constructor;
-          [ red; rewrite Integers.unsigned_repr; [reflexivity | now split]
-          | reflexivity ] ]
+      apply Z.leb_le in LE; apply Z.geb_le in GE
   end.
+
+Lemma I2F_memory_bit_to_bit mb1 mb2 :
+    I2F_memory_bit mb1 mb2 ->
+    I2F_EOUP Logic.eq (memory_bit_to_bit mb1) (memory_bit_to_bit mb2).
+Proof.
+  intros H.
+  inversion H; subst.
+  - destruct p. destruct p'. simpl in H0. destruct H0; subst.
+    inversion H0. subst.
+    cbn. constructor. reflexivity.
+  - cbn. constructor.
+  - cbn.  constructor. reflexivity.
+Qed.
+
+
+Lemma I2F_memory_bits_to_Z bits1 bits2 :
+    Forall2 I2F_memory_bit bits1 bits2 ->
+    I2F_EOUP Logic.eq (memory_bits_to_Z bits1) (memory_bits_to_Z bits2).
+Proof.
+  intros H.
+  unfold memory_bits_to_Z.
+  eapply I2F_EOUP_bind with (RA:=Forall2 Logic.eq).
+  eapply I2F_EOUP_map_monad2 with (RA:=I2F_memory_bit); auto.
+  intros. apply I2F_memory_bit_to_bit; auto.
+  intros.
+  constructor. 
+  apply Forall2_eq in H0. subst.
+  reflexivity.
+Qed.  
+  
+Lemma I2F_memory_byte_to_Z mb1 mb2 :
+    I2F_memory_byte mb1 mb2 ->
+    I2F_EOUP Logic.eq (memory_byte_to_Z mb1) (memory_byte_to_Z mb2).
+Proof.
+  intros H.
+  inversion H; subst.
+  - constructor. reflexivity.
+  - cbn in *.
+    destruct p. destruct p'.  simpl in H0. intuition. subst.
+    inversion H1. subst.
+    constructor. cbn. reflexivity.
+  - cbn.
+    eapply I2F_EOUP_bind with (RA:=Forall2 Logic.eq).
+    eapply I2F_EOUP_map_monad2 with (RA:=I2F_memory_bit); auto.
+    intros. eapply I2F_memory_bit_to_bit. assumption.
+    intros. 
+    apply Forall2_eq in H1. subst.
+    constructor.
+    reflexivity.
+Qed.  
+
+Lemma Forall2_take {A B: Type} (RR : A -> B -> Prop) : forall n l l',
+  Forall2 RR l l' ->
+  Forall2 RR (take n l) (take n l').
+Proof.
+  intros n l l' H. revert n.
+  induction H.
+  - constructor.
+  - cbn.
+    destruct n; constructor; auto.
+Qed.    
+
+Lemma I2F_concat_bytes_Z_mixed extra_bits acc dbs dbs' 
+    (H : Forall2 I2F_memory_byte dbs dbs') : 
+    I2F_EOUP Logic.eq (concat_bytes_Z_mixed extra_bits acc dbs) (concat_bytes_Z_mixed extra_bits acc dbs').
+Proof.
+  revert acc.
+  induction H; intros.
+  - cbn. constructor; auto.
+  - inversion H; subst.
+    + cbn. inversion H0; subst; auto. 
+    + cbn. inversion H0; subst; auto. 
+      unfold I2F_Addr in H1.
+      destruct p. destruct p'.
+      destruct H1. subst. unfold I2F_Iptr in H1.
+      subst.
+      apply IHForall2.
+    + cbn. inversion H0; subst; auto.
+      * apply (Forall2_take extra_bits) in H1.
+        eapply I2F_EOUP_bind with (RA:=Logic.eq).
+        eapply I2F_EOUP_bind with (RA:=Forall2 Logic.eq).
+        eapply I2F_EOUP_map_monad2 with (RA:=I2F_memory_bit); auto.
+        apply I2F_memory_bit_to_bit.
+        intros. constructor.
+        apply Forall2_eq in H2. subst.
+        reflexivity.
+        intros. subst.
+        constructor. reflexivity.
+      * eapply I2F_EOUP_bind with (RA:=Logic.eq).
+        eapply I2F_EOUP_bind with (RA:=Forall2 Logic.eq).
+        eapply I2F_EOUP_map_monad2 with (RA:=I2F_memory_bit); auto.
+        apply I2F_memory_bit_to_bit.
+        intros. constructor.
+        apply Forall2_eq in H4. subst.
+        reflexivity.
+        intros. subst.
+        eapply IHForall2.
+Qed.        
+
+Lemma I2F_memory_bytes_to_int (bit_sz : positive) dbs dbs' :
+    Forall2 I2F_memory_byte dbs dbs' ->
+    I2F_EOUP Logic.eq (memory_bytes_to_int bit_sz dbs) (memory_bytes_to_int bit_sz dbs'). 
+Proof.
+  intros H.
+  unfold memory_bytes_to_int.
+  destruct (negb (N.pos bit_sz mod 8 =? 0)%N).
+  - eapply I2F_concat_bytes_Z_mixed. assumption.
+  - eapply I2F_EOUP_bind with (RA:=Forall2 Logic.eq).
+    eapply I2F_EOUP_map_monad2 with (RA:=I2F_memory_byte); auto.
+    apply I2F_memory_byte_to_Z.
+    intros.
+    apply Forall2_eq in H0. subst.
+    constructor. reflexivity.
+Qed.    
+
+Lemma in_bounds_case k (x : Z)
+  (LE: x <= @max_unsigned k)
+  (GE : 0 <= x) :
+  x = @unsigned k (repr x).
+Proof.
+  rewrite unsigned_repr; auto.
+Qed.
+
+
+(*
+Lemma I2F_EOUP_valid_pointer_bits p p' base offset bits bits' 
+  (H : I2F_Addr p p')
+  (HM : 
+
+
+  Fixpoint valid_pointer_bits p base offset bits : EOUP bool :=
+    match bits with
+    | [] => ret (N.eqb offset 8)
+    | (Bit_ptr q j) :: rest  =>
+        if eq_dec_ptr p q then
+          if N.eqb j (base + offset) then
+            valid_pointer_bits p base (1+offset) rest 
+          else
+            ret false
+        else
+          ret false
+    | _ => ret Pois
+    end.
+  
+  Definition valid_pointer_byte (p:ptr) (idx:N) (mb:memory_byte) : EOUP bool :=
+    match mb with
+    | BYTE_Pointer q i =>
+        if eq_dec_ptr p q then ret (N.eqb idx i) else ret false 
+    | BYTE_Mixed bits =>
+        valid_pointer_bits p (idx * 8) 0 bits 
+    | BYTE_I _ => ret false
+    end.
+ *)
+
+(* NOTE: we use proof irrelevance here *)
+Lemma unsigned_inj : forall sz x y, (@unsigned sz) x = unsigned y -> x = y.
+Proof.
+  intros.
+  unfold unsigned in H.
+  unfold intval in H.
+  destruct x. destruct y.
+  subst.
+  specialize (proof_irrelevance _ intrange intrange0) as H.
+  rewrite H.
+  reflexivity.
+Qed.  
+  
+(* TODO: this is a pretty ugly proof. *)
+Lemma I2F_EOUP_valid_pointer_bits p p' base offset bits bits'  
+  (HP: I2F_Addr p p')
+  (HB: Forall2 I2F_memory_bit bits bits') :
+  I2F_EOUP Logic.eq (@valid_pointer_bits PInf p base offset bits) (@valid_pointer_bits PFin p' base offset bits').
+Proof.
+  revert base offset.
+  induction HB.
+  - constructor. reflexivity.
+  - intros. inversion H; subst. 
+    + unfold valid_pointer_bits.
+      repeat break_match_goal_safe; subst; try constructor; auto.
+      * unfold I2F_Addr in H0.
+        destruct p0. destruct p'0.
+        intuition. subst.
+        
+        inversion H. subst.
+        destruct p'.
+        inversion HP. subst.
+        inversion H0. subst.
+        unfold I2F_Iptr in *.
+        apply unsigned_inj in H1.
+        subst.
+        contradiction.
+      * unfold I2F_Addr in H0.
+        destruct p0. destruct p'0.
+        intuition. subst.
+        inversion H. subst.
+        destruct p.
+        inversion HP. subst.
+        inversion H0. subst.
+        unfold I2F_Iptr in *.
+        subst.
+        contradiction.
+    + repeat constructor.
+    + repeat constructor.
+Qed.      
+        
+      
+Lemma I2F_EOUP_valid_pointer_byte p p' idx byte byte'  
+  (HP: I2F_Addr p p')
+  (HB: I2F_memory_byte byte byte') :
+  I2F_EOUP Logic.eq (@valid_pointer_byte PInf p idx byte) (@valid_pointer_byte PFin p' idx byte').
+Proof.
+  inversion HB.
+  - repeat constructor.
+  - subst.
+    unfold valid_pointer_byte.
+    repeat break_match_goal_safe; subst; try constructor; auto.
+    + unfold I2F_Addr in HP.
+      destruct p0.
+      destruct p'.
+      destruct p'0.
+      unfold I2F_Addr in H.
+      intuition. subst.
+      
+      unfold I2F_Iptr in *.
+      subst.
+      apply unsigned_inj in H2. subst.
+      contradiction.
+    + unfold I2F_Addr in HP.
+      destruct p0.
+      destruct p'0.
+      destruct p.
+      unfold I2F_Addr in H.
+      intuition. subst.
+      unfold I2F_Iptr in *.
+      subst.
+      contradiction.
+  - cbn.
+    eapply I2F_EOUP_valid_pointer_bits; auto.
+Qed.    
+  
+                                  
+Lemma I2F_EOUP_valid_pointer_bytes p p' idx bytes bytes' 
+  (HP: I2F_Addr p p')
+  (HB: Forall2 I2F_memory_byte bytes bytes') :
+  I2F_EOUP Logic.eq (@valid_pointer_bytes PInf p idx bytes) (@valid_pointer_bytes PFin p' idx bytes').
+Proof.
+  revert idx.
+  induction HB; intros.
+  - repeat constructor.
+  - eapply I2F_EOUP_bind with (RA:=Logic.eq).
+    apply I2F_EOUP_valid_pointer_byte; auto.
+    intros. subst.
+    destruct a2; auto.
+    repeat constructor.
+Qed.    
+
+Lemma I2F_EOUP_memory_bytes_to_pointer dbs dbs'
+  (F : Forall2 I2F_memory_byte dbs dbs') :
+  I2F_EOUP I2F_Addr (memory_bytes_to_pointer dbs) (memory_bytes_to_pointer dbs').
+Proof.
+  unfold memory_bytes_to_pointer.
+  inversion F.
+  - constructor.
+  - inversion H.
+    + constructor.
+    + subst.
+      eapply I2F_EOUP_bind with (RA:=Logic.eq).
+      apply I2F_EOUP_valid_pointer_bytes; auto.
+      intros; subst.
+      destruct a2; auto.
+      constructor; auto.
+    + subst.
+      inversion H3; auto; subst.
+      inversion H1; subst; auto.
+      eapply I2F_EOUP_bind with (RA:=Logic.eq).
+      apply I2F_EOUP_valid_pointer_bytes; auto.
+      intros; subst.
+      destruct a2; auto.
+      constructor; auto.
+Qed.      
+      
 
 (** Deserialization at base types: every arm funnels through the shared
       [EOUP] stream of [memory_byte_value]s (equal by [I2F_mbyte]);
       [DTYPE_Iptr] and [DTYPE_Pointer] then run the finite in-range
       analysis. *)
 Lemma I2F_memory_bytes_to_dvalue_base : forall t dbs dbs',
-    Forall2 I2F_mbyte dbs dbs' ->
+    Forall2 I2F_memory_byte dbs dbs' ->
     I2F_EOU I2F_dvalue_base
       (@memory_bytes_to_dvalue_base PInf dbs t)
       (@memory_bytes_to_dvalue_base PFin dbs' t).
 Proof.
   intros t dbs dbs' F; destruct t; cbn; auto.
   - (* DTYPE_I *)
-    rewrite (I2F_map_monad_memory_byte_value F).
-    apply I2F_absorb_pois; intros v; repeat constructor.
+    eapply I2F_absorb_pois; eauto.
+    apply I2F_memory_bytes_to_int; auto.
+    intros; subst; repeat constructor.
   - (* DTYPE_Iptr *)
-    rewrite (I2F_map_monad_memory_byte_value F).
-    apply I2F_absorb_pois; intros v; cbn.
-    unfold from_Z_bits;
-      repeat (break_match_goal_safe; cbn); auto;
+    eapply I2F_absorb_pois; eauto.
+    apply I2F_EOUP_map_monad2 with (RA:=I2F_memory_byte); auto.
+    apply I2F_memory_byte_to_Z; auto.
+    intros.
+    unfold from_Z_bits.
+      repeat (break_match_goal_safe; cbn); auto.
+      apply Forall2_eq in H. subst.
+      repeat constructor.
+      unfold I2F_Iptr.
       i2f_in_range_case.
+      erewrite <- in_bounds_case; auto.
   - (* DTYPE_Pointer *)
-    rewrite (I2F_map_monad_memory_byte_value F).
-    apply I2F_absorb_pois; intros v; cbn.
-    unfold from_Z_bits;
-      repeat (break_match_goal_safe; cbn); auto;
-      i2f_in_range_case.
+    eapply I2F_absorb_pois; eauto.
+    apply I2F_EOUP_memory_bytes_to_pointer; auto.
   - (* DTYPE_FP *)
-    destruct fp; cbn; auto;
-      rewrite (I2F_map_monad_memory_byte_value F);
-      apply I2F_absorb_pois; intros v; repeat constructor.
+    destruct fp; cbn; auto.
+    eapply I2F_absorb_pois; eauto.
+    apply I2F_EOUP_map_monad2 with (RA:=I2F_memory_byte); auto.
+    apply I2F_memory_byte_to_Z.
+    intros.
+    apply Forall2_eq in H. subst.
+    repeat constructor.
+    eapply I2F_absorb_pois; eauto.
+    apply I2F_EOUP_map_monad2 with (RA:=I2F_memory_byte); auto.
+    apply I2F_memory_byte_to_Z.
+    intros.
+    apply Forall2_eq in H. subst.
+    repeat constructor.
 Qed.
 
 Lemma Forall2_split_every_pos {A B} (R : A -> B -> Prop) (n : positive) :
@@ -852,7 +1122,7 @@ Qed.
 (** Deserialization: related byte lists deserialize to related values;
       aggregates recurse through the [Forall2] list combinators. *)
 Lemma I2F_memory_bytes_to_dvalue : forall t dbs dbs',
-    Forall2 I2F_mbyte dbs dbs' ->
+    Forall2 I2F_memory_byte dbs dbs' ->
     I2F_EOU I2F_dvalue
       (@memory_bytes_to_dvalue PInf dbs t)
       (@memory_bytes_to_dvalue PFin dbs' t).
@@ -875,7 +1145,7 @@ Proof.
       | |- context [?R 0%N fields dbs'] => set (goR := R)
       end.
       assert (GO : forall offset xs ys,
-                 Forall2 I2F_mbyte xs ys ->
+                 Forall2 I2F_memory_byte xs ys ->
                  I2F_EOU (Forall2 I2F_dvalue)
                    (goL offset fields xs) (goR offset fields ys)).
       { clear F.
@@ -906,7 +1176,7 @@ Proof.
       | |- context [?R 0%N fields dbs'] => set (goR := R)
       end.
       assert (GO : forall offset xs ys,
-                 Forall2 I2F_mbyte xs ys ->
+                 Forall2 I2F_memory_byte xs ys ->
                  I2F_EOU (Forall2 I2F_dvalue)
                    (goL offset fields xs) (goR offset fields ys)).
       { clear F.
@@ -934,12 +1204,12 @@ Proof.
     cbn.
     break_match_goal_safe.
     + eapply I2F_EOU_bind;
-        [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_mbyte);
+        [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_memory_byte);
           [ apply Forall2_repeatN; constructor
           | intros ? ? ?; auto ]
         | intros ? ? ?; do 2 constructor; auto ].
     + eapply I2F_EOU_bind;
-        [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_mbyte);
+        [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_memory_byte);
           [ apply Forall2_split_every_nil; auto
           | intros ? ? ?; auto ]
         | intros ? ? ?; do 2 constructor; auto ].
