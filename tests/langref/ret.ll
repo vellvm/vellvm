@@ -15,18 +15,10 @@ define void @ret_void() {
   ret void
 }
 
-; The harness cannot spell `ASSERT SUCCEEDS: call void @ret_void()` -- the
-; assertion grammar's texp does not accept the void type -- so the void call
-; is reached through a wrapper.
-define i32 @call_ret_void() {
-  call void @ret_void()
-  ret i32 0
-}
-
 define { i32, i8 } @ret_struct() {
   ret { i32, i8 } { i32 4, i8 2 }
 }
 
 ; ASSERT EQ: i32 5 = call i32 @ret_int()
-; ASSERT SUCCEEDS: call i32 @call_ret_void()
+; ASSERT SUCCEEDS: call void @ret_void()
 ; ASSERT EQ: { i32, i8 } { i32 4, i8 2 } = call { i32, i8 } @ret_struct()

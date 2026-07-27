@@ -70,7 +70,7 @@ A `gap` row is a test whose LangRef example Vellvm cannot currently meet: the as
 | [`phi`](https://llvm.org/docs/LangRef.html#phi-instruction) | done | 2 assertions |
 | [`select`](https://llvm.org/docs/LangRef.html#select-instruction) | done | 2 assertions |
 | [`freeze`](https://llvm.org/docs/LangRef.html#freeze-instruction) | done | 4 assertions |
-| [`call`](https://llvm.org/docs/LangRef.html#call-instruction) | done | 5 assertions |
+| [`call`](https://llvm.org/docs/LangRef.html#call-instruction) | done | 6 assertions |
 | [`landingpad`](https://llvm.org/docs/LangRef.html#landingpad-instruction) | unsupported | exception handling not modelled |
 | [`catchpad`](https://llvm.org/docs/LangRef.html#catchpad-instruction) | unsupported | exception handling not modelled |
 | [`cleanuppad`](https://llvm.org/docs/LangRef.html#cleanuppad-instruction) | unsupported | exception handling not modelled |

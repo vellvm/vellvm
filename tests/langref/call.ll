@@ -73,15 +73,17 @@ define i32 @call_struct_returning() {
   ret i32 %sum
 }
 
-; The assertion grammar's texp does not accept the void type, so the void
-; call is reached through a wrapper.
-define i32 @call_indirect_void() {
+; Assertion arguments are turned into dvalues without a global environment
+; (assertion.ml's texp_to_dvalue), so @void_fn cannot be named in an assertion
+; directly; the function pointer is supplied here instead.
+define void @call_indirect_void() {
   call void @indirect_void_call(ptr @void_fn)
-  ret i32 0
+  ret void
 }
 
 ; ASSERT EQ: i32 43 = call i32 @direct_call(i32 42)
 ; ASSERT EQ: i32 12 = call i32 @tail_call()
 ; ASSERT EQ: i32 12 = call i32 @tail_call_fastcc()
-; ASSERT SUCCEEDS: call i32 @call_indirect_void()
+; ASSERT SUCCEEDS: call void @void_fn(i8 signext 97)
+; ASSERT SUCCEEDS: call void @call_indirect_void()
 ; ASSERT EQ: i32 6 = call i32 @call_struct_returning()
