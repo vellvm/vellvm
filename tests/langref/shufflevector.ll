@@ -1,4 +1,16 @@
-; Examples from the LLVM LangRef's shufflevector section.
+; Examples from the LLVM LangRef's 'shufflevector' Instruction section.
+; langref: shufflevector-instruction sha1=7e4cf12ff4903f52c02f8d3d2955e82fdbc4f676
+;
+; LangRef 24.0.0git gives the following example(s):
+;
+; <result> = shufflevector <4 x i32> %v1, <4 x i32> %v2,
+;                         <4 x i32> <i32 0, i32 4, i32 1, i32 5>  ; yields <4 x i32>
+; <result> = shufflevector <4 x i32> %v1, <4 x i32> poison,
+;                         <4 x i32> <i32 0, i32 1, i32 2, i32 3>  ; yields <4 x i32> - Identity shuffle.
+; <result> = shufflevector <8 x i32> %v1, <8 x i32> poison,
+;                         <4 x i32> <i32 0, i32 1, i32 2, i32 3>  ; yields <4 x i32>
+; <result> = shufflevector <4 x i32> %v1, <4 x i32> %v2,
+;                         <8 x i32> <i32 0, i32 1, i32 2, i32 3, i32 4, i32 5, i32 6, i32 7 >  ; yields <8 x i32>
 
 define <4 x i32> @interleave(<4 x i32> %v1, <4 x i32> %v2) {
   %r = shufflevector <4 x i32> %v1, <4 x i32> %v2,
