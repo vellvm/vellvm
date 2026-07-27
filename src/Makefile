@@ -30,8 +30,11 @@ EXEC_VOFILES := $(ROCQFILES_EXEC:%=rocq/%.vo)
 RocqMakefile: _RocqProject
 	$(ROCQMAKEFILE) -f _RocqProject -o RocqMakefile
 
+######## Use `make interp` to skip rocq/Theory and only build the executable.
 .PHONY: all
-all: vellvm
+all:
+	$(MAKE) rocq
+	$(MAKE) vellvm
 
 .PHONY: rocq
 rocq: real-all
