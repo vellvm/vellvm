@@ -3,7 +3,7 @@
 # Run from anywhere; uses the binary at src/vellvm.
 set -u
 here="$(cd "$(dirname "$0")" && pwd)"
-src="$here/../src"
+src="$here/../../src"
 vellvm="$src/vellvm"
 
 if [ ! -x "$vellvm" ]; then
