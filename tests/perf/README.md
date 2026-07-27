@@ -63,6 +63,8 @@ global-init 1.1 s.
 These are for orientation only — always re-measure the baseline on your own machine
 before comparing.
 
-This directory deliberately lives outside `tests/` so that `make test`
-(which recursively picks up every `.ll` under `tests/`) does not run it;
-use `make perf` instead.
+Even though this directory lives under `tests/`, `make test`/`make test-full`
+never run it: the test harness (`ml/test.ml`, `ml/frontendTest.ml`)
+explicitly excludes anything with a `perf` path component from its
+recursive `.ll` scan. Use `make perf` instead, which times each file here
+directly via its own script (`run.sh`).
