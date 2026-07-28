@@ -155,12 +155,12 @@ Section Convert.
         match t1, x, t2 with
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_float =>
             if Pos.eqb sz_t sz_from
-            then ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+            then ret (DVALUE_Float (Float32.of_int (repr (signed i1))))
             else raise_error "i-to-float ill-typed Sitofp"
 
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_double =>
             if Pos.eqb sz_t sz_from
-            then ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+            then ret (DVALUE_Double (Float.of_long (repr (signed i1))))
             else raise_error "i-to-double ill-typed Sitofp"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
