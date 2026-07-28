@@ -240,7 +240,10 @@ Section Convert.
         match t1, x, t2 with
         | DTYPE_FP FP_float, DVALUE_Float f, DTYPE_FP FP_double  =>
             ret (DVALUE_Double (float_to_double f))
-            
+
+        | DTYPE_FP FP_float, DVALUE_Poison t, DTYPE_FP FP_double =>
+            ret (dvp t2)
+           
         | _, _, _ => raise_error "ill-typed Fpext"
         end
 
