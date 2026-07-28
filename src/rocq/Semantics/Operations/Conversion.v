@@ -84,6 +84,26 @@ Section Convert.
   Program Definition float_to_double (f : ll_float) : ll_double :=
     Bconv _ _ _ _ eq_refl eq_refl (fun _ => default_nan_64) BinarySingleNaN.mode_NE f.
 
+  (* Floating point truncation *)
+  (* LANGREF: The ‘fptrunc’ instruction casts a value from a larger
+     floating-point type to a smaller floating-point type.  This instruction is
+     assumed to execute in the default floating-point environment.
+
+     NaN values follow the usual NaN behaviors, except that if a NaN payload is
+     propagated from the input (“Quieting NaN propagation” or “Unchanged NaN
+     propagation” cases), then the low order bits of the NaN payload which
+     cannot fit in the resulting type are discarded.
+
+     Same caveat as for [float_to_double], but worst:
+     unlike extension, truncation genuinely rounds, and we do not model the
+     non-default rounding modes.  [mode_NE] is the default environment's
+     round-to-nearest-ties-to-even.  As with [float_to_double], we do not
+     propagate NaN payloads: every NaN input yields the default quiet NaN
+     rather than the input's payload with its low bits dropped.
+   *)
+  Program Definition double_to_float (f : ll_double) : ll_float :=
+    Bconv _ _ _ _ eq_refl eq_refl (fun _ => default_nan_32) BinarySingleNaN.mode_NE f.
+
   (** ** Typed conversion
         Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
         For instance, convert an integer over 8 bits to one over 1 bit by truncation.
@@ -101,7 +121,7 @@ Section Convert.
             then ret (DVALUE_I sz_to (repr (unsigned i1)))
             else raise_error "i-to-i ill-typed Trunc"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_I sz_to =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Trunc"
@@ -114,7 +134,7 @@ Section Convert.
             then ret (DVALUE_I sz_to (repr (unsigned i1)))
             else raise_error "i-to-i ill-typed Zext"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_I sz_to =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Zext"
@@ -127,7 +147,7 @@ Section Convert.
             then ret (DVALUE_I sz_to (repr (signed i1)))
             else raise_error "i-to-i ill-typed Sext"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_I sz_to =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Sext"
@@ -145,7 +165,7 @@ Section Convert.
             then ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
             else raise_error "i-to-double ill-typed Uitofp"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_FP _ =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Uitofp"
@@ -155,15 +175,15 @@ Section Convert.
         match t1, x, t2 with
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_float =>
             if Pos.eqb sz_t sz_from
-            then ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+            then ret (DVALUE_Float (Float32.of_int (repr (signed i1))))
             else raise_error "i-to-float ill-typed Sitofp"
 
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_double =>
             if Pos.eqb sz_t sz_from
-            then ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+            then ret (DVALUE_Double (Float.of_long (repr (signed i1))))
             else raise_error "i-to-double ill-typed Sitofp"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_FP _ =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Sitofp"
@@ -186,7 +206,7 @@ Section Convert.
             | Some z => ret (DVALUE_I sz_t (repr z))
             end
               
-        | DTYPE_FP _, DVALUE_Poison t, DTYPE_I _ =>
+        | DTYPE_FP _, DVALUE_Poison, DTYPE_I _ =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Fptoui"
@@ -209,7 +229,7 @@ Section Convert.
             | Some z => ret (DVALUE_I sz_t (repr z))
             end
               
-        | DTYPE_FP _, DVALUE_Poison t, DTYPE_I _ =>
+        | DTYPE_FP _, DVALUE_Poison, DTYPE_I _ =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Fptosi"
@@ -220,12 +240,28 @@ Section Convert.
         match t1, x, t2 with
         | DTYPE_FP FP_float, DVALUE_Float f, DTYPE_FP FP_double  =>
             ret (DVALUE_Double (float_to_double f))
-            
+
+        | DTYPE_FP FP_float, DVALUE_Poison, DTYPE_FP FP_double =>
+            ret (dvp t2)
+           
         | _, _, _ => raise_error "ill-typed Fpext"
         end
 
-    | Fptrunc _
-      => raise_error "TODO: unimplemented numeric conversion"
+    | Fptrunc _ =>
+        (* NOTE: Does not support "fast-math" flags *)
+        match t1, x, t2 with
+        (* [double] and [float] are the only floating-point types carried by
+           [dvalue_base], so double-to-float is the only narrowing there is.
+           In particular the LangRef's second example, [fptrunc double 1.0E+300
+           to half], is out of reach. *)
+        | DTYPE_FP FP_double, DVALUE_Double f, DTYPE_FP FP_float =>
+            ret (DVALUE_Float (double_to_float f))
+
+        | DTYPE_FP FP_double, DVALUE_Poison, DTYPE_FP FP_float =>
+            ret (dvp t2)
+
+        | _, _, _ => raise_error "ill-typed Fptrunc"
+        end
     end.
   
   Arguments convert_pure_base _ _ _ _ : simpl nomatch.
@@ -260,12 +296,12 @@ Section Convert.
             raise_error "convert_pure: type mismatch"
         end
           
-    | (DVALUE_Array true (DTYPE_Array true sz t) elts1) =>
+    | (DVALUE_Array true elts1) =>
         match get_vector_conversion_type t_from t_to with
         | Some (t_from', t_to') =>
               elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
               val <- map_monad (fun v => convert_pure_base conv t_from' v t_to') elts1' ;;
-              ret (DVALUE_Array true (DTYPE_Array true sz t_to') (List.map DVALUE_Base val))
+              ret (DVALUE_Array true (List.map DVALUE_Base val))
 
         | None =>
             raise_error "convert_pure: type or vector size mismatch"
@@ -284,7 +320,7 @@ Section Convert.
         else if bit_sizeof_dtyp t_from =? bit_sizeof_dtyp t_to
              then
                EOU_to_itree (
-                   bytes <- dvalue_to_memory_bytes dv t_from ;;
+                   bytes <- dvalue_to_memory_bytes t_from dv None ;;
                    memory_bytes_to_dvalue bytes t_to
                  )
              else raise "unequal bitsize in cast"

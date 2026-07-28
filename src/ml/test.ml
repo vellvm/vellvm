@@ -13,8 +13,6 @@ open Assert
 
 module DV = DynamicValues
 
-
-
 (* test harness ------------------------------------------------------------- *)
 (* Todo add line count information *)
 let parse_tests filename =
@@ -59,7 +57,7 @@ let test_file link_files path = test_file_h make_test link_files path
 
 let test_dir link_files dir =
   Printf.printf "===> TESTING ASSERTIONS IN: %s\n" dir ;
-  let pathlist = Platform.ll_files_of_dir dir in
+  let pathlist = Platform.ll_files_of_dir_excluding ["perf"] dir in
   let files =
     List.filter_map
       (fun path ->

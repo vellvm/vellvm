@@ -18,7 +18,7 @@ lines.append("; time re-processing constants. Pre-elaborating the cases (they ar
 lines.append("; syntactically constant) would make this test collapse toward")
 lines.append("; loop-phi-arith.ll's per-iteration cost.")
 lines.append(";")
-lines.append("; Tune: regenerate with a different C / K (see perf/README.md).")
+lines.append("; Tune: regenerate with a different C / K (see tests/perf/README.md).")
 lines.append("; Result is sum of (i mod C) for i in [0,K) = K*(C-1)/2.")
 lines.append("")
 lines.append("define i64 @main(i64 %argc, i8** %argv) {")

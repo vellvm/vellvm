@@ -335,8 +335,8 @@ Section ExpIndFull.
   Hypothesis IH_Poison  : P ((EXP_Poison)).
   Hypothesis IH_Struct  : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
   Hypothesis IH_Packed_struct : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
-  Hypothesis IH_Array   : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array t elts)).
-  Hypothesis IH_Vector  : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector t elts)).
+  Hypothesis IH_Array   : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array elts)).
+  Hypothesis IH_Vector  : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector elts)).
   Hypothesis IH_IBinop  : forall (iop:ibinop) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
   Hypothesis IH_Fneg    : forall (flags:list fast_math) (v:(T*exp T)), P(snd v) -> P (OP_Fneg flags v).
   Hypothesis IH_ICmp    : forall (samesign:bool) (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp samesign cmp t v1 v2)).
@@ -384,8 +384,8 @@ refine(
   | EXP_Poison => IH_Poison
   | EXP_Struct fields => _
   | EXP_Packed_struct fields => _
-  | EXP_Array t elts => _
-  | EXP_Vector t elts => _
+  | EXP_Array elts => _
+  | EXP_Vector elts => _
   | OP_IBinop iop t v1 v2 => IH_IBinop iop t (F v1) (F v2)
   | OP_ICmp cmp s t v1 v2 => IH_ICmp cmp s t (F v1) (F v2)
   | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t (F v1) (F v2)
@@ -434,12 +434,12 @@ F).
   }
 - apply IH_Array.
   { revert elts.
-    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    fix IHelts 1. intros [|elts']. intros. inversion H.
     intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
   }
 - apply IH_Vector.
   { revert elts.
-    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    fix IHelts 1. intros [|elts']. intros. inversion H.
     intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
   }
 - apply IH_GetElementPtr. apply F.
@@ -470,8 +470,8 @@ refine(
   | EXP_Poison => IH_Poison
   | EXP_Struct fields => _
   | EXP_Packed_struct fields => _
-  | EXP_Array t elts => _
-  | EXP_Vector t elts => _
+  | EXP_Array elts => _
+  | EXP_Vector elts => _
   | OP_IBinop iop t v1 v2 => IH_IBinop iop t (F v1) (F v2)
   | OP_ICmp s cmp t v1 v2 => IH_ICmp s cmp t (F v1) (F v2)
   | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t (F v1) (F v2)
@@ -520,12 +520,12 @@ F0).
   }
 - apply IH_Array.
   { revert elts.
-    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    fix IHelts 1. intros [|elts']. intros. inversion H.
     intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
   }
 - apply IH_Vector.
   { revert elts.
-    fix IHelts 1. intros [|u elts']. intros. inversion H.
+    fix IHelts 1. intros [|elts']. intros. inversion H.
     intros u' [<-|Hin]. apply F. eapply IHelts. apply Hin.
   }
 - apply IH_GetElementPtr. apply F.
@@ -563,8 +563,8 @@ Section ExpInd.
   Hypothesis IH_Poison  : P ((EXP_Poison)).
   Hypothesis IH_Struct  : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Struct fields)).
   Hypothesis IH_Packed_struct : forall (fields: list (T * (exp T))), (forall p, In p fields -> P (snd p)) -> P ((EXP_Packed_struct fields)).
-  Hypothesis IH_Array   : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array t elts)).
-  Hypothesis IH_Vector  : forall t (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector t elts)).
+  Hypothesis IH_Array   : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Array elts)).
+  Hypothesis IH_Vector  : forall (elts: list (T * (exp T))), (forall p, In p elts -> P (snd p)) -> P ((EXP_Vector elts)).
   Hypothesis IH_IBinop  : forall (iop:ibinop) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_IBinop iop t v1 v2)).
   Hypothesis IH_Fneg    : forall (flags:list fast_math) (v:(T*exp T)), P(snd v) -> P (OP_Fneg flags v).
   Hypothesis IH_ICmp    : forall (samesign:bool) (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp samesign cmp t v1 v2)).

@@ -464,7 +464,7 @@ Section Intrinsics.
     let res_u := munsigned res in
     let res_u' := Z.shiftl (munsigned x) (munsigned y) in
     if option_pred (fun bw => munsigned y >=? Zpos bw) (@mbitwidth I VMI)
-    then ret (DVALUE_Poison (@mdtyp_of_int I VMI))
+    then ret DVALUE_Poison
     else
       if (res_u' >? res_u)
       then 
@@ -531,7 +531,7 @@ Section Intrinsics.
       match args, varargs with
     | [ a ], Some varargs =>
         match a with
-        | DVALUE_Base (DVALUE_Poison dt) => raiseUB ("Store to poisoned address in va_start.")
+        | DVALUE_Base DVALUE_Poison => raiseUB ("Store to poisoned address in va_start.")
         | _ => store DTYPE_Pointer a (DVALUE_Pointer varargs);;
               retr (DVALUE_Base DVALUE_None)
         end

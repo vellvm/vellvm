@@ -897,6 +897,103 @@ Section Map_Operations.
       apply IM_Refine_add; auto.
   Qed.
 
+  (** ** [IM_Refine] and [lookup]/[delete]/[add_all_index]/[IM_greatest_key]
+
+      Complements to [IM_Refine] needed to relate the infinite/finite
+      memory models: [lookup] agrees pointwise ([IM_Refine_lookup]),
+      [delete] and [add_all_index] preserve the relation, and the
+      structurally-defined [IM_greatest_key] only depends on the
+      (related) domain of the map, not its values.
+   *)
+
+  Lemma IM_Refine_lookup :
+    forall {R1 R2} (R1R2 : R1 -> R2 -> Prop) m1 m2
+      (REF : IM_Refine R1R2 m1 m2) k,
+      option_rel R1R2 (lookup k m1) (lookup k m2).
+  Proof using.
+    intros R1 R2 R1R2 m1 m2 [DOM VAL] k.
+    destruct (lookup k m1) eqn:L1; destruct (lookup k m2) eqn:L2.
+    - constructor; eauto.
+    - exfalso.
+      apply lookup_member, DOM, member_lookup in L1 as [? ?]; congruence.
+    - exfalso.
+      apply lookup_member, DOM, member_lookup in L2 as [? ?]; congruence.
+    - constructor.
+  Qed.
+
+  Lemma IM_Refine_remove :
+    forall {R1 R2} (R1R2 : R1 -> R2 -> Prop) m1 m2 k
+      (REF : IM_Refine R1R2 m1 m2),
+      IM_Refine R1R2 (delete k m1) (delete k m2).
+  Proof using.
+    intros R1 R2 R1R2 m1 m2 k [DOM VAL].
+    unfold delete, member, lookup in *.
+    split.
+    - intros k0.
+      destruct (Z.eq_dec k k0); subst.
+      + split; intros MEM; rewrite F.mem_find_b, F.remove_eq_o in MEM;
+          try discriminate; auto.
+      + rewrite 2 F.mem_find_b, 2 F.remove_neq_o; auto.
+        rewrite <- 2 F.mem_find_b.
+        apply DOM.
+    - intros k0 e e' L1 L2.
+      destruct (Z.eq_dec k k0); subst.
+      + rewrite F.remove_eq_o in L1; auto; discriminate.
+      + rewrite F.remove_neq_o in L1, L2; eauto.
+  Qed.
+
+  Lemma IM_Refine_add_all_index :
+    forall {R1 R2} (R1R2 : R1 -> R2 -> Prop) l1 l2 z m1 m2
+      (ALL : Forall2 R1R2 l1 l2)
+      (REF : IM_Refine R1R2 m1 m2),
+      IM_Refine R1R2 (add_all_index l1 z m1) (add_all_index l2 z m2).
+  Proof using.
+    intros R1 R2 R1R2 l1 l2 z m1 m2 ALL.
+    revert z m1 m2.
+    induction ALL as [| x y l1 l2 Rxy ALL' IH]; intros z m1 m2 REF.
+    - cbn; auto.
+    - cbn.
+      apply IM_Refine_add; eauto.
+  Qed.
+
+  Lemma IM_greatest_key_morph :
+    forall {A B} (m1 : IM.t A) (m2 : IM.t B),
+      (forall k, member k m1 <-> member k m2) ->
+      IM_greatest_key m1 = IM_greatest_key m2.
+  Proof using.
+    intros A B m1 m2 DOM.
+    destruct (IM_greatest_key m1) as [k1|] eqn:GK1;
+      destruct (IM_greatest_key m2) as [k2|] eqn:GK2.
+    - f_equal.
+      assert (IN1 : IM.In k1 m1) by (eapply IM_greatest_key_In; eauto).
+      assert (IN2 : IM.In k2 m2) by (eapply IM_greatest_key_In; eauto).
+      assert (IN1' : IM.In k1 m2)
+        by (apply F.mem_in_iff, DOM, F.mem_in_iff; auto).
+      assert (IN2' : IM.In k2 m1)
+        by (apply F.mem_in_iff, DOM, F.mem_in_iff; auto).
+      pose proof (IM_greatest_key_lt _ _ GK1) as LT1.
+      pose proof (IM_greatest_key_lt _ _ GK2) as LT2.
+      unfold IM.In in IN1', IN2'.
+      apply IM.Raw.Proofs.In_alt in IN1', IN2'.
+      red in LT1, LT2.
+      specialize (LT1 k2 IN2').
+      specialize (LT2 k1 IN1').
+      lia.
+    - exfalso.
+      assert (IN1 : IM.In k1 m1) by (eapply IM_greatest_key_In; eauto).
+      assert (IN1' : IM.In k1 m2)
+        by (apply F.mem_in_iff, DOM, F.mem_in_iff; auto).
+      apply IM_greatest_key_none in GK2.
+      destruct IN1' as [e HE]; eapply GK2; eauto.
+    - exfalso.
+      assert (IN2 : IM.In k2 m2) by (eapply IM_greatest_key_In; eauto).
+      assert (IN2' : IM.In k2 m1)
+        by (apply F.mem_in_iff, DOM, F.mem_in_iff; auto).
+      apply IM_greatest_key_none in GK1.
+      destruct IN2' as [e HE]; eapply GK1; eauto.
+    - reflexivity.
+  Qed.
+
 End Map_Operations.
 
 Definition traverseWithKeyRaw {t} `{Applicative t} {a b} (f : IM.Raw.key -> a -> t b) (m : IM.Raw.t a) : t (IM.Raw.t b)

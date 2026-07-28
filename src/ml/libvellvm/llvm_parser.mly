@@ -1573,8 +1573,8 @@ expr_val:
   | KW_ZEROINITIALIZER                                { fun _ -> EXP_Zero_initializer }
   | LCURLY l=separated_list(csep, tconst) RCURLY      { fun _ -> EXP_Struct l         }
   | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { fun _ -> EXP_Packed_struct l  }
-  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { fun t -> EXP_Array (t, l)     }
-  | LT l=separated_list(csep, tconst) GT              { fun t -> EXP_Vector (t, l)    }
+  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { fun t -> EXP_Array  l     }
+  | LT l=separated_list(csep, tconst) GT              { fun t -> EXP_Vector l    }
   | i=ident                                           { fun _ -> EXP_Ident i          }
   | KW_C cstr=STRING                                  { fun _ -> EXP_Cstring (
 								     cstring_bytes_to_LLVM_i8_array

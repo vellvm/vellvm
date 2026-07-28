@@ -451,8 +451,8 @@ Inductive exp : Set :=
 | EXP_Poison
 | EXP_Struct          (fields: list (T * exp))
 | EXP_Packed_struct   (fields: list (T * exp))
-| EXP_Array           (t:T) (elts: list (T * exp))
-| EXP_Vector          (t:T) (elts: list (T * exp))
+| EXP_Array           (elts: list (T * exp))
+| EXP_Vector          (elts: list (T * exp))
 | OP_IBinop           (iop:ibinop) (t:T) (v1:exp) (v2:exp)
 | OP_ICmp             (samesign:bool) (cmp:icmp)   (t:T) (v1:exp) (v2:exp)
 | OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp) (v2:exp)

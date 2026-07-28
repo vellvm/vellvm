@@ -732,10 +732,10 @@ Section ShowInstances.
     | EXP_Packed_struct fields =>
         sd "<{" @@ comma_sep fields @@ sd "}>"
 
-    | EXP_Array t elts =>
+    | EXP_Array elts =>
         sd "[" @@ comma_sep elts @@ sd "]"
 
-    | EXP_Vector t elts =>
+    | EXP_Vector elts =>
         sd "<" @@ comma_sep elts @@ sd ">"
 
     | OP_IBinop iop t v1 v2 =>
@@ -1350,14 +1350,6 @@ tag ::= string constant
     sd "(" @@ arg_str @@ vararg_str @@ sd ")".
   
 End ShowInstances.
-
-(* TODO: REALLY?!? *)
-Fixpoint zip {X Y} (xs : list X) (ys : list Y) : list (X * Y)
-  := match xs, ys with
-     | [], _ => []
-     | _, [] => []
-     | (x::xs), (y::ys) => (x, y) :: zip xs ys
-     end.
 
 Fixpoint zip3 {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) : list (X * Y * Z)
   := match xs, ys, zs with

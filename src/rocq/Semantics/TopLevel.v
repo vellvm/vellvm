@@ -138,7 +138,6 @@ Section withParams.
   Definition i8_array_of_string (s : string) : dvalue :=
     let len := N.of_nat (String.length s) + 1%N in
       DVALUE_Array false
-          (DTYPE_Array false len i8)
           (List.app
             (map (DVALUE_Base ∘ (DVALUE_I 8%positive) ∘
             @Integers.repr 8%positive ∘
@@ -158,7 +157,7 @@ Section withParams.
       v <- alloca DTYPE_Pointer len None;;
       arg_addrs <- map_monad allocate_arg args;;
       store (DTYPE_Array false len DTYPE_Pointer) v
-            (DVALUE_Array false (DTYPE_Array false len DTYPE_Pointer) arg_addrs);;
+            (DVALUE_Array false arg_addrs);;
       ret v.
 
   Definition build_main_args (args : list string) : MCFGtop (list dvalue) :=
@@ -206,7 +205,7 @@ Section withParams.
     let dt := (g_typ g) in
     a <- gread (g_ident g);;
     uv <- match (g_exp g) with
-         | None => ret (DVALUE_Base (DVALUE_Poison dt))
+         | None => ret (DVALUE_Base DVALUE_Poison)
          | Some e => denote_exp (Some dt) e
          end ;;
     store dt a uv.
@@ -301,7 +300,7 @@ Section withParams.
       args <- arg_gen;;
       denote_vellvm ret_typ entry args
         (convert_types (mcfg_of_tle (link PREDEFINED_FUNCTIONS prog)))
-    in interp_mcfg t Maps.empty (Build_stack_frame Maps.empty None None,[]) initial_state.
+    in interp_mcfg t (initial_state, ((Build_stack_frame Maps.empty None None,[]), Maps.empty)).
 
   (**
      Finally, the reference interpreter assumes no user-defined intrinsics and starts

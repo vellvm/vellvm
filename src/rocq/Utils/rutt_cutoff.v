@@ -33,6 +33,7 @@ From ITree Require Import
   Recursion
   RecursionFacts
   TranslateFacts
+  InterpFacts 
 .
 
 From Paco Require Import paco.
@@ -444,7 +445,7 @@ Proof.
   red; cbn.
   constructor; auto; intros [].
 Qed. 
-
+ 
 (* map_monad *)
 Lemma ruttc_map_monad_gen {E1 E2 R1 R2 A1 A2}
   (Rcutl : pred1 E1)
@@ -872,4 +873,78 @@ Qed.
 Proof.
   intros ?? EQ1 ?? EQ2; rewrite EQ1,EQ2; intuition eauto with *.
 Qed.
+
+Lemma ruttc_trigger_cutl
+  {E1 E2 R1 S1 R2 Rcutl Rcutr REv RAns RR}
+  (e1 : E1 R1) (k1 : R1 -> itree E1 S1) (t2 : itree E2 R2) :
+  Rcutl R1 e1 ->
+  ruttc Rcutl Rcutr REv RAns RR (trigger e1 >>= k1) t2.
+Proof.
+  intros.
+  unfold trigger; cbn. 
+  rewrite bind_vis.
+  now pstep; constructor.
+Qed.
+
+Lemma ruttc_trigger_cutr
+  {E1 E2 R1 R2 S2 Rcutl Rcutr REv RAns RR}
+  (t1 : itree E1 R1) (e2 : E2 R2) (k2 : R2 -> itree E2 S2) :
+  Rcutr R2 e2 ->
+  ruttc Rcutl Rcutr REv RAns RR t1 (trigger e2 >>= k2).
+Proof.
+  intros.
+  unfold trigger; cbn. 
+  rewrite bind_vis.
+  now pstep; constructor.
+Qed.
+
+Lemma ruttc_interp_itree {E1 E2 R1 R2 Rcutl Rcutr REv RAns RR}
+  (h1 : E1 ~> itree E1) (h2 : E2 ~> itree E2)
+  (Hl: forall A1 (e1 : E1 A1), Rcutl _ e1 -> h1 _ e1 ≅ trigger e1)
+  (Hr: forall A2 (e2 : E2 A2), Rcutr _ e2 -> h2 _ e2 ≅ trigger e2)
+  (Hh: forall A1 A2 (e1 : E1 A1) (e2 : E2 A2),
+      REv _ _ e1 e2 ->
+      ruttc Rcutl Rcutr REv RAns (fun a1 a2 => RAns _ _ e1 a1 e2 a2) (h1 _ e1) (h2 _ e2))
+  t1 t2
+  (HR: @ruttc E1 E2 R1 R2 Rcutl Rcutr REv RAns RR t1 t2):
+  ruttc Rcutl Rcutr REv RAns RR (interp h1 t1) (interp h2 t2).
+Proof.
+  revert t1 t2 HR.
+  ginit; gcofix cih; intros.
+  rewrite 2 unfold_interp.
+  punfold HR; red in HR.
+  induction HR; cbn; pclearbot.
+  - now gstep; constructor.
+  - gstep; constructor; auto with paco.
+  - guclo (@ruttc_clo_bind E1 E2 R1 R2).
+    econstructor.
+    apply Hh; auto.
+    intros; gstep; constructor.
+    gfinal; left; apply cih.
+    apply H0,H1.
+  - rewrite tau_euttge, unfold_interp; auto.
+  - rewrite tau_euttge, unfold_interp; auto.
+  - rewrite Hl; auto.
+    gfinal; right.
+    apply pacobot2, ruttc_trigger_cutl; auto.
+  - rewrite Hr; auto.
+    gfinal; right.
+    apply pacobot2, ruttc_trigger_cutr; auto.
+Qed.
+
+Lemma ruttc_trigger'
+  {E1 E2 R1 R2 Rcutr Rcutl REv RAns S1 S2 SS} (e1 : E1 R1) (e2 : E2 R2)
+  (k1 : R1 -> itree E1 S1) (k2 : R2 -> itree E2 S2):
+  REv R1 R2 e1 e2 ->
+  (forall a b, RAns R1 R2 e1 a e2 b -> ruttc Rcutr Rcutl REv RAns SS (k1 a) (k2 b)) ->
+  @ruttc E1 E2 S1 S2 Rcutr Rcutl REv RAns SS
+    (ITree.bind (ITree.trigger e1) k1) (ITree.bind (ITree.trigger e2) k2).
+Proof.
+  intros * HE HA.
+  unfold ITree.trigger.
+  rewrite 2 bind_vis.
+  pfold. constructor; auto.
+  intros.
+  left; rewrite 2 bind_ret_l; apply HA; auto.
+Qed. 
 

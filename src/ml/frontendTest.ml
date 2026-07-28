@@ -49,7 +49,7 @@ let pp_test_of_dir dir =
     ( "Parsing files in: " ^ dir ^ "\n"
     , List.map
         (fun f -> (f, fun () -> parse_pp_test f))
-        (Platform.ll_files_of_dir dir) )
+        (Platform.ll_files_of_dir_excluding ["perf"] dir) )
 
 let test_pp_file path =
   parse_pp_test path

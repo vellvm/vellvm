@@ -177,19 +177,41 @@ From ITree Require Import
      ITree
      Eq.Eqit.
 
-Ltac bind_ret_r1 :=
+Ltac bind_ret_r1_eutt :=
   match goal with
-    |- eutt _ ?t ?s => let x := fresh in
-                     remember s as x;
-                     rewrite <- (bind_ret_r t); subst x
+    |- eutt _ ?t ?s =>
+      let x := fresh in
+      remember s as x;
+      rewrite <- (bind_ret_r t); subst x
   end.
 
-Ltac bind_ret_r2 :=
+Ltac bind_ret_r1_eq_itree :=
   match goal with
-    |- eutt _ ?t ?s => let x := fresh in
-                     remember t as x;
-                     rewrite <- (bind_ret_r s); subst x
+    |- eq_itree _ ?t ?s =>
+      let x := fresh in
+      remember s as x;
+      rewrite <- (bind_ret_r t); subst x
   end.
+
+Ltac bind_ret_r1 := first [bind_ret_r1_eutt | bind_ret_r1_eq_itree].
+                           
+Ltac bind_ret_r2_eutt :=
+  match goal with
+    |- eutt _ ?t ?s =>
+      let x := fresh in
+      remember t as x;
+      rewrite <- (bind_ret_r s); subst x
+  end.
+
+Ltac bind_ret_r2_eq_itree :=
+  match goal with
+    |- eq_itree _ ?t ?s =>
+      let x := fresh in
+      remember t as x;
+      rewrite <- (bind_ret_r s); subst x
+  end.
+
+Ltac bind_ret_r2 := first [bind_ret_r2_eutt | bind_ret_r2_eq_itree].
 
 Ltac forward H :=
   let H' := fresh in

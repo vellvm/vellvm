@@ -112,7 +112,7 @@ Fixpoint Bit_sizeof_dtyp (ty : dtyp) : N :=
 Definition Sizeof_dtyp_base (ty:dtyp_base) : N :=
   match ty with
   | DTYPE_Void         => 0
-  | DTYPE_I sz         => N.max 1 (N.div (Npos sz) 8)
+  | DTYPE_I sz         => N.div (round_up_to_eight (Npos sz)) 8
   | DTYPE_Iptr         => N.of_nat ptr_size
   | DTYPE_Pointer      => N.of_nat ptr_size
   | DTYPE_FP fp        => byte_sizeof_floating_point_variant fp
@@ -121,8 +121,9 @@ Definition Sizeof_dtyp_base (ty:dtyp_base) : N :=
   | DTYPE_Metadata     => 0
   | DTYPE_X86_mmx      => 8 (* TODO: Unsupported *)
   | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
-  | DTYPE_B sz         => N.max 1 (N.div (Npos sz) 8)
+  | DTYPE_B sz         => N.div (round_up_to_eight (Npos sz)) 8
   end.
+
                            
 Fixpoint Sizeof_dtyp (ty:dtyp) : N :=
   match ty with

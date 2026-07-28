@@ -85,12 +85,35 @@ Section MemoryByte.
    *)
   Definition memory_byte : Type := @dvalue_bv Pa 8.
 
-  (* There is a "bijection" between lists of memory bytes (of the right length) and dynamic values. *)
+  (* A byte of poison in the memory model *)
+  Definition poison_memory_byte : memory_byte :=
+    BYTE_Mixed 8 (repeat Bit_psn 8).
+
+  (* Accumulates num_bytes copies of mb.*)
+  Definition accumulate_memory_bytes (mb:memory_byte) (num_bytes : N) : list memory_byte -> list memory_byte :=
+    N.rev_loop_acc (fun _ => mb) num_bytes 0.
+
+  Definition accumulate_poison_bytes (num_bytes : N) :=
+    accumulate_memory_bytes poison_memory_byte num_bytes.
+
+  Definition accumulate_padding (offset : N) (pad_to : option N) (acc : list memory_byte) : N * (list memory_byte) :=
+    match pad_to with
+    | None => (offset, acc)
+    | Some align =>
+        let extra_bytes :=  N.modulo offset align in
+        let num_padding_bytes := if negb (N.eqb extra_bytes 0) then align - extra_bytes else 0%N in
+        (num_padding_bytes + offset, accumulate_poison_bytes num_padding_bytes acc)
+    end.
+
+  (* Given a type, there is a "bijection" between lists of memory bytes (of the
+  right length) and dynamic values. *)
 
   (* Returns a memory byte at index 0 <= idx < (max 1 (bit_sz / 8)).
      If bit_sz is not divisible by 8, returns a BYTE_Mixed value with poison as the pad bits.
    *) 
-  Definition memory_byte_of_dvalue_bv (bit_sz : positive) (bv : dvalue_bv bit_sz) (idx : N) : memory_byte :=
+  Definition memory_byte_of_dvalue_bv
+    (bit_sz : positive) (bv : dvalue_bv bit_sz) (idx : N)
+    : memory_byte :=
     
     match bv with
     (* num_chunks := (8 * pointer_size / bit_sz)
@@ -128,7 +151,7 @@ Section MemoryByte.
         (* TODO: Case when pointer bit_sz is not a mulutiple of 8 ? *)
         BYTE_Pointer 8 p (((Npos bit_sz) * idx' / 8) + idx)
     | BYTE_I x =>
-        (* If bit_sz isn't divisible by 8 and this is the last index, there is padding *)
+        (* If bit_sz isn't divisible by 8 and this is the last index, there is bit-level padding *)
         let extra_bits := N.modulo (Npos bit_sz) 8 in
         if negb (N.eqb extra_bits 0) && (N.eqb (idx + 1) (sizeof_dtyp (DTYPE_Base (DTYPE_I bit_sz))))  then
           let pad_bits := 8 - extra_bits in
@@ -148,9 +171,6 @@ Section MemoryByte.
         BYTE_Mixed 8 (mbits ++ pad)
     end.
 
-  (* A byte of poison in the memory model *)
-  Definition poison_memory_byte : memory_byte :=
-    BYTE_Mixed 8 (repeat Bit_psn 8).
   
   (* Computes the memory byte at index [idx] of the dvalue_base.
      Only valid if 0 <= [idx] < size_of_dv_base dvalue_base.
@@ -162,41 +182,34 @@ Section MemoryByte.
         BYTE_Mixed [Bit_bit x1, .. , Bit_bit xn, Bit_psn, .. Bit_psn]
      where 
    *)
-  Definition memory_byte_of_dvalue_base (dv:dvalue_base) (idx : N) : EOU memory_byte  :=
-    match dv with
-    | DVALUE_I sz x =>
-        (* Here we can coerce the integer value to a dvalue_bv because the byte type
-           and integer type values are the same when there is no poison *)
-        ret (memory_byte_of_dvalue_bv (BYTE_I x) idx)
-    | DVALUE_Iptr x =>
-        ret (BYTE_I (repr (extract_byte_Z (to_Z x) idx)))
-    | DVALUE_Pointer ptr =>
-        ret (BYTE_Pointer 8 ptr idx)
-    | DVALUE_Float f =>
-        ret (BYTE_I (repr (extract_byte_Z (unsigned (Float32.to_bits f)) idx)))
-    | DVALUE_Double d =>
-        ret (BYTE_I (repr (extract_byte_Z (unsigned (Float.to_bits d)) idx)))
-    | DVALUE_Poison dt =>
-        (* NOTE: This is one place where the Memory Model violates the LLVM
-           Invariants because the Memory Model doesn't have structured poison.
-         *)
-        ret poison_memory_byte
-        
-    | DVALUE_None =>
-        (* TODO: Not sure if this should be an error, poison, or what. *)
-        raise_error "dvalue_extract_byte on DVALUE_None"
-    | DVALUE_B sz bits =>
-        ret (memory_byte_of_dvalue_bv bits idx)
-    end.
+  Definition acc_memory_bytes_of_dvalue_base (dt:dtyp_base)
+    (dv:dvalue_base) (offset : N) (acc : list memory_byte)
+    : N * (list memory_byte)  :=
+    let byte_size := sizeof_dtyp dt in
+    let byte_gen := 
+      match dv with
+      | DVALUE_I sz x => memory_byte_of_dvalue_bv (BYTE_I x)
+      | DVALUE_Iptr x => fun idx => BYTE_I (repr (extract_byte_Z (to_Z x) idx))
+      | DVALUE_Pointer ptr => BYTE_Pointer 8 ptr
+      | DVALUE_Float f =>  fun idx => BYTE_I (repr (extract_byte_Z (unsigned (Float32.to_bits f)) idx))
+      | DVALUE_Double d => fun idx => BYTE_I (repr (extract_byte_Z (unsigned (Float.to_bits d)) idx))
+      | DVALUE_Poison => fun idx => poison_memory_byte
+      | DVALUE_None => fun idx => poison_memory_byte
+                        (* was: raise_error "dvalue_extract_byte on DVALUE_None" *)
+      | DVALUE_B sz bits => memory_byte_of_dvalue_bv bits
+      end in
+    (byte_size + offset, N.rev_loop_acc byte_gen byte_size 0 acc).
   
+    
+  (* Invariants:
+     [acc] the accumulated list of memory_bytes so far is in _reverse_ order.
+     [offset] is the offset in bytes of the next byte to be accumulated
+         it is used to decide when to accumulate padding
+     [pad_to] gives an (option) target that determines the amount of padding
+         added to the end of the dvalue.
 
-  (* TODO: does this work correctly with sub-byte size values? *)
-  (* offset is the number of bytes indexed past so far *)
-  Fixpoint memory_byte_of_dvalue (dv : dvalue) (dt : dtyp) (idx : N) {struct dv} : EOU memory_byte  :=
-    let dvalue_extract_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> N -> EOU memory_byte :=
-      fix loop fields types (offset : N) (idx : N) {struct fields} : EOU memory_byte :=
-        match fields, types with
-        | [], [] =>
+
+
             (* Handle padding at the end of the structure *)
             let padding :=
               match pad with
@@ -206,93 +219,94 @@ Section MemoryByte.
                   0%N
               end
             in
-            if N.ltb idx padding
+            if N.ltb  padding
             then
               (* Indexing into padding bytes *)
-              (* TODO: currently we pad with poision bytes. *)
+              (* TODO: currently we pad with poison bytes. *)
               ret poison_memory_byte
             else
               raise_error "No fields left for byte-indexing..."
+
+   *)
+  Fixpoint acc_dvalue_to_memory_bytes_h
+    (dt:dtyp)
+    (dv : dvalue) (offset : N)
+    (pad_to : option N) (acc : list memory_byte)
+    {struct dv}
+    : EOU (N * (list memory_byte)) :=
+    let accumulate_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> list memory_byte -> EOU (N * list memory_byte) :=
+      fix loop fields types (offset : N) (acc : list memory_byte) {struct fields} : EOU (N * list memory_byte) :=
+        match fields, types with
+        | [], [] => ret (accumulate_padding offset pad_to acc)
         | f::fs, dt::dts =>
-            let padding :=
-              if pad
-              then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
-              else 0%N
+            let field_pad := None
+              (* if pad *)
+              (* then Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset) *)
+              (* else None *)
             in
-            let sz := sizeof_dtyp dt in
-            if N.ltb idx padding
-            then
-              (* Indexing into padding bytes *)
-              ret poison_memory_byte
-            else
-              let offset' := (offset + padding)%N in
-              let idx' := (idx - padding)%N in
-              if N.ltb idx' sz
-              then memory_byte_of_dvalue f dt idx'
-              else loop fs dts (offset' + sz)%N (idx' - sz)%N
+            '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset field_pad acc ;;
+            loop fs dts offset' bs
         | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
         end
     in
-
-    let dvalue_extract_array_bytes :=
-      fix loop (elts : list dvalue) dt (idx : N) {struct elts}  :=
+    let dvalue_extract_array_bytes dt :=
+      fix loop (elts : list dvalue) offset (acc : list memory_byte) {struct elts}  :=
         match elts with
-        | [] => raise_error "No fields left for byte-indexing..."
+        | [] => ret (accumulate_padding offset pad_to acc)
         | e::es =>
-            let sz := sizeof_dtyp dt in
-            if N.ltb idx sz
-            then memory_byte_of_dvalue e dt idx
-            else loop es dt (idx - sz)%N
+            let padding := Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset) in
+            '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt e offset padding acc ;; 
+            loop es offset' bs 
         end
     in
-    match dv with
-    | DVALUE_Base dv => memory_byte_of_dvalue_base dv idx
-    | DVALUE_Struct false fields =>
-        match dt with
-        | DTYPE_Struct false dts =>
-            dvalue_extract_struct_bytes (Some (max_preferred_dtyp_alignment dts)) fields dts 0 idx
-        | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Struct."
+    match dt with
+    | DTYPE_Base dtb =>
+        match dv with
+        | DVALUE_Base dv =>
+            let '(offset', bs) := acc_memory_bytes_of_dvalue_base dtb dv offset acc in
+            ret (accumulate_padding offset' pad_to bs)
+        | _ => raise_error "acc_dvalue_to_memory_bytes_h: type-mismatch non-base value"
         end
-
-    | DVALUE_Struct true fields =>
-        match dt with
-        | DTYPE_Struct true dts =>
-            dvalue_extract_struct_bytes None fields dts 0 idx
-        | _ => raise_error "dvalue_extract_byte: type mismatch on DVALUE_Packed_struct."
+    | DTYPE_Struct p dts =>
+        match dv with
+          (* TODO: could check that the type and dvalue packed flag agree *)
+        | DVALUE_Struct _ fields =>
+            let pad := if p then (Some (max_preferred_dtyp_alignment dts)) else None in        
+            accumulate_struct_bytes pad fields dts offset acc
+        | _ => raise_error "acc_dvalue_to_memory_bytes_h: type-mismatch non-struct value"
         end
-
-    | DVALUE_Array v _ elts =>
-        match dt with
-        | DTYPE_Array _ sz dt =>
-            dvalue_extract_array_bytes elts dt idx
-        | _ =>
-            raise_error "dvalue_extract_byte: type mismatch on DVALUE_Array."
+    | DTYPE_Array p sz elt_t =>
+        match dv with
+        | DVALUE_Array v elts =>
+            dvalue_extract_array_bytes elt_t elts offset acc
+        | _ => raise_error ("acc_dvalue_to_memory_bytes_h: type-mismatch non-array value: "  ++ (show dv))
         end
     end.
-
+  
+  
+  
   (* Toplevel operation to convert a dvalue into a list of memory_bytes. *)
-  Definition dvalue_to_memory_bytes (dv : dvalue) (dt : dtyp) : EOU (list memory_byte)
-    := map_monad
-         (memory_byte_of_dvalue dv dt)
-         (Nseq 0 (N.to_nat (sizeof_dtyp dt))).
-
+  Definition dvalue_to_memory_bytes (dt:dtyp) (dv : dvalue) (pad_to : option N) : EOU (list memory_byte) :=
+    '(offset, bytes) <- acc_dvalue_to_memory_bytes_h dt dv 0 pad_to [] ;;
+    (* reverse the list *)
+    ret (rev_append bytes []).
 
   
-  (* Walk through a list *)
-  (* Returns field index + number of bytes remaining *)
-  Fixpoint extract_field_byte_helper (fields : list dtyp) (field_idx : N) (byte_idx : N) : EOU (dtyp * (N * N))%type
-    := match fields with
-       | [] =>
-           raise_error "No fields left for byte-indexing..."
-       | (x::xs) =>
-           let sz := sizeof_dtyp x
-           in if N.ltb byte_idx sz
-              then ret (x, (field_idx, byte_idx))
-              else extract_field_byte_helper xs (N.succ field_idx) (byte_idx - sz)
-       end.
+  (* (* Walk through a list *) *)
+  (* (* Returns field index + number of bytes remaining *) *)
+  (* Fixpoint extract_field_byte_helper (fields : list dtyp) (field_idx : N) (byte_idx : N) : EOU (dtyp * (N * N))%type *)
+  (*   := match fields with *)
+  (*      | [] => *)
+  (*          raise_error "No fields left for byte-indexing..." *)
+  (*      | (x::xs) => *)
+  (*          let sz := sizeof_dtyp x *)
+  (*          in if N.ltb byte_idx sz *)
+  (*             then ret (x, (field_idx, byte_idx)) *)
+  (*             else extract_field_byte_helper xs (N.succ field_idx) (byte_idx - sz) *)
+  (*      end. *)
 
-  Definition extract_field_byte (fields : list dtyp) (byte_idx : N) : EOU (dtyp * (N * N))%type
-    := extract_field_byte_helper fields 0 byte_idx.
+  (* Definition extract_field_byte (fields : list dtyp) (byte_idx : N) : EOU (dtyp * (N * N))%type *)
+  (*   := extract_field_byte_helper fields 0 byte_idx. *)
 
   (* Need the type of the dvalue in order to know how big fields and array elements are.
 
@@ -361,10 +375,10 @@ Section MemoryByte.
 
   #[local] Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
 
-  Definition absorb_pois {A} dt (c : EOUP A) (k : A -> EOU dvalue_base) : EOU dvalue_base :=
+  Definition absorb_pois {A} (c : EOUP A) (k : A -> EOU dvalue_base) : EOU dvalue_base :=
     x <- (c : EOU _) ;;
     match x with
-    | Pois => ret (DVALUE_Poison dt)
+    | Pois => ret DVALUE_Poison
     | NoPois v => k v
     end.
   
@@ -403,7 +417,7 @@ Section MemoryByte.
 
   Fixpoint valid_pointer_bytes (p:ptr) (idx:N) (bytes : list memory_byte) : EOUP bool :=
     match bytes with
-    | [] => ret (N.eqb idx 8)
+    | [] => ret (N.eqb idx (sizeof_dtyp (DTYPE_Base DTYPE_Pointer)))
     | b::rest =>
         v <- valid_pointer_byte p idx b ;;
         if v then valid_pointer_bytes p (1+idx) rest else ret false
@@ -441,24 +455,73 @@ Section MemoryByte.
       v <- map_monad (m := EOUP) (memory_byte_to_Z) dbs ;;
       ret (concat_bytes_Z v).
 
+  Definition memory_byte_to_memory_bits (mb : memory_byte) : list memory_bit :=
+    match mb with
+    | BYTE_Pointer p idx => rev_append (N.rev_loop_acc (fun i => Bit_ptr p i) (8 * idx) 8 []) []
+    | BYTE_I x  => rev_append (N.rev_loop_acc (fun i => Bit_bit (repr (extract_bit_vint x i))) 0 8 []) []
+    | BYTE_Mixed bits => bits
+    end.
+
+  Fixpoint get_bits_of_memory_byte_list (bit_sz : N) (dbs : list memory_byte) acc : list memory_bit :=
+    match dbs with
+    | [] => if (N.eqb bit_sz 0) then
+             acc
+           else
+             (* still need poison bits as padding *)
+             N.rev_loop_acc (fun _ => Bit_psn) 0 bit_sz acc 
+    | b::bs =>
+        let bits := memory_byte_to_memory_bits b in
+        if (N.ltb bit_sz 8) then
+          rev_append (take bit_sz bits) acc
+        else
+          get_bits_of_memory_byte_list (bit_sz - 8) bs (rev_append bits acc)
+        
+    end.
+  
+  Definition memory_bytes_to_byte_value (bit_sz : positive) (dbs : list memory_byte) : EOU (@dvalue_bv _ bit_sz) :=
+    match memory_bytes_to_int bit_sz dbs with
+    (* First try to serialize as an integer *)
+    | raise_ret (NoPois x) => ret (BYTE_I (repr x))
+    | _ => match memory_bytes_to_pointer dbs with
+          (* Next try to serialize as a pointer *)            
+          | raise_ret (NoPois p) => ret (BYTE_Pointer bit_sz p 0)
+          | _ => (* otherwise retain as just a list of mixed bits *)
+              ret (BYTE_Mixed bit_sz (rev_append (get_bits_of_memory_byte_list (Npos bit_sz) dbs []) []))
+          end
+    end.
+
+  Definition is_poison_bit (b : memory_bit) : bool :=
+    match b with
+    | Bit_psn => true
+    | _ => false
+    end.
+  
+  Definition all_poison_bits (bits : list memory_bit) : bool :=
+    List.forallb is_poison_bit bits.
+
+  Definition is_all_poison_byte (mb : memory_byte) : bool :=
+    match mb with
+    | BYTE_Mixed bits => all_poison_bits bits
+    | _ => false
+    end.
+  
+  Definition all_poison_bytes (bytes : list memory_byte) : bool :=
+    List.forallb is_all_poison_byte bytes.
+  
   Definition memory_bytes_to_dvalue_base (dbs : list memory_byte) (dt : dtyp_base) : EOU dvalue_base :=
     match dt with
     | DTYPE_I sz =>
-        (* TODO: fix for integer sizes not-multiples of 8. *)
-        absorb_pois (DTYPE_Base dt)
+        absorb_pois 
           (memory_bytes_to_int sz dbs)
           (fun v => ret (DVALUE_I sz (repr v)))
 
     | DTYPE_Iptr =>
-        absorb_pois (DTYPE_Base dt)
+        absorb_pois 
           (map_monad memory_byte_to_Z dbs)
           (fun zs => DVALUE_Iptr <$> from_Z (concat_bytes_Z zs))
 
-    (* TODO: not sure if this should be wildcard provenance.
-           TODO: not sure if this should truncate iptr value... *)
-    (* TODO: not sure if this should be lazy OOM or not *)
     | DTYPE_Pointer =>
-        absorb_pois (DTYPE_Base dt) (memory_bytes_to_pointer dbs)
+        absorb_pois (memory_bytes_to_pointer dbs)
                     (fun p => ret (DVALUE_Pointer p))
     | DTYPE_Void =>
         raise_error "memory_bytes_to_dvalue on void type."
@@ -467,10 +530,10 @@ Section MemoryByte.
     | DTYPE_FP FP_bfloat =>
         raise_error "memory_bytes_to_dvalue: unsupported bfloat"
     | DTYPE_FP FP_float =>
-        absorb_pois (DTYPE_Base dt) (map_monad memory_byte_to_Z dbs)
+        absorb_pois (map_monad memory_byte_to_Z dbs)
           (fun zs => ret (DVALUE_Float (Float32.of_bits (concat_bytes_Z_vint zs))))
     | DTYPE_FP FP_double => 
-        absorb_pois (DTYPE_Base dt) (map_monad memory_byte_to_Z dbs)
+        absorb_pois  (map_monad memory_byte_to_Z dbs)
           (fun zs => ret (DVALUE_Double (Float.of_bits (concat_bytes_Z_vint zs))))
     | DTYPE_FP FP_x86_fp80 =>
         raise_error "memory_bytes_to_dvalue: unsupported X86_fp80."
@@ -488,9 +551,15 @@ Section MemoryByte.
         raise_error "memory_bytes_to_dvalue: unsupported DTYPE_X86_mmx."
     | DTYPE_Opaque =>
         raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Opaque."
-
     | DTYPE_B sz =>
-        raise_error "memory_bytes_to_dvalue_base: TODO: byte type"
+        (* If all the bits are poison then create the poison value *)
+        (* Question: do we have to check the length too *)
+        if all_poison_bytes dbs then
+          ret DVALUE_Poison
+        else
+        (* otherwise at least one is non-poision *)
+        dv <- memory_bytes_to_byte_value sz dbs ;;
+        ret (@DVALUE_B _ sz dv)
     end.
 
   
@@ -533,7 +602,7 @@ Section MemoryByte.
           else split_every_nil sz' dbs
         in
         elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
-        ret (DVALUE_Array v (DTYPE_Array v sz t) elts)
+        ret (DVALUE_Array v elts)
 
     | DTYPE_Struct false fields =>
         (DVALUE_Struct false) <$> (list_memory_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
@@ -541,6 +610,26 @@ Section MemoryByte.
     | DTYPE_Struct true fields =>
         (DVALUE_Struct true) <$> (list_memory_bytes_to_dvalue None 0 fields dbs)
     end.
+
+(*
+  Lemma round_trip_memory_bytes_to_dvalue_base (dt : dtyp_base) (dv : dvalue_base) i bs :
+    dv <> DVALUE_None ->
+    dtyp_base_of_dvalue_base dv = Some dt ->
+      (acc_memory_bytes_of_dvalue_base dv i []) = (sizeof_dtyp (DTYPE_Base dt) + i, bs) <->
+        memory_bytes_to_dvalue_base bs dt = raise_ret dv.
+  Proof.
+    intros HN HT.
+    split; intros H.
+    - unfold acc_memory_bytes_of_dvalue_base in H.
+      inversion H; clear H.
+      destruct dv; simpl in HT; inversion HT; subst; clear HT; simpl.
+      6 : { destruct t; inversion H0. subst. clear HN H0.
+            
+            
+      7 : { contradiction. }
+      7 : { 
+*)      
+
   
 End MemoryByte.
 

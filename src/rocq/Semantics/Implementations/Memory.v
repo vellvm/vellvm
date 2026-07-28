@@ -66,16 +66,17 @@ Section MemoryModel.
   (** Writing dvalues *)
   Definition write_bytes (p : ptr) (bytes : list memory_byte) : memM unit :=
     ptrs <- lift (get_consecutive_ptrs p (N.length bytes));;
-    let ptr_bytes := zip ptrs bytes in
+    let ptr_bytes := ListUtil.zip ptrs bytes in
     (* Actually perform writes *)
     loop_monad (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
-  Definition write_dvalue (dt : dtyp) (p : ptr) (v : dvalue) : memM unit :=
-    bytes <- lift (dvalue_to_memory_bytes v dt) ;;
+  (* TODO: not sure about sub-byte-sized values and bits / poison / padding *)
+  Definition write_dvalue (p : ptr) (dt:dtyp) (v : dvalue) : memM unit :=
+    bytes <- lift (dvalue_to_memory_bytes dt v None) ;;
     write_bytes p bytes.
 
   Definition generate_num_poison_bytes_h
-    (start_ix : N) (num : N) (dt : dtyp) : list memory_byte :=
+    (start_ix : N) (num : N) : list memory_byte :=
     N.recursion 
       (fun (x : N) => [])
       (fun n mf x =>
@@ -83,11 +84,11 @@ Section MemoryModel.
          poison_memory_byte :: rest_bytes)
       num start_ix.
 
-  Definition generate_num_poison_bytes (num : N) (dt : dtyp) : list memory_byte :=
-    generate_num_poison_bytes_h 0 num dt.
+  Definition generate_num_poison_bytes (num : N) : list memory_byte :=
+    generate_num_poison_bytes_h 0 num.
 
   Definition generate_poison_bytes (dt : dtyp) : list memory_byte :=
-    generate_num_poison_bytes (sizeof_dtyp dt) dt.
+    generate_num_poison_bytes (sizeof_dtyp dt).
 
   (** Allocating dtyps *)
   Definition allocate_bytes (init_bytes : list memory_byte) (align : N) : memM ptr :=
@@ -137,12 +138,12 @@ Section MemoryModel.
             merr "convert_impure: type mismatch"
         end
           
-    | (DVALUE_Array true (DTYPE_Array true sz t) elts1) =>
+    | (DVALUE_Array true elts1) =>
         match get_vector_conversion_type t_from t_to with
         | Some (t_from', t_to') =>
               elts1' <- lift (map_monad dvalue_to_dvalue_base elts1) ;;
               val <- map_monad (fun v => convert_impure_base conv t_from' v t_to') elts1' ;;
-              ret (DVALUE_Array true (DTYPE_Array true sz t_to') (List.map DVALUE_Base val))
+              ret (DVALUE_Array true (List.map DVALUE_Base val))
 
         | None =>
             merr "convert_impure: type or vector size mismatch"
@@ -172,7 +173,7 @@ Section MemoryModel.
       | Store t a v =>
           match a with
           | DVALUE_Base (DVALUE_Pointer a) =>
-              write_dvalue t a v
+              write_dvalue a t v
           | _ => mub "Writing something to somewhere that isn't an address."
           end
       | Conv ct t_from v t_to =>
@@ -246,9 +247,9 @@ Section MemoryModel.
   Definition handle_malloc (args : list dvalue_base) (align : N) : memM ptr :=
     match args with
     | [DVALUE_I bitwidth sz] =>
-        malloc_bytes (generate_num_poison_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8)) align
+        malloc_bytes (generate_num_poison_bytes (Z.to_N (unsigned sz))) align
     | [DVALUE_Iptr sz] =>
-        malloc_bytes (generate_num_poison_bytes (Z.to_N (to_unsigned sz)) (DTYPE_I 8)) align
+        malloc_bytes (generate_num_poison_bytes (Z.to_N (to_unsigned sz))) align
     | _ => merr "Malloc: invalid arguments."
     end.
 

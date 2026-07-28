@@ -446,8 +446,8 @@ Section ReprInstances.
     | EXP_Poison => "EXP_Poison"
     | EXP_Struct fields => "(EXP_Struct [" ++ (contents id (List.map texp fields)) ++ "])"
     | EXP_Packed_struct fields => "(EXP_Packed_struct [" ++ (contents id (List.map texp fields)) ++ "])"
-    | EXP_Array t fields => "(EXP_Array (" ++ repr t ++ ")" ++ " [" ++ (contents id (List.map texp fields)) ++ "])"
-    | EXP_Vector t fields => "(EXP_vector (" ++ repr t ++ ")" ++ " [" ++ (contents id (List.map texp fields)) ++ "])"
+    | EXP_Array fields => "(EXP_Array [" ++ (contents id (List.map texp fields)) ++ "])"
+    | EXP_Vector fields => "(EXP_vector [" ++ (contents id (List.map texp fields)) ++ "])"
     | OP_IBinop iop t v1 v2 =>
       "(OP_IBinop " ++ repr iop ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_ICmp s cmp t v1 v2 =>
