@@ -69,8 +69,9 @@ let debug (msg : string) =
 
 let current_line = ref (Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()))
 
+(* Mirrors [InterpretationStack.Res dvalue] = [FusedS * dvalue]. *)
 type interp_state =
-  Memory.state * ((Stack.stack_frame * Stack.stack) * (Global.global_env * DV.dvalue))
+  (Memory.state * ((Stack.stack_frame * Stack.stack) * Global.global_env)) * DV.dvalue
 
 let single_step (m : (__ coq_MCFGEbot, interp_state) itree)
     : ((__ coq_MCFGEbot, interp_state) itree,
@@ -89,7 +90,7 @@ let single_step (m : (__ coq_MCFGEbot, interp_state) itree)
      Either.left x
   (* SAZ: Could inspect the memory or stack here too. *)
   (* We finished the computation *)
-  | RetF (_, ((_, _), (_, v))) -> Either.right (Ok v)
+  | RetF (_, v) -> Either.right (Ok v)
   (* The ExternalCallE effect *)
   | VisF (Sum.Coq_inl1 (ExternalCall (t, _, dvs)), _) ->
      let loc_str = Camlcoq.camlstring_of_coqstring (LLVMEvents.printer_object.printer_get_loc ()) in

@@ -1,3 +1,5 @@
+(** * I2F invariant for the uninterpreted denotation *)
+
 From Equations Require Import Equations.
 
 From Stdlib Require Import Lia Program.
@@ -30,47 +32,36 @@ From Paco Require Import paco.
 
 Ltac bind_exp := erbind; [apply I2F_denote_exp'| intros].
 
-(* Can we avoid these duplications? *)
+(** The CFG-signature instances of the shared lifting lemmas
+    ([refine_dvalue_base_map_gen] in Refinement.v, [I2F_freeze_*_gen] in
+    I2F_exp.v, [I2F_refine_lift_gen] in Refinement.v): the former
+    primed/unprimed duplication is now just a different [draw]-refinement
+    ([I2F_draw_CFG]) resp. [Throw] side-condition ([I2FE_CFG_Throw]). *)
 Lemma refine_dvalue_base_map' t1 t2 :
   I2F_refine_CFG I2F_dvalue_base t1 t2 ->
   I2F_refine_CFG I2F_dvalue (ITree.map DVALUE_Base t1) (ITree.map DVALUE_Base t2).
-Proof.
-  intros; erbind; eauto.
-Qed.
+Proof. apply refine_dvalue_base_map_gen. Qed.
 Hint Resolve refine_dvalue_base_map' : core.
 Hint Unfold I2F_refine_CFG : core.
+
+Lemma I2F_draw_CFG : forall dt,
+    I2F_refine_CFG I2F_dvalue (draw dt) (draw dt).
+Proof. intros; unfold I2F_refine_CFG, draw; rstep. Qed.
 
 Lemma I2F_freeze_base' a b :
   I2F_dvalue_base a b ->
   I2F_refine_CFG I2F_dvalue (freeze_base a) (freeze_base b).
-Proof.
-  intros HDV.
-  induction HDV; cbn; eauto 8.
-  rstep.
-Qed.
+Proof. intros H; unfold I2F_refine_CFG; now apply (I2F_freeze_base_gen I2F_draw_CFG). Qed.
 
 Lemma I2F_freeze' a b :
   I2F_dvalue a b ->
   I2F_refine_CFG I2F_dvalue (freeze a) (freeze b).
-Proof.
-  intros HDV.
-  induction HDV; cbn.
-  apply I2F_freeze_base'; eauto.
-  all: erbind; [apply ruttc_map_monad_gen; eauto | eauto ].
-Qed. 
- 
+Proof. intros H; unfold I2F_refine_CFG; now apply (I2F_freeze_gen I2F_draw_CFG). Qed.
+
 Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
   I2F_EOU RR m1 m2 ->
   I2F_refine_CFG RR (EOU_to_itree m1) (EOU_to_itree m2).
-Proof.
-  intros []; cbn.
-  - pfold; constructor; auto.
-  - apply ruttc_trigger_cast; easy.
-  - pfold; red; cbn.
-    apply EqCutL; constructor.
-  - pfold; red; cbn.
-    apply EqCutR; constructor.
-Qed.
+Proof. intros H; unfold I2F_refine_CFG; apply (I2F_refine_lift_gen I2FE_CFG_Throw); exact H. Qed.
 
 Lemma I2F_denote_instr :
   forall i va1 va2,
@@ -295,18 +286,15 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   - destruct v; bind_exp.
     rewrite (I2F_dvalue_is_poison H).
     break_match_goal...
-    rbind (Forall2 (prod_rel I2F_dvalue (@Logic.eq block_id))).
-    { apply ruttc_map_monad.
-      intros [[sz x] id] _; cbn.
-      rbind I2F_dvalue_base.
-      { first [ apply I2F_refine_lift'; now repeat constructor
-              | rstep; now repeat constructor ]. }
-      intros; rstep; now repeat constructor. }
-    intros sw1 sw2 HSW.
     rbind (@Logic.eq block_id).
     { apply I2F_refine_lift'.
-      erewrite I2F_select_switch; eauto.
-      apply I2F_EOU_refl. }
+      eapply I2F_EOU_bind with (RA := Forall2 (prod_rel I2F_dvalue (@Logic.eq block_id))).
+      - apply I2F_EOU_map_monad.
+        intros [[sz x] id] _; cbn.
+        now repeat constructor.
+      - intros sw1 sw2 HSW.
+        erewrite I2F_select_switch; eauto.
+        apply I2F_EOU_refl. }
     intros ?? <-...
   - destruct v.
     bind_exp...
@@ -417,61 +405,6 @@ Proof with cbn; eauto using I2F_EOU_error, I2F_EOU_ret, I2F_EOU_oom, I2F_EOU_ub.
     constructor; cbn...
 Qed.
 
-(** [dtyp_of_dvalue] computes in the parameter-free [EOU dtyp]: on
-    related values the two sides are literally equal (related scalars
-    carry equal payloads, and aggregates share their annotations). *)
-Lemma I2F_dtyp_of_dvalue_eq :
-  forall v v',
-    I2F_dvalue v v' ->
-    @dtyp_of_dvalue PInf v = @dtyp_of_dvalue PFin v'.
-Proof.
-  induction v using dvalue_ind; intros v' R; inversion R; subst;
-    repeat match goal with
-      | H : existT _ _ _ = existT _ _ _ |- _ =>
-          apply Eqdep_dec.inj_pair2_eq_dec in H; [| apply Pos.eq_dec]; subst
-      end;
-    clear R; cbn; auto.
-  - inv H0; reflexivity.
-  - (* Struct *)
-    match goal with
-    | F2 : Forall2 I2F_dvalue fields ?l2 |- context [?L fields] =>
-        match goal with
-        | |- context [?R l2] =>
-            assert (GO : L fields = R l2); [| rewrite GO; reflexivity]
-        end
-    end.
-    match goal with
-    | F2 : Forall2 I2F_dvalue fields _, IH : Forall _ fields |- _ =>
-        revert IH; induction F2 as [| u u' us us' HU HUS IHUS]
-    end; intros FIH; cbn; auto.
-    inversion FIH; subst.
-    match goal with
-    | HP : forall _, I2F_dvalue u _ -> _ |- _ => rewrite (HP _ HU)
-    end.
-    rewrite IHUS by assumption; reflexivity.
-  - (* Array *)
-    break_match_goal; cbn; auto.
-    match goal with
-    | F2 : Forall2 I2F_dvalue elts ?l2 |- context [forallb ?f elts] =>
-        match goal with
-        | |- context [forallb ?g l2] =>
-            assert (FB : forallb f elts = forallb g l2);
-            [| assert (LEN : length elts = length l2)
-                 by (eapply Forall2_length; eauto);
-               rewrite FB, LEN; reflexivity ]
-        end
-    end.
-    match goal with
-    | F2 : Forall2 I2F_dvalue elts _, IH : Forall _ elts |- _ =>
-        revert IH; induction F2 as [| u u' us us' HU HUS IHUS]
-    end; intros FIH; cbn; auto.
-    inversion FIH; subst.
-    match goal with
-    | HP : forall _, I2F_dvalue u _ -> _ |- _ => rewrite (HP _ HU)
-    end.
-    rewrite IHUS by assumption; reflexivity.
-Qed.
-
 Lemma I2F_dtyp_of_dvalue :
   forall a1 a2 : dvalue,
     I2F_dvalue a1 a2 ->
@@ -523,28 +456,6 @@ Proof.
   rewrite bind_vis. apply eqit_Vis.
   intros.
   rewrite Eqit.bind_ret_l; reflexivity.
-Qed.
-
-Lemma unfold_run_exc `{Params.Params} {A} (t : itree _ A) :
-  run_exc t ≳ match observe t with
-         | RetF a  => Ret (inr a)
-         | TauF u' => run_exc u'
-         | VisF X e k =>
-             match exc_of_event e with
-             | Some x => Ret (inl x)
-             | None   => Vis e (fun x => run_exc (k x))
-             end
-    end.
-Proof.
-  unfold run_exc.
-  rewrite unfold_iter.
-  desobs t ot; cbn; auto.
-  rewrite Eqit.bind_ret_l; reflexivity.
-  rewrite Eqit.bind_ret_l, tau_euttge; reflexivity.
-  break_goal_fast; rewrite ?Eqit.bind_ret_l; [reflexivity |].
-  rewrite bind_vis. apply eqit_Vis.
-  intros.
-  rewrite Eqit.bind_ret_l, tau_euttge; reflexivity.
 Qed.
 
 Lemma cutUB_exc_of_event `{Params.Params} {X} (e : _ X) :

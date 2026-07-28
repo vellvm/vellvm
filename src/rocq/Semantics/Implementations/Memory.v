@@ -66,7 +66,7 @@ Section MemoryModel.
   (** Writing dvalues *)
   Definition write_bytes (p : ptr) (bytes : list memory_byte) : memM unit :=
     ptrs <- lift (get_consecutive_ptrs p (N.length bytes));;
-    let ptr_bytes := zip ptrs bytes in
+    let ptr_bytes := ListUtil.zip ptrs bytes in
     (* Actually perform writes *)
     loop_monad (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 

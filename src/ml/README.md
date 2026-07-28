@@ -1,6 +1,5 @@
 # Vellvm Executable
 
-
 ## Behavior of `vellvm`:
 
 By default, `vellvm file1.ll ... fileN.ll` will simply _parse_ each of the files provided and then link them together.
@@ -21,7 +20,6 @@ Processing: Any `.ll` files passed as command-line arguments (i.e. without `-l`)
 
 Processed outputs generated via the `-emit-llvm` or `-print-ast` options are generated (by default) in the `output` directory.
 
-
 # Vellvm Testing Infrastructure
 
 This code provides a means to add Vellvm semantics tests as `.ll` files with
@@ -30,11 +28,12 @@ that a single function might be called more than once or multiple similar
 functions might be run.
 
 A valid test file is an LLVM `.ll` file some of whose comments are interpreted
-as assertions.  The test infrastructure supports `ASSERT EQ:` comments
-of the form:
+as assertions.  The test infrastructure supports three shape of assertions
+
+## ASSERT EQ
 
 ```
-; ASSERT EQ: <typ> <exp> = call <typ> <@function_name> (<typ_1> <lit_1>, ..., <typ_n> <lit_n>)
+; ASSERT EQ: <typ> <lit> = call <typ> <@function_name> (<typ_1> <lit_1>, ..., <typ_n> <lit_n>)
 ```
 
 This represents a test case asserting that the result of calling function
@@ -42,9 +41,28 @@ This represents a test case asserting that the result of calling function
 `typ_1` ... `typ_n` are LLVM IR types (that do not mention names or pointers).
 The `lit` and `lit_1` ... `lit_n` are LLVM IR literal values.  The legal LLVM IR
 literals that can appear in the assertions correspond to a subset of Vellvm
-UVALUEs that can be interpreted without needing any program context
+DVALUEs that can be interpreted without needing any program context
 (i.e. variables, globals, or pointers).
 
+## ASSERT SUCCEEDS
+
+```
+; ASSERT SUCCEEDS: call <typ> <@function_name> (<typ_1> <lit_1>, ..., <typ_n> <lit_n>)
+```
+
+This represents a test case asserting that the result of calling function
+`@function_name` with the given inputs does not fail, disregarding the result.
+
+## ASSERT FAILS
+
+```
+; ASSERT FAILS: call <typ> <@function_name> (<typ_1> <lit_1>, ..., <typ_n> <lit_n>)
+```
+
+This represents a test case asserting that the result of calling function
+`@function_name` with the given inputs fails.
+
+## Example
 
 Here is a simple, complete example of a test file in the form permitted by the
 tester:
@@ -57,7 +75,7 @@ define i32 @shl_test(i32 %x, i32 %amt) {
 ; ASSERT EQ: i32 3 = call i32 @shl_test(i32 3, i32 0)
 ; ASSERT EQ: i32 6 = call i32 @shl_test(i32 3, i32 1)
 ; ASSERT EQ: i32 12 = call i32 @shl_test(i32 3, i32 2)
-; ASSERT POISON: call i32 @main(i32 0, i32 0)
+; ASSERT SUCCEEDS: call i32 @shl_test(i32 3, i32 3)
 ```
 
 # Structure

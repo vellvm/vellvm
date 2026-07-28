@@ -39,8 +39,11 @@ Extraction Blacklist String List Char Core Z Format.
 (* strings ------------------------------------------------------------------ *)
 
 (* camlstring_of_coqstring is from Camlcoq *)
+(* [loc_state] holds the raw [file_info option] of the current instruction;
+   the location string is only formatted (AstLib.location_string) when read,
+   so the per-instruction [set_loc] is a single pointer write. *)
 Extract Constant printer_object => "
-  let loc_state = ref [] in
+  let loc_state = ref None in
   let camlstring_of_coqstring (s: char list) =
     let r = Bytes.create (List.length s) in
     let rec fill pos = function
@@ -48,11 +51,11 @@ Extract Constant printer_object => "
       | c :: s -> Bytes.set r pos c; fill (pos + 1) s
     in Bytes.to_string (fill 0 s)
   in
-  let printer_set_loc loc = (loc_state := loc; []) in
+  let printer_set_loc fi = (loc_state := fi; []) in
   let printer_print_msg msg =
-    print_string ((camlstring_of_coqstring !loc_state) ^ "": "" ^ (camlstring_of_coqstring msg) ^ ""\n"")
+    print_string ((camlstring_of_coqstring (AstLib.location_string !loc_state)) ^ "": "" ^ (camlstring_of_coqstring msg) ^ ""\n"")
   in
-  let printer_get_loc = fun _ -> !loc_state in
+  let printer_get_loc = fun _ -> AstLib.location_string !loc_state in
   { printer_set_loc;
     printer_print_msg;
     printer_get_loc; }

@@ -1351,14 +1351,6 @@ tag ::= string constant
   
 End ShowInstances.
 
-(* TODO: REALLY?!? *)
-Fixpoint zip {X Y} (xs : list X) (ys : list Y) : list (X * Y)
-  := match xs, ys with
-     | [], _ => []
-     | _, [] => []
-     | (x::xs), (y::ys) => (x, y) :: zip xs ys
-     end.
-
 Fixpoint zip3 {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) : list (X * Y * Z)
   := match xs, ys, zs with
      | [], _, _ => []

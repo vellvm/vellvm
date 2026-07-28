@@ -526,12 +526,104 @@ Section Forall2.
     intros * HR; induction HR; subst; cbn; auto.
   Qed.
 
+
   Lemma eq_Forall2 {A} (l : list A) :
     Forall2 eq l l.
   Proof.
     induction l; auto.
   Qed.
   
+  (* [filter] under agreeing predicates preserves [Forall2]-relatedness. *)
+  Lemma Forall2_filter {A B} (R : A -> B -> Prop) (p1 : A -> bool) (p2 : B -> bool)
+    (Hp : forall a b, R a b -> p1 a = p2 b) :
+    forall l1 l2, Forall2 R l1 l2 -> Forall2 R (filter p1 l1) (filter p2 l2).
+  Proof.
+    intros l1 l2 F; induction F as [| x y l1 l2 Rxy F' IH]; cbn.
+    - constructor.
+    - rewrite (Hp x y Rxy).
+      destruct (p2 y); [constructor; auto | auto].
+  Qed.
+
+  Lemma Forall2_concat {A1 A2} (R : A1 -> A2 -> Prop) :
+    forall ls1 ls2, Forall2 (Forall2 R) ls1 ls2 -> Forall2 R (List.concat ls1) (List.concat ls2).
+  Proof.
+    intros ls1 ls2 H; induction H; cbn; auto.
+    apply Forall2_app; auto.
+  Qed.
+
+  Lemma Forall2_zip {A1 A2 B1 B2}
+    (RA : A1 -> A2 -> Prop) (RB : B1 -> B2 -> Prop) :
+    forall xs1 xs2, Forall2 RA xs1 xs2 ->
+               forall ys1 ys2, Forall2 RB ys1 ys2 ->
+                          Forall2 (prod_rel RA RB) (zip xs1 ys1) (zip xs2 ys2).
+  Proof.
+    intros xs1 xs2 Hxs; induction Hxs; intros ys1 ys2 Hys; cbn.
+    - constructor.
+    - destruct Hys; cbn; constructor; auto. apply IHHxs; auto.
+  Qed.
+
+  (* [split_every] of related lists yields related lists of chunks. *)
+  Lemma Forall2_split_every_pos {A B} (R : A -> B -> Prop) (n : positive) :
+    forall k l l',
+      (length l <= k)%nat ->
+      Forall2 R l l' ->
+      Forall2 (Forall2 R) (split_every_pos n l) (split_every_pos n l').
+  Proof.
+    induction k; intros l l' LEN F; inversion F; subst.
+    - rewrite !split_every_pos_equation; constructor.
+    - cbn in LEN; lia.
+    - rewrite !split_every_pos_equation; constructor.
+    - (* [!]-rewriting would loop: the unfolding reintroduces a redex on
+         the dropped tail; pin each rewrite to its argument instead *)
+      match goal with
+      | |- Forall2 _ (split_every_pos _ ?u) (split_every_pos _ ?v) =>
+          rewrite (split_every_pos_equation _ u),
+          (split_every_pos_equation _ v)
+      end.
+      constructor.
+      + apply Forall2_take; constructor; auto.
+      + apply IHk.
+        * match goal with
+          | |- (length (drop _ (?x :: ?xs)) <= _)%nat =>
+              pose proof (@drop_length_lt _ (x :: xs) (Npos n))
+          end;
+          cbn in *.
+          forward H1; [lia|].
+          forward H1; [easy|].
+          lia.
+        * apply Forall2_drop; constructor; auto.
+  Qed.
+
+  Lemma Forall2_split_every_nil {A B} (R : A -> B -> Prop) :
+    forall n l l',
+      Forall2 R l l' ->
+      Forall2 (Forall2 R) (split_every_nil n l) (split_every_nil n l').
+  Proof.
+    intros [|p] l l' F; cbn; [constructor|].
+    apply Forall2_split_every_pos with (k := length l); eauto.
+  Qed.
+
+  Lemma Forall2_nth_error {A B} (R : A -> B -> Prop) (l1 : list A) (l2 : list B) :
+    Forall2 R l1 l2 ->
+    forall n,
+      match nth_error l1 n, nth_error l2 n with
+      | Some a, Some b => R a b
+      | None, None => True
+      | _, _ => False
+      end.
+  Proof.
+    intros F; induction F; intros [| n]; cbn; auto.
+    apply IHF.
+  Qed.
+
+  Lemma Forall2_map_rel {A1 A2 B1 B2} (R : A1 -> A2 -> Prop) (R' : B1 -> B2 -> Prop)
+    (f : A1 -> B1) (g : A2 -> B2) :
+    (forall a b, R a b -> R' (f a) (g b)) ->
+    forall l1 l2, Forall2 R l1 l2 -> Forall2 R' (map f l1) (map g l2).
+  Proof.
+    intros HRR l1 l2 F; induction F; cbn; constructor; auto.
+  Qed.
+
 End Forall2.
 
 (** *** Interactions between monadic computations and lists *)
@@ -573,13 +665,12 @@ Section monad.
      through all of them — O(n) per step, O(n²) for a straight-line block
      (see perf/locals-chain.ll). The direct sequencing fold keeps the
      pending-bind depth constant. *)
-  Definition loop_monad {A B}
+  Fixpoint loop_monad {A B}
     (f: A -> m B) (l: list A): m unit :=
-    (fix loop l :=
-       match l with
-       | [] => ret tt
-       | a::l' => f a;; loop l'
-       end) l.
+    match l with
+    | [] => ret tt
+    | a::l' => f a;; loop_monad f l'
+    end.
 
   (* Value-collecting analogue of [loop_monad]: the recursive call is in
      tail position of the bind, so the pending-bind depth stays constant
