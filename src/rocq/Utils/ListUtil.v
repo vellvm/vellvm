@@ -526,6 +526,12 @@ Section Forall2.
     intros * HR; induction HR; subst; cbn; auto.
   Qed.
 
+  Lemma eq_Forall2 {A} (l : list A) :
+    Forall2 eq l l.
+  Proof.
+    induction l; auto.
+  Qed.
+  
 End Forall2.
 
 (** *** Interactions between monadic computations and lists *)

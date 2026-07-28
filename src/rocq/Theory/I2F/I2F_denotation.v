@@ -488,7 +488,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   intros.
   erbind; [apply I2F_refine_lift', I2F_combine_lists_varargs; auto | intros].
   destruct r1, r2; inv H0; cbn in * |-.
-  erbind; [eapply I2F_refine_lift', I2F_EOU_map_monad2 with (RB := Logic.eq); eauto | intros ?? HEQ; apply Forall2_eq in HEQ; subst].
+  erbind; [eapply I2F_refine_lift', I2F_EOU_map_monad2 with (RB := Logic.eq); eauto | intros ?? HEQ; apply ListUtil.Forall2_eq in HEQ; subst].
   apply I2F_dtyp_of_dvalue.
   rbind TT...
   intros _ _ _.

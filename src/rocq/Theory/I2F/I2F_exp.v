@@ -1226,69 +1226,128 @@ Lemma I2F_max_alignment : forall ts,
     = @max_preferred_dtyp_alignment (@SIZE PFin) ts.
 Proof. reflexivity. Qed.
 
-Lemma I2F_dvalue_extract_byte : forall v v',
+Lemma length_take {A B} (l : list A) (l' : list B) n :
+  length l = length l' -> length (take n l) = length (take n l').
+Proof.
+  revert l' n.
+  induction l; intros.
+  - destruct l'.  reflexivity.
+    inversion H.
+  - destruct l'.  inversion H.
+    cbn. destruct n; auto.
+    cbn. erewrite IHl; eauto.
+Qed.    
+
+Lemma length_drop {A B} (l : list A) (l' : list B) n :
+  length l = length l' -> length (drop n l) = length (drop n l').
+Proof.
+  revert l' n.
+  induction l; intros.
+  - destruct l'.  reflexivity.
+    inversion H.
+  - destruct l'.  inversion H.
+    cbn. destruct n; auto.
+Qed.
+
+
+Lemma I2F_memory_byte_of_dvalue_bv (bit_sz : positive) bv bv' (idx : N) :
+  I2F_dvalue_bv bv bv' ->
+  I2F_memory_byte (@memory_byte_of_dvalue_bv PInf bit_sz bv idx) (@memory_byte_of_dvalue_bv PFin bit_sz bv' idx).
+Proof.
+  intros H.
+  inversion H; subst.
+  - unfold memory_byte_of_dvalue_bv.
+    destruct (negb (N.pos bit_sz mod 8 =? 0)%N && (idx + 1 =? sizeof_dtyp (DTYPE_I bit_sz))%N).
+    repeat constructor.
+    apply Forall2_app.
+    apply Forall2_map2.
+    intros.
+    constructor.
+    apply Forall2_repeat.
+    constructor.
+    constructor.
+  - unfold memory_byte_of_dvalue_bv.
+    constructor. assumption.
+  - unfold memory_byte_of_dvalue_bv.
+    constructor.
+    apply Forall2_app.
+    apply Forall2_take.
+    destruct ((idx =? 0)%N); auto.
+    apply Forall2_drop; auto.
+    apply Forall2_length in H0.    
+    destruct ((idx =? 0)%N).
+    + rewrite (length_take bits bits'); auto.
+      destruct (negb (N.of_nat (Datatypes.length (take 8 bits')) =? 8)%N); auto.
+    + rewrite (length_take (drop _ bits) (drop (8 * N.pred idx) bits')); auto.
+      destruct (negb (N.of_nat (Datatypes.length (take 8 (drop (8 * N.pred idx) bits'))) =? 8)%N).
+      apply Forall2_repeat; auto. constructor.
+      apply length_drop. auto.
+Qed.
+
+
+Lemma I2F_poison_memory_byte : I2F_memory_byte (@poison_memory_byte PInf) (@poison_memory_byte PFin).
+Proof.
+  constructor.
+  apply Forall2_repeat.
+  constructor.
+Qed.  
+
+
+Lemma I2F_memory_byte_of_dvalue : forall v v',
     I2F_dvalue v v' ->
     forall dt idx,
-      @dvalue_extract_byte PInf v dt idx = @dvalue_extract_byte PFin v' dt idx.
+      I2F_EOU I2F_memory_byte (@memory_byte_of_dvalue PInf v dt idx) (@memory_byte_of_dvalue PFin v' dt idx).
 Proof.
   induction v using dvalue_ind; intros v' R; inversion R; subst;
-    clear R; intros dt idx; cbn; auto.
+    clear R; intros dt idx; cbn.
   - (* Base *)
-    match goal with HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst end;
-    cbn; auto.
-    + (* Pointer *)
-      repeat match goal with
-             | HA : I2F_Addr ?a ?b |- _ =>
-                 destruct a, b; destruct HA as [HI ->]; red in HI; subst
-             end; reflexivity.
-    + (* Iptr *)
-      match goal with HI : I2F_Iptr _ _ |- _ => red in HI; subst end;
-      reflexivity.
+    inversion H0; subst; repeat constructor; auto.
+    eapply I2F_memory_byte_of_dvalue_bv. constructor.
+    unfold I2F_Iptr in H. subst.
+    cbn.  constructor.
+    apply I2F_memory_byte_of_dvalue_bv; auto.
+
   - (* Struct: the packed flavour has no padding (capture the loops so
          only the applied offset gets generalized); the aligned one first
          aligns and generalizes the baked-in padding bound (freeing the
          type list). Then induct on the related fields with the type list
          universal; each step unfolds one iteration of both loops in
          lockstep on shared scrutinees. *)
-    match goal with p : bool |- _ => destruct p end;
-    destruct dt as [ ? | p' ? | ? ? ? ]; cbn; auto;
-    destruct p'; cbn; auto.
-    + (* packed × packed *)
+    rename s2 into fields'.
+    destruct p.
+    + destruct dt as [ ? | p' ? | ? ? ? ]; auto.
+      destruct p'; auto.
+      (* packed × packed *)
       match goal with
-      | |- ?L _ _ _ _ = ?R _ _ _ _ => set (loopL := L); set (loopR := R)
+      | |- I2F_EOU I2F_memory_byte (?L _ _ _ _) (?R _ _ _ _) => set (loopL := L); set (loopR := R)
       end.
-      match goal with
-      | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ _ ?ts _ _ = _ =>
-          generalize 0%N as offset; intros offset;
-          revert offset; revert idx; revert IH; revert ts;
-          induction F
-      end;
-      intros ts IH idx offset.
+      rename fields0 into ts.
+      generalize 0%N as offset. 
+      revert idx; revert IH; revert ts;
+        induction H2; intros ts IH idx offset.
       * unfold loopL, loopR; cbn;
           destruct ts; cbn; auto;
-          repeat (break_match_goal; cbn); auto.
+          repeat (break_match_goal; cbn);
+        repeat econstructor.
       * unfold loopL, loopR; cbn; fold loopL; fold loopR;
-          inversion IH; subst;
-          destruct ts; cbn; auto;
-          repeat (break_match_goal; cbn); auto.
-    + (* aligned × aligned *)
+        inversion IH; subst;
+        destruct ts; cbn; auto.
+        repeat (break_match_goal; cbn); auto; repeat constructor.
+    + destruct dt as [ ? | p' ? | ? ? ? ]; auto.
+      destruct p'; auto.
+      rename fields0 into ts.
       rewrite I2F_max_alignment.
-      match goal with
-      | |- context [@max_preferred_dtyp_alignment ?S ?ts] =>
-          generalize (@max_preferred_dtyp_alignment S ts) as mpad; intros mpad
-      end.
-      match goal with
-      | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ _ ?ts _ _ = _ =>
-          generalize 0%N as offset; intros offset;
-          revert offset; revert idx; revert IH; revert ts;
-          induction F
-      end;
-      intros ts IH idx offset; cbn.
+      remember (max_preferred_dtyp_alignment ts) as m. clear Heqm.
+      generalize 0%N as offset.
+      revert idx; revert IH; revert ts;
+        induction H2; intros ts IH idx offset.
       * destruct ts; cbn; auto;
           repeat (break_match_goal; cbn); auto.
+        repeat constructor.
       * inversion IH; subst;
           destruct ts; cbn; auto;
           repeat (break_match_goal; cbn); auto.
+        repeat constructor.
   - (* Array *)
     destruct dt; cbn; auto.
     match goal with
@@ -1300,27 +1359,34 @@ Proof.
     break_match_goal; cbn; auto.
 Qed.
 
+  
 Lemma I2F_dvalue_to_memory_bytes : forall v v' t,
     I2F_dvalue v v' ->
-    Forall2 I2F_mbyte
+    I2F_EOU (Forall2 I2F_memory_byte)
       (@dvalue_to_memory_bytes PInf v t)
       (@dvalue_to_memory_bytes PFin v' t).
 Proof.
   intros; unfold dvalue_to_memory_bytes.
   rewrite I2F_sizeof_dtyp.
-  apply Forall2_map2; intros b _.
-  red; cbn.
-  now apply I2F_dvalue_extract_byte.
+  eapply I2F_EOU_map_monad2 with (RA:=Logic.eq).
+  apply eq_Forall2.
+  intros; subst.
+  now apply I2F_memory_byte_of_dvalue.
 Qed.
 
 (** Bitcast round-trips a value through its byte representation. *)
 Lemma I2F_bitcast_bytes : forall v v' t_from t_to,
     I2F_dvalue v v' ->
     I2F_EOU I2F_dvalue
-      (@memory_bytes_to_dvalue PInf (@dvalue_to_memory_bytes PInf v t_from) t_to)
-      (@memory_bytes_to_dvalue PFin (@dvalue_to_memory_bytes PFin v' t_from) t_to).
+      (dv <- (@dvalue_to_memory_bytes PInf v t_from) ;;
+       @memory_bytes_to_dvalue PInf dv t_to)
+      (dv <- (@dvalue_to_memory_bytes PFin v' t_from) ;;
+       @memory_bytes_to_dvalue PFin dv t_to).
 Proof.
-  intros; apply I2F_memory_bytes_to_dvalue, I2F_dvalue_to_memory_bytes; auto.
+  intros.
+  eapply I2F_EOU_bind with (RA:=Forall2 I2F_memory_byte).
+  apply  I2F_dvalue_to_memory_bytes; auto.
+  apply I2F_memory_bytes_to_dvalue.
 Qed.
 
 (*
@@ -1432,7 +1498,8 @@ Proof.
   intros R.
   destruct ct.
   - cbn.
-    repeat break_match_goal; auto.
+    destruct (dtyp_eqb t_from t_to); auto.
+    break_match_goal_safe.
     apply I2F_refine_lift.
     apply I2F_bitcast_bytes; auto.
     rstep. constructor.
@@ -1499,8 +1566,8 @@ Proof.
        | |- context [match @handle_gep_h ?pa ?u ?o ?ws with _ => _ end] =>
            destruct (@handle_gep_h pa u o ws); cbn; auto
        end);
-  repeat (break_match_goal_safe; cbn); auto;
-  i2f_in_range_case.
+  repeat (break_match_goal_safe; cbn); repeat constructor; auto; 
+  i2f_in_range_case; unfold I2F_Iptr; apply in_bounds_case; auto.
 Qed.
 
 Lemma I2F_eval_gep t a1 a2 b1 b2 :
