@@ -18,12 +18,19 @@ What *is* mechanical, and what this script does:
   * re-check a completed suite against a newer LangRef and report drift.
 
 Usage:
-    utilities/langref_examples.py generate [--force]   # write skeletons
-    utilities/langref_examples.py manifest             # (re)write MANIFEST.md
-    utilities/langref_examples.py check                # report drift, exit 1
+    python3 utilities/langref_examples.py generate [--force]   # write skeletons
+    python3 utilities/langref_examples.py manifest             # (re)write MANIFEST.md
+    python3 utilities/langref_examples.py check                # report drift, exit 1
 
 ``generate`` never overwrites an existing test unless ``--force`` is given:
 the hand-written assertions are the valuable part.
+
+``check`` assumes that langref is present at the root of the project: fetch it using
+`curl -o langref.html https://llvm.org/docs/LangRef.html` before running the check.
+NOTE: we could add it to the repo, but it's slightly heavy. We could also automate
+that with a target in the makefile, but it's a niche usage, probably fine to leave
+it as a slightly adhoc tool.
+
 """
 
 import argparse
@@ -96,6 +103,10 @@ class Example(object):
 
 
 def _strip_tags(s):
+    # Drop the "permalink to this heading" anchor first: its visible text is a
+    # pilcrow in one sphinx theme and a "#" in another, and either would end
+    # up glued to the section title.
+    s = re.sub(r'<a class="headerlink".*?</a>', "", s, flags=re.S)
     return html.unescape(re.sub(r"<[^>]+>", "", s))
 
 
@@ -104,12 +115,18 @@ def parse_langref(path=LANGREF):
     with open(path, encoding="utf-8") as f:
         doc = f.read()
 
+    # Attributes are matched loosely on purpose: a LangRef saved from a
+    # browser carries the DOM *after* the Sphinx JS has run, which sprinkles
+    # extra attributes around (sphinx-copybutton adds style="position:
+    # relative" to every highlight div).  A pattern anchored on the exact
+    # markup silently matches nothing there, which reads as "no examples".
     token = re.compile(
-        r'<section id="([^"]+)">'
+        r'<section [^>]*id="([^"]+)"'
         r"|</section>"
-        r"|<h4>(.*?)</h4>"
-        r'|<h5>([^<]*)<a class="headerlink"'
-        r'|<div class="highlight-[\w+-]+ notranslate"><div class="highlight"><pre>(.*?)</pre>',
+        r"|<h4[^>]*>(.*?)</h4>"
+        r'|<h5[^>]*>([^<]*)<a class="headerlink"'
+        r'|<div class="highlight-[\w+-]+ notranslate"[^>]*>'
+        r'<div class="highlight"[^>]*><pre[^>]*>(.*?)</pre>',
         re.S,
     )
 
@@ -158,9 +175,17 @@ def instruction_name(title):
 
 def llvm_version(path=LANGREF):
     with open(path, encoding="utf-8") as f:
-        head = f.read(20000)
-    m = re.search(r"LLVM ([\w.]+) documentation", head)
-    return m.group(1) if m else "unknown"
+        doc = f.read()
+    # A raw sphinx page says it in the <title>; a browser-saved one rewrites
+    # the title, so fall back to the Release Notes link in the sidebar.
+    for pat in (
+        r"LLVM ([\d][\w.]*) documentation",
+        r"LLVM ([\d][\w.]*) Release Notes",
+    ):
+        m = re.search(pat, doc)
+        if m:
+            return m.group(1)
+    return "unknown"
 
 
 # --------------------------------------------------------------------------
