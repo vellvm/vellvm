@@ -66,10 +66,6 @@ Section Convert.
  *)
   
   (* Floating point extension *)
-  (* SAZ: I'm not sure that this implementation does the right thing
-     with respect to the rounding mode (maybe not a problem for extension)
-     and NAN propagation.
-   *)
   (* LANGREF: The ‘fpext’ instruction extends the value from a smaller
      floating-point type to a larger floating-point type. The fpext cannot be
      used to make a no-op cast because it always changes bits. Use bitcast to
@@ -80,9 +76,43 @@ Section Convert.
      propagation” cases), then it is copied to the high order bits of the
      resulting payload, and the remaining low order bits are zero.
 
+     [Float.of_single] is [Bconv] instantiated with [Float.of_single_nan],
+     which implements exactly the rule above: [expand_nan_payload] shifts the
+     source payload left by 29 bits, putting it in the high order bits of the
+     result and zeroing the rest.  Rolling our own [conv_nan] here instead
+     (which is what we used to do) flattens every NaN to the default one:
+     legal, since the "Preferred NaN" case is always an option, but needlessly
+     lossy and inconsistent with what the binops do.
+
+     Note that [of_single_nan] consults [Archi.float_of_single_preserves_sNaN],
+     which we set to [true]: a signaling NaN stays signaling across [fpext].
+     That is the "Unchanged NaN propagation" case, and is legal.
    *)
-  Program Definition float_to_double (f : ll_float) : ll_double :=
-    Bconv _ _ _ _ eq_refl eq_refl (fun _ => default_nan_64) BinarySingleNaN.mode_NE f.
+  Definition float_to_double : ll_float -> ll_double := Float.of_single.
+
+  (* Floating point truncation *)
+  (* LANGREF: The ‘fptrunc’ instruction casts a value from a larger
+     floating-point type to a smaller floating-point type.  This instruction is
+     assumed to execute in the default floating-point environment.
+
+     NaN values follow the usual NaN behaviors, except that if a NaN payload is
+     propagated from the input (“Quieting NaN propagation” or “Unchanged NaN
+     propagation” cases), then the low order bits of the NaN payload which
+     cannot fit in the resulting type are discarded.
+
+     [Float.to_single] is [Bconv] instantiated with [Float.to_single_nan],
+     which implements exactly the rule above: [reduce_nan_payload] shifts the
+     source payload right by 29 bits, discarding the low order bits that do not
+     fit.  It quiets the payload *before* the shift, which is precisely what
+     stops the shift from producing the all-zero payload the LangRef warns
+     about (an all-zero payload with the quiet bit clear would denote an
+     infinity, not a NaN).
+
+     Caveat inherited from [float_to_double]: unlike extension, truncation
+     genuinely rounds, and we do not model the non-default rounding modes.
+     [mode_NE] is the default environment's round-to-nearest-ties-to-even.
+   *)
+  Definition double_to_float : ll_double -> ll_float := Float.to_single.
 
   (** ** Typed conversion
         Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
@@ -155,12 +185,12 @@ Section Convert.
         match t1, x, t2 with
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_float =>
             if Pos.eqb sz_t sz_from
-            then ret (DVALUE_Float (Float32.of_intu (repr (signed i1))))
+            then ret (DVALUE_Float (Float32.of_int (repr (signed i1))))
             else raise_error "i-to-float ill-typed Sitofp"
 
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_double =>
             if Pos.eqb sz_t sz_from
-            then ret (DVALUE_Double (Float.of_longu (repr (signed i1))))
+            then ret (DVALUE_Double (Float.of_long (repr (signed i1))))
             else raise_error "i-to-double ill-typed Sitofp"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
@@ -220,12 +250,28 @@ Section Convert.
         match t1, x, t2 with
         | DTYPE_FP FP_float, DVALUE_Float f, DTYPE_FP FP_double  =>
             ret (DVALUE_Double (float_to_double f))
-            
+
+        | DTYPE_FP FP_float, DVALUE_Poison t, DTYPE_FP FP_double =>
+            ret (dvp t2)
+           
         | _, _, _ => raise_error "ill-typed Fpext"
         end
 
-    | Fptrunc _
-      => raise_error "TODO: unimplemented numeric conversion"
+    | Fptrunc _ =>
+        (* NOTE: Does not support "fast-math" flags *)
+        match t1, x, t2 with
+        (* [double] and [float] are the only floating-point types carried by
+           [dvalue_base], so double-to-float is the only narrowing there is.
+           In particular the LangRef's second example, [fptrunc double 1.0E+300
+           to half], is out of reach. *)
+        | DTYPE_FP FP_double, DVALUE_Double f, DTYPE_FP FP_float =>
+            ret (DVALUE_Float (double_to_float f))
+
+        | DTYPE_FP FP_double, DVALUE_Poison t, DTYPE_FP FP_float =>
+            ret (dvp t2)
+
+        | _, _, _ => raise_error "ill-typed Fptrunc"
+        end
     end.
   
   Arguments convert_pure_base _ _ _ _ : simpl nomatch.

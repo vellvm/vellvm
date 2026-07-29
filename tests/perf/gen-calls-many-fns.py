@@ -17,7 +17,7 @@ lines.append("; rebuilding the map per call. Compare per-call cost against")
 lines.append("; calls-fib.ll (many calls, two functions) and calls-large-fn.ll")
 lines.append("; (per-call setup vs. callee size).")
 lines.append(";")
-lines.append("; Tune: regenerate with a different N / K (see perf/README.md).")
+lines.append("; Tune: regenerate with a different N / K (see tests/perf/README.md).")
 lines.append("; Result is K (the callee is the successor function).")
 lines.append("")
 for i in range(N):

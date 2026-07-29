@@ -14,7 +14,7 @@ lines.append("; ~9x slower than with the AVL block map; the dead blocks are neve
 lines.append("; executed, so any slowdown relative to loop-phi-arith.ll (same hot")
 lines.append("; loop, tiny function) is pure lookup cost.")
 lines.append(";")
-lines.append("; Tune: regenerate with a different D / K (see perf/README.md).")
+lines.append("; Tune: regenerate with a different D / K (see tests/perf/README.md).")
 lines.append("; Result is sum 0..(K-1) = K*(K-1)/2.")
 lines.append("")
 lines.append("define i64 @jumps(i64 %n) {")

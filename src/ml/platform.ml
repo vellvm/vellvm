@@ -219,3 +219,13 @@ let ll_files_of_dir path : string list =
   let rm_cmd = Printf.sprintf "rm %s" tmp_file in
   let () = sh rm_cmd raise_error in
   ans
+
+(* Like [ll_files_of_dir], but drops any path with one of [excluded] as a
+   path component -- e.g. ["perf"] to skip performance stress tests (which
+   live under tests/ but are only meant to be run via `make perf`, never as
+   part of the regular suite). *)
+let ll_files_of_dir_excluding (excluded : string list) path : string list =
+  List.filter
+    (fun p ->
+      not (List.exists (fun name -> List.mem name (String.split_on_char '/' p)) excluded) )
+    (ll_files_of_dir path)
