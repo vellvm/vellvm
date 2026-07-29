@@ -64,23 +64,25 @@ Section MemoryModel.
     lift (memory_bytes_to_dvalue bytes dt).
 
   (** Writing dvalues *)
+  (* [N_length] rather than [N.length]: the latter's [1 + length l] is
+     non-tail, recursing as deep as [bytes] — a problem for large writes
+     (see perf/global-init.ll). *)
   Definition write_bytes (p : ptr) (bytes : list memory_byte) : memM unit :=
-    ptrs <- lift (get_consecutive_ptrs p (N.length bytes));;
-    let ptr_bytes := ListUtil.zip ptrs bytes in
+    ptrs <- lift (get_consecutive_ptrs p (N_length bytes));;
+    let ptr_bytes := zip_acc ptrs bytes in
     (* Actually perform writes *)
     loop_monad (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
   Definition write_dvalue (dt : dtyp) (p : ptr) (v : dvalue) : memM unit :=
     write_bytes p (dvalue_to_memory_bytes v dt).
 
+  (* [seq_map_acc]/[N_to_nat_safe] rather than [N.recursion]: the latter's
+     doubling composition is non-tail (same disease as [Pos.to_nat] — see
+     perf/global-init.ll), so filling a large fresh allocation's poison
+     bytes this way blew the native stack. *)
   Definition generate_num_poison_bytes_h
     (start_ix : N) (num : N) (dt : dtyp) : list memory_byte :=
-    N.recursion 
-      (fun (x : N) => [])
-      (fun n mf x =>
-         let rest_bytes := mf (N.succ x) in
-         MByte (DVALUE_Poison dt) dt x :: rest_bytes)
-      num start_ix.
+    seq_map_acc (fun x => MByte (DVALUE_Poison dt) dt x) start_ix (N_to_nat_safe num).
 
   Definition generate_num_poison_bytes (num : N) (dt : dtyp) : list memory_byte :=
     generate_num_poison_bytes_h 0 num dt.
@@ -93,11 +95,16 @@ Section MemoryModel.
     pr <- fresh_prov tt;;
     allocate_bytes_with_pr init_bytes align pr.
 
+  (* [concat_acc] rather than [List.concat]: for a single (num_elements =
+     1) large allocation this reduces to [poison_bytes ++ []] under the
+     hood — [++]/[app] is non-tail, blowing the native stack (see
+     perf/global-init.ll). [concat_acc_eq] shows it is a faithful
+     replacement. *)
   Definition allocate_dtyp (dt : dtyp) (num_elements : N) (align : N) : memM ptr :=
     if dtyp_eqb dt DTYPE_Void
     then mub "allocating void type"
     else let element_bytes := repeatN num_elements (generate_poison_bytes dt) in
-         let bytes := List.concat element_bytes in
+         let bytes := concat_acc element_bytes in
          allocate_bytes bytes align.
 
 
@@ -367,9 +374,12 @@ Section Implementation.
     IM.add phys_ptr byte mem.
   
  (** Add block to memory with a given allocation id *)
+  (* [map_acc] rather than [map]: the latter's [f a :: map f t] is
+     non-tail, recursing as deep as [bytes] — a problem for large
+     allocations (see perf/global-init.ll). *)
   Definition memory_bytes_to_bytes
     (aid : allocationId) (bytes : list memory_byte) : list byte :=
-    map (fun b => (b, aid)) bytes.
+    map_acc (fun b => (b, aid)) bytes.
 
   (* Register a concrete ptress in a frame *)
   Definition add_to_frame (m : memory_stack) (k : ptr) : memory_stack :=
@@ -486,11 +496,15 @@ Section Implementation.
     upd_mem (set_byte_raw_mem m phys_addr byte).
 
   (** Add block to memory with a given allocation id *)
+  (* [add_all_index_acc] rather than [add_all_index]: the latter's
+     recursive call is not in tail position, so bulk-inserting a large
+     allocation's bytes blew the native stack (see perf/global-init.ll).
+     [IntMaps.add_all_index_acc_eq] shows it is a faithful replacement. *)
   Definition add_block (aid : allocationId) (p : ptr)
     (ptrs : list ptr) (init_bytes : list memory_byte) : memM unit :=
     let mem_bytes := memory_bytes_to_bytes aid init_bytes in
     m <- get_mem;;
-    upd_mem (add_all_index mem_bytes (ptr_to_int p) m).
+    upd_mem (add_all_index_acc mem_bytes (ptr_to_int p) m).
 
   (** Add pointers to the stack frame *)
   Definition add_ptrs_to_frame (ptrs : list ptr) : memM unit :=
@@ -536,16 +550,18 @@ Section Implementation.
     ptrs <- lift (get_consecutive_ptrs ptr size);;
     ret (ptr,ptrs).
 
+  (* [N_length] rather than [N.length] — see [write_bytes]. *)
   Definition Allocate_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM ptr :=
-    let size := N.length init_bytes in
+    let size := N_length init_bytes in
     let aid := provenance_to_allocation_id pr in
     '(ptr, ptrs) <- get_free_block size align pr;;
     add_block_to_stack aid ptr ptrs init_bytes;;
     ret ptr.
 
   (** Heap allocation *)
+  (* [N_length] rather than [N.length] — see [write_bytes]. *)
   Definition Malloc_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM ptr :=
-    let size := N.length init_bytes in
+    let size := N_length init_bytes in
     let aid := provenance_to_allocation_id pr in
     '(ptr, ptrs) <- get_free_block size align pr;;
     add_block_to_heap aid ptr ptrs init_bytes;;

@@ -69,5 +69,5 @@ From Stdlib Require Import Basics.
 Open Scope program_scope.
 
 Definition intptr_seq {IP : IPtr} (start size : N) : EOU (list iptr)
-  := map_monad (from_Z ∘ Z.of_N) (ListUtil.Nseq start (N.to_nat size)).
+  := ListUtil.seq_map_monad_acc (from_Z ∘ Z.of_N) start (ListUtil.N_to_nat_safe size).
 

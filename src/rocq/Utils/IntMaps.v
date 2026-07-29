@@ -90,6 +90,20 @@ Section Map_Operations.
     | v :: tl => add i v (add_all_index tl (i+1) m)
     end.
 
+  (* Tail-safe analogue of [add_all_index]: [add i v (add_all_index tl
+     (i+1) m)]'s recursive call is not in tail position, so bulk-inserting
+     a large allocation's bytes (one call per allocation, but internally
+     recursing per byte) blew the native stack — see perf/global-init.ll.
+     Inserts the head immediately instead of after recursing on the tail;
+     [add_all_index_acc_eq] below shows this agrees with [add_all_index]
+     since all indices touched are pairwise distinct, so insertion order
+     doesn't matter ([add_add_ineq]). *)
+  Fixpoint add_all_index_acc {a} vs (i:Z) (m:IntMap a) :=
+    match vs with
+    | [] => m
+    | v :: tl => add_all_index_acc tl (i+1) (add i v m)
+    end.
+
   (* Give back a list of values from [|i|] to [|i| + |sz| - 1] in [m].
      Uses [def] as the default value if a lookup failed.
    *)
@@ -623,6 +637,35 @@ Section Map_Operations.
     inv H0.
   Qed.
 
+  (* Inserting at an index outside of [l]'s target range ([i .. i+len l))
+     commutes with [add_all_index l i]. *)
+  Lemma add_all_index_add_comm {a} : forall (l : list a) i j v (m : IntMap a),
+      j < i \/ j >= i + Zlength l ->
+      Equal (add_all_index l i (add j v m)) (add j v (add_all_index l i m)).
+  Proof using.
+    induction l as [| x l IH]; intros i j v m OUT; [reflexivity |].
+    cbn [add_all_index].
+    pose proof (Zlength_correct l).
+    assert (NEQ : j <> i) by (rewrite Zlength_cons in OUT; lia).
+    transitivity (add i x (add j v (add_all_index l (i+1) m))).
+    - apply Proper_add; auto.
+      apply IH; rewrite Zlength_cons in OUT; lia.
+    - apply add_add_ineq; auto.
+  Qed.
+
+  (* [add_all_index_acc] agrees with [add_all_index]: both insert the same
+     set of (distinct-key, value) pairs, only in a different order, and
+     [add_all_index_add_comm] shows that order is inconsequential. *)
+  Lemma add_all_index_acc_eq {a} : forall (vs : list a) i m,
+      Equal (add_all_index_acc vs i m) (add_all_index vs i m).
+  Proof using.
+    induction vs as [| v vs IH]; intros i m; [reflexivity |].
+    cbn [add_all_index_acc add_all_index].
+    transitivity (add_all_index vs (i+1) (add i v m)).
+    - apply IH.
+    - apply add_all_index_add_comm; lia.
+  Qed.
+
   (** ** Behavior of [lookup_all_index]
    *)
 
@@ -954,6 +997,20 @@ Section Map_Operations.
     - cbn; auto.
     - cbn.
       apply IM_Refine_add; eauto.
+  Qed.
+
+  Lemma IM_Refine_add_all_index_acc :
+    forall {R1 R2} (R1R2 : R1 -> R2 -> Prop) l1 l2 z m1 m2
+      (ALL : Forall2 R1R2 l1 l2)
+      (REF : IM_Refine R1R2 m1 m2),
+      IM_Refine R1R2 (add_all_index_acc l1 z m1) (add_all_index_acc l2 z m2).
+  Proof using.
+    intros R1 R2 R1R2 l1 l2 z m1 m2 ALL.
+    revert z m1 m2.
+    induction ALL as [| x y l1 l2 Rxy ALL' IH]; intros z m1 m2 REF.
+    - cbn; auto.
+    - cbn.
+      apply IH, IM_Refine_add; auto.
   Qed.
 
   Lemma IM_greatest_key_morph :

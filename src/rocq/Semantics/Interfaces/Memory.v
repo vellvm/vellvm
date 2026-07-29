@@ -59,7 +59,11 @@ Inductive memS {S A P : Type} (X : Type) : Type :=
 | Mub  (s : string) : memS X
 | Merr (s : string) : memS X
 | Mget (k : S -> memS X) : memS X
-| Mput (σ : S) (k : memS X) : memS X
+(* [k] is thunked ([unit -> memS X], not a bare [memS X]) so that
+   [memS_bind]'s [Mput] arm can defer its recursive call inside a closure
+   like every other constructor, instead of forcing it eagerly as a
+   strict data-constructor argument — see [memS_bind] below. *)
+| Mput (σ : S) (k : unit -> memS X) : memS X
 | Mchoose (c:@memC) (k : (@memCType P c) -> memS X) : memS X
 (* | Massert (c : S -> A -> P -> Prop) : memS unit ????? *) 
 .
@@ -92,7 +96,12 @@ Fixpoint memS_bind {S A P X Y} (c : memS S A P X) (k : X -> memS S A P Y) : memS
   | Mub s => Mub s
   | Merr s => Merr s
   | Mget g => Mget (fun σ => memS_bind (g σ) k)
-  | Mput σ g => Mput σ (memS_bind g k)
+  (* Closure-wrapped like every other case: constructing this [Mput]
+     must not force [memS_bind (g tt) k] eagerly. A long chain of writes
+     (e.g. [write_bytes] over a large buffer, bound via [loop_monad])
+     otherwise cascades into one native stack frame per element — see
+     perf/global-init.ll. *)
+  | Mput σ g => Mput σ (fun _ => memS_bind (g tt) k)
   | Mchoose c g => Mchoose c (fun a => memS_bind (g a) k)
   end.
 
@@ -111,7 +120,7 @@ Definition lift {S A P} : EOU ~> memS S A P :=
 Definition mub        {S A P X} s : memS S A P X := Mub s.
 Definition merr       {S A P X} s : memS S A P X := Merr s.
 Definition moom       {S A P X} s : memS S A P X := Moom s.
-Definition put {S A P} (σ: S) : memS S A P unit := Mput σ (ret tt).
+Definition put {S A P} (σ: S) : memS S A P unit := Mput σ (fun _ => ret tt).
 Definition get {S A P}  : memS S A P S := Mget (fun σ => ret σ).
 Definition next_key {S A P} size align : memS S A P Z := Mnext_key size align (fun a => ret a). 
 Definition fresh_prov {S A P} : unit -> memS S A P P := fun _ => Mfresh_prov (fun p => ret p).

@@ -17,14 +17,82 @@ Set Contextual Implicit.
 
 Module N.
   (* Standard library things in [N] rather than [nat] *)
-  
+
   Fixpoint length {A} (l : list A) : N :=
     match l with
     | [] => 0
     | _ :: l => 1 + length l
     end.
+
+  (* Tail-safe analogue of [length] *)
+  Fixpoint length_acc {A} (l : list A) (acc : N) : N :=
+    match l with
+    | [] => acc
+    | _ :: l => length_acc l (1 + acc)
+    end.
 End N.
-  
+
+Definition N_length {A} (l : list A) : N := N.length_acc l 0.
+
+Lemma N_length_acc_eq {A} : forall (l : list A) acc,
+    N.length_acc l acc = (acc + N.length l)%N.
+Proof.
+  induction l as [| x l IH]; intros acc; cbn [N.length_acc N.length]; [lia |].
+  rewrite IH; lia.
+Qed.
+
+Lemma N_length_eq {A} (l : list A) : N_length l = N.length l.
+Proof. unfold N_length; rewrite N_length_acc_eq; lia. Qed.
+
+(* Tail-safe analogue of [List.concat] *)
+Fixpoint concat_acc_go {A} (ls : list (list A)) (acc : list A) : list A :=
+  match ls with
+  | [] => acc
+  | l :: ls => concat_acc_go ls (rev_append l acc)
+  end.
+
+Definition concat_acc {A} (ls : list (list A)) : list A :=
+  rev_append (concat_acc_go ls []) [].
+
+Lemma concat_acc_go_eq {A} : forall (ls : list (list A)) acc,
+    concat_acc_go ls acc = rev_append (List.concat ls) acc.
+Proof.
+  induction ls as [| l ls IH]; intros acc; cbn [concat_acc_go List.concat].
+  - reflexivity.
+  - rewrite IH.
+    rewrite rev_append_rev, rev_append_rev, rev_append_rev.
+    rewrite rev_app_distr, app_assoc.
+    reflexivity.
+Qed.
+
+Lemma concat_acc_eq {A} (ls : list (list A)) : concat_acc ls = List.concat ls.
+Proof.
+  unfold concat_acc.
+  rewrite concat_acc_go_eq.
+  rewrite !rev_append_rev, !app_nil_r, rev_involutive.
+  reflexivity.
+Qed.
+
+(* Tail-safe analogue of pure [List.map] *)
+Fixpoint map_acc_go {A B} (f : A -> B) (l : list A) (acc : list B) : list B :=
+  match l with
+  | [] => rev_append acc []
+  | a :: l => map_acc_go f l (f a :: acc)
+  end.
+
+Definition map_acc {A B} (f : A -> B) (l : list A) : list B :=
+  map_acc_go f l [].
+
+Lemma map_acc_go_eq {A B} (f : A -> B) : forall (l : list A) acc,
+    map_acc_go f l acc = rev_append acc (map f l).
+Proof.
+  induction l as [| x l IH]; intros acc; cbn [map_acc_go map]; [reflexivity |].
+  apply IH.
+Qed.
+
+Lemma map_acc_eq {A B} (f : A -> B) (l : list A) : map_acc f l = map f l.
+Proof. unfold map_acc; rewrite map_acc_go_eq; reflexivity. Qed.
+
 (** * Collection of misc definitions and lemmas over lists *)
 
 (** *** Standard lemmas over standard lists *)
@@ -180,7 +248,115 @@ Section Standard.
     | O => []
     | S x => start :: Nseq (N.succ start) x
     end.
-  
+
+  (* [N.to_nat]/[Pos.to_nat] convert via [Pos.iter_op], which composes
+     O(log n) doublings but each doubling calls stdlib [Nat.add] — itself
+     non-tail (depth = its first argument's size). Near the top of the
+     doubling, that argument is close to n/2, so materializing [N.to_nat
+     n] alone costs O(n) native stack depth for large [n] (this is what
+     actually blew the stack in perf/global-init.ll — every list-builder
+     above already being tail-safe wasn't enough, since they all still
+     received their [len : nat] via [N.to_nat]).
+     [nat_double] below doubles a nat via its OWN tail loop (add "2" per
+     step, [n] steps — same asymptotic work as [Nat.add], but as a loop,
+     not a nesting of pending calls). [pos_to_nat_safe] then recurses on
+     [positive]'s structure (O(log n) native frames — safe) and, at each
+     level, calls [nat_double] on the ALREADY-COMPUTED inner result
+     (a completed value, not a deferred composition) — so no frame ever
+     waits on more than one further such call. *)
+  Fixpoint nat_double_acc (n : nat) (acc : nat) : nat :=
+    match n with
+    | O => acc
+    | S k => nat_double_acc k (S (S acc))
+    end.
+
+  Definition nat_double (n : nat) : nat := nat_double_acc n O.
+
+  Fixpoint pos_to_nat_safe (p : positive) : nat :=
+    match p with
+    | xH => S O
+    | xO p' => nat_double (pos_to_nat_safe p')
+    | xI p' => S (nat_double (pos_to_nat_safe p'))
+    end.
+
+  Definition N_to_nat_safe (n : N) : nat :=
+    match n with
+    | N0 => O
+    | Npos p => pos_to_nat_safe p
+    end.
+
+  Lemma nat_double_acc_eq : forall n acc, nat_double_acc n acc = (acc + 2 * n)%nat.
+  Proof.
+    induction n as [| k IH]; intros acc; cbn; [lia|].
+    rewrite IH; lia.
+  Qed.
+
+  Lemma nat_double_eq : forall n, nat_double n = (2 * n)%nat.
+  Proof. intros; unfold nat_double; rewrite nat_double_acc_eq; lia. Qed.
+
+  Lemma pos_to_nat_safe_eq : forall p, pos_to_nat_safe p = Pos.to_nat p.
+  Proof.
+    induction p as [p' IH | p' IH |]; cbn;
+      try rewrite nat_double_eq; try rewrite IH;
+      try rewrite Pos2Nat.inj_xI; try rewrite Pos2Nat.inj_xO; try lia.
+  Qed.
+
+  Lemma N_to_nat_safe_eq : forall n, N_to_nat_safe n = N.to_nat n.
+  Proof.
+    destruct n as [| p]; cbn; [reflexivity|].
+    apply pos_to_nat_safe_eq.
+  Qed.
+
+  (* Tail-safe analogue of [map f (Nseq start len)] *)
+  Fixpoint seq_map_acc_go {A} (f : N -> A) (acc : list A) (cur : N) (remaining : nat) : list A :=
+    match remaining with
+    | O => rev_append acc []
+    | S k => seq_map_acc_go f (f cur :: acc) (N.succ cur) k
+    end.
+
+  Definition seq_map_acc {A} (f : N -> A) (start : N) (len : nat) : list A :=
+    seq_map_acc_go f [] start len.
+
+  Lemma seq_map_acc_go_eq {A} (f : N -> A) :
+    forall (len : nat) (acc : list A) (cur : N),
+      seq_map_acc_go f acc cur len = rev_append acc (map f (Nseq cur len)).
+  Proof.
+    induction len as [| k IH]; intros acc cur; cbn.
+    - reflexivity.
+    - apply IH.
+  Qed.
+
+  Lemma seq_map_acc_eq {A} (f : N -> A) (start : N) (len : nat) :
+    seq_map_acc f start len = map f (Nseq start len).
+  Proof.
+    unfold seq_map_acc. rewrite seq_map_acc_go_eq. reflexivity.
+  Qed.
+
+  (* Tail-safe analogue of stdlib [repeat] *)
+  Fixpoint repeat_acc_go {A} (x : A) (acc : list A) (remaining : nat) : list A :=
+    match remaining with
+    | O => rev_append acc []
+    | S k => repeat_acc_go x (x :: acc) k
+    end.
+
+  Definition repeat_acc {A} (x : A) (n : nat) : list A :=
+    repeat_acc_go x [] n.
+
+  Lemma repeat_acc_go_eq {A} (x : A) :
+    forall (n : nat) (acc : list A),
+      repeat_acc_go x acc n = rev_append acc (repeat x n).
+  Proof.
+    induction n as [| k IH]; intros acc; cbn.
+    - reflexivity.
+    - apply IH.
+  Qed.
+
+  Lemma repeat_acc_eq {A} (x : A) (n : nat) :
+    repeat_acc x n = repeat x n.
+  Proof.
+    unfold repeat_acc. rewrite repeat_acc_go_eq. reflexivity.
+  Qed.
+
   Fixpoint drop {A} (n : N) (l : list A) : list A
     := match l with
        | [] => []
@@ -261,6 +437,34 @@ Section Standard.
        end.
 
   Definition zip {X Y} (xs : list X) (ys : list Y) := zipWith (fun a b => (a, b)) xs ys.
+
+  (* Tail-safe analogue of [zip] *)
+  Fixpoint zip_acc_go {X Y} (acc : list (X * Y)) (xs : list X) (ys : list Y) : list (X * Y) :=
+    match xs, ys with
+    | [], _ | _, [] => rev_append acc []
+    | x::xs', y::ys' => zip_acc_go ((x,y)::acc) xs' ys'
+    end.
+
+  Definition zip_acc {X Y} (xs : list X) (ys : list Y) : list (X * Y) :=
+    zip_acc_go [] xs ys.
+
+  Lemma zip_acc_go_eq {X Y} : forall (xs : list X) (ys : list Y) acc,
+      zip_acc_go acc xs ys = rev_append acc (zip xs ys).
+  Proof.
+    induction xs as [| x xs IH]; intros ys acc; destruct ys as [| y ys];
+      cbn [zip_acc_go zip zipWith]; auto.
+  Qed.
+
+  Lemma zip_acc_eq {X Y} (xs : list X) (ys : list Y) : zip_acc xs ys = zip xs ys.
+  Proof. unfold zip_acc; rewrite zip_acc_go_eq; reflexivity. Qed.
+
+  Fixpoint zip3 {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) : list (X * Y * Z)
+    := match xs, ys, zs with
+       | [], _, _ => []
+       | _, [], _ => []
+       | _, _, [] => []
+       | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip3 xs ys zs
+       end.
 
 End Standard.
 
@@ -681,6 +885,21 @@ Section monad.
        | a::l' => b <- f a;; loop (b::acc) l'
        end) [] l.
 
+  (* Monadic counterpart of [seq_map_acc]: replaces [map_monad f (Nseq
+     start len)] (e.g. [intptr_seq]) with a tail-recursive fold, avoiding
+     both [Nseq]'s and [map_monad]'s non-tail recursion. Named worker
+     (rather than an anonymous [fix]) so it has something to induct on —
+     see [seq_map_monad_acc_eq] in [EOU.v], proved there against [EOU]'s
+     concrete monad instance rather than generically here. *)
+  Fixpoint seq_map_monad_acc_go {A} (f : N -> m A) (acc : list A) (cur : N) (remaining : nat) : m (list A) :=
+    match remaining with
+    | O => ret (rev_append acc [])
+    | S k => a <- f cur;; seq_map_monad_acc_go f (a::acc) (N.succ cur) k
+    end.
+
+  Definition seq_map_monad_acc {A} (f : N -> m A) (start : N) (len : nat) : m (list A) :=
+    seq_map_monad_acc_go f [] start len.
+
   Definition sequence {a} (ms : list (m a)) : m (list a)
     := map_monad id ms.
 
@@ -726,6 +945,8 @@ Arguments monad_app_snd {_ _ _ _ _}.
 Arguments map_monad {_ _ _ _}.
 Arguments loop_monad {_ _ _ _}.
 Arguments map_monad_acc {_ _ _ _}.
+Arguments seq_map_monad_acc {_ _ _}.
+Arguments seq_map_monad_acc_go {_ _ _}.
 Arguments sequence {_ _ _}.
 Arguments foldM {_ _ _ _}.
 Arguments vec_loop {_ _ _ _ _}.

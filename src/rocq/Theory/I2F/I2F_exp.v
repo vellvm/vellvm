@@ -156,7 +156,7 @@ Proof.
     intros; do 2 constructor; auto.
   - (* DTYPE_Array *)
     eapply I2F_EOU_bind; [eassumption|].
-    intros; do 2 constructor; auto.
+    intros; rewrite !repeat_acc_eq; do 2 constructor; auto.
 Qed.
 
   (** * Arithmetic bridge: [IPZ] vs [IP64Bit] under [I2F_Iptr]
@@ -1017,6 +1017,7 @@ Lemma I2F_dvalue_to_memory_bytes : forall v v' t,
       (@dvalue_to_memory_bytes PFin v' t).
 Proof.
   intros; unfold dvalue_to_memory_bytes.
+  rewrite !seq_map_acc_eq.
   rewrite I2F_sizeof_dtyp.
   apply Forall2_map2; intros b _.
   red; cbn.

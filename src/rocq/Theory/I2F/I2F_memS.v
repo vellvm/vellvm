@@ -22,7 +22,7 @@ Section I2F_MemS.
       I2F_memS RS RR (Mget k1) (Mget k2)
   | I2F_Mput  σ1 σ2 k1 k2 :
       RS σ1 σ2 ->
-      I2F_memS RS RR k1 k2 ->
+      I2F_memS RS RR (k1 tt) (k2 tt) ->
       I2F_memS RS RR (Mput σ1 k1) (Mput σ2 k2)
   | I2F_Mchoose c k1 k2 :
       (forall a : @memCType P c, I2F_memS RS RR (k1 a) (k2 a)) ->

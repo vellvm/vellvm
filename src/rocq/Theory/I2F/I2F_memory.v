@@ -78,6 +78,7 @@ Lemma I2F_intptr_seq : forall start size,
     I2F_EOU (Forall2 I2F_Iptr) (@intptr_seq IPZ start size) (@intptr_seq IP64Bit start size).
 Proof.
   intros start size; unfold intptr_seq.
+  rewrite 2 seq_map_monad_acc_eq.
   apply I2F_EOU_map_monad.
   intros a _; apply I2F_from_Z.
 Qed.
@@ -133,15 +134,8 @@ Lemma generate_num_poison_bytes_h_succ {Pa : Params} (dt : dtyp) (start num : N)
   MByte (DVALUE_Poison dt) dt start :: generate_num_poison_bytes_h (N.succ start) num dt.
 Proof.
   unfold generate_num_poison_bytes_h.
-  assert (PROP : Proper (Logic.eq ==> Logic.eq ==> Logic.eq)
-            (fun (n : N) (mf : N -> list memory_byte) (x : N) =>
-               MByte (DVALUE_Poison dt) dt x :: mf (N.succ x))).
-  { intros n1 n2 -> mf1 mf2 ->; reflexivity. }
-  pose proof
-    (N.recursion_succ Logic.eq (fun _ : N => ([] : list memory_byte))
-       (fun n mf x => MByte (DVALUE_Poison dt) dt x :: mf (N.succ x))
-       eq_refl PROP num) as REC.
-  rewrite REC; cbn; reflexivity.
+  rewrite !seq_map_acc_eq, !N_to_nat_safe_eq, Nnat.N2Nat.inj_succ.
+  cbn [Nseq map]; reflexivity.
 Qed.
 
 Lemma I2F_generate_num_poison_bytes_h : forall start num dt,
@@ -560,7 +554,8 @@ Lemma I2F_memory_bytes_to_bytes : forall aid
     Forall2 I2F_mbyte bytes1 bytes2 ->
     Forall2 I2F_byte (@memory_bytes_to_bytes PInf aid bytes1) (@memory_bytes_to_bytes PFin aid bytes2).
 Proof.
-  intros aid bytes1 bytes2 H; induction H; cbn; constructor; auto.
+  intros aid bytes1 bytes2 H; unfold memory_bytes_to_bytes; rewrite !map_acc_eq.
+  induction H; cbn; constructor; auto.
   split; auto.
 Qed.
 
@@ -578,7 +573,7 @@ Proof.
   eapply I2F_memS_bind; [apply I2F_get_mem |].
   intros m1 m2 Hm.
   apply I2F_upd_mem.
-  apply IM_Refine_add_all_index; auto.
+  apply IM_Refine_add_all_index_acc; auto.
   apply I2F_memory_bytes_to_bytes; auto.
 Qed.
 
@@ -641,7 +636,7 @@ Lemma I2F_Allocate_bytes_with_pr : forall
       (@Allocate_bytes_with_pr PFin init_bytes2 align pr).
 Proof.
   intros init_bytes1 init_bytes2 Hbytes align pr; unfold Allocate_bytes_with_pr.
-  rewrite (Forall2_length_N Hbytes).
+  rewrite !N_length_eq, (Forall2_length_N Hbytes).
   eapply I2F_memS_bind; [apply I2F_get_free_block |].
   intros [ptr1 ptrs1] [ptr2 ptrs2] [Hptr Hptrs]; cbn in Hptr, Hptrs.
   eapply I2F_memS_bind; [apply I2F_add_block_to_stack; auto |].
@@ -657,7 +652,7 @@ Lemma I2F_Malloc_bytes_with_pr : forall
       (@Malloc_bytes_with_pr PFin init_bytes2 align pr).
 Proof.
   intros init_bytes1 init_bytes2 Hbytes align pr; unfold Malloc_bytes_with_pr.
-  rewrite (Forall2_length_N Hbytes).
+  rewrite !N_length_eq, (Forall2_length_N Hbytes).
   eapply I2F_memS_bind; [apply I2F_get_free_block |].
   intros [ptr1 ptrs1] [ptr2 ptrs2] [Hptr Hptrs]; cbn in Hptr, Hptrs.
   eapply I2F_memS_bind; [apply I2F_add_block_to_heap; auto |].
@@ -754,9 +749,10 @@ Lemma I2F_write_bytes : forall (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p2 : @ptr (
     I2F_memS I2F_State (fun (_ _ : unit) => True) (write_bytes p1 bytes1) (write_bytes p2 bytes2).
 Proof.
   intros p1 p2 Hp bytes1 bytes2 Hbytes; unfold write_bytes.
-  rewrite (Forall2_length_N Hbytes).
+  rewrite !N_length_eq, (Forall2_length_N Hbytes).
   eapply I2F_memS_bind; [apply I2F_memS_lift, I2F_get_consecutive_ptrs; auto |].
   intros ptrs1 ptrs2 Hptrs.
+  rewrite !zip_acc_eq.
   eapply I2F_memS_loop_monad2.
   - eapply Forall2_zip; eauto.
   - intros [pa ba] [pb bb] [Hpp Hbb]; cbn; apply I2F_Write_byte; auto.
@@ -793,6 +789,7 @@ Proof.
   destruct (dtyp_eqb dt DTYPE_Void).
   - constructor.
   - apply I2F_allocate_bytes.
+    rewrite !concat_acc_eq.
     apply Forall2_concat.
     apply Forall2_repeatN.
     apply I2F_generate_poison_bytes.

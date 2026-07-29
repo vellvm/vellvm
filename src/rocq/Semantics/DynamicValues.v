@@ -1151,7 +1151,7 @@ Section DValue.
         ret (DVALUE_Struct p v)
     | DTYPE_Array v sz t =>
         dv <- default_dvalue_of_dtyp t ;;
-        ret (DVALUE_Array v dt (repeat dv (N.to_nat sz)))
+        ret (DVALUE_Array v dt (repeat_acc dv (N_to_nat_safe sz)))
     end.
 
   Lemma dvalue_default_base_NO_VOID :

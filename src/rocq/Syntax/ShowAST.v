@@ -1350,14 +1350,6 @@ tag ::= string constant
   
 End ShowInstances.
 
-Fixpoint zip3 {X Y Z} (xs : list X) (ys : list Y) (zs : list Z) : list (X * Y * Z)
-  := match xs, ys, zs with
-     | [], _, _ => []
-     | _, [], _ => []
-     | _, _, [] => []
-     | (x::xs), (y::ys), (z::zs) => (x, y, z) :: zip3 xs ys zs
-     end.
-
 (** Return empty string when None *)
 (** Adds a space -- is this the right place to do that? *)
 Definition maybe_to_string {X} (to_string : X -> string) (ox : option X) :=
