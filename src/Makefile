@@ -16,7 +16,8 @@ ROCQMAKEFILE="$(ROCQBIN)rocq" makefile
 ######## The full vellvm executable
 VELLVM_EXE=_build/default/ml/main.exe
 # Override with `make DUNE_PROFILE=dev` for debug builds.
-DUNE_PROFILE?=release
+DUNE_PROFILE?=dev
+# DUNE_PROFILE?=release
 
 ######## The "frontend" is only the parser/pretty-printer
 FRONTEND_EXE=_build/default/ml/frontend.exe
