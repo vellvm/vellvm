@@ -28,6 +28,7 @@ let typ_to_dtyp_base (typ : LLVMAst.typ) : DynamicTypes.dtyp_base =
   | TYPE_I i -> DTYPE_I i
   | TYPE_FP FP_float -> DTYPE_FP FP_float
   | TYPE_FP FP_double -> DTYPE_FP FP_double
+  | TYPE_FP FP_half -> DTYPE_FP FP_half
   | _ ->
       failwith
         (Printf.sprintf "Assertion includes unsupported type:\n\t %s"
@@ -76,6 +77,13 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
      | None ->
         let s = Camlcoq.camlstring_of_coqstring (ShowAST.show_float_syntax f) in
         failwith @@ Printf.sprintf "assertion.ml: texp_to_dvalue failed float conversion: %s" s
+     end
+  | TYPE_FP FP_half, EXP_Float f ->
+     begin match float16_of_float_syntax f with
+     | Some v ->  DVALUE_Base (DVALUE_Half v)
+     | None ->
+        let s = Camlcoq.camlstring_of_coqstring (ShowAST.show_float_syntax f) in
+        failwith @@ Printf.sprintf "assertion.ml: texp_to_dvalue failed float16 conversion: %s" s
      end
   | TYPE_Struct _, EXP_Struct elts ->
       DVALUE_Struct (false, List.map texp_to_dvalue elts)

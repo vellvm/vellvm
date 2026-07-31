@@ -818,13 +818,13 @@ Proof.
     rewrite (I2F_dvalue_base_int_unsigned Hv).
     eapply I2F_EOU_bind; [apply I2F_int_to_ptr |].
     intros a1 a2 Ha; repeat constructor; auto.
-  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ]; [ | constructor .. ].
+  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | | ]; [ | constructor .. ].
     destruct HI as [HI ->]; red in HI; subst.
     destruct t_to;
       [ apply I2F_memS_lift; apply I2F_coerce_integer_to_int
       | apply I2F_memS_lift; apply I2F_coerce_integer_to_int
       | constructor .. ].
-  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ]; [ | constructor .. ].
+  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | | ]; [ | constructor .. ].
     destruct HI as [HI ->]; red in HI; subst.
     destruct t_to;
       [ apply I2F_memS_lift; apply I2F_coerce_integer_to_int
@@ -889,7 +889,7 @@ Proof.
   - (* Load *)
     destruct H as [Ht Ha]; subst.
     destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1 τ1 s1 s2 Hs].
-    + destruct Hb as [p1 p2 Hp | | | | | | | ]; [ | apply I2F_Mub_l ..].
+    + destruct Hb as [p1 p2 Hp | | | | | | | | ]; [ | apply I2F_Mub_l ..].
       eapply I2F_memS_mono; [ | apply I2F_read_dvalue; auto].
       intros; simp I2FA_Memory; auto.
     + apply I2F_Mub_l.
@@ -897,7 +897,7 @@ Proof.
   - (* Store *)
     destruct H as [Ht [Ha Hv]]; subst.
     destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1' τ1 s1 s2 Hs].
-    + destruct Hb as [p1 p2 Hp | | | | | | | ]; [ | apply I2F_Mub_l ..].
+    + destruct Hb as [p1 p2 Hp | | | | | | | | ]; [ | apply I2F_Mub_l ..].
       eapply I2F_memS_mono; [ | apply I2F_write_dvalue; auto].
       intros; simp I2FA_Memory; auto.
     + apply I2F_Mub_l.
@@ -960,17 +960,17 @@ Lemma I2F_handle_memcpy : forall (args1 : list (@dvalue_base PInf)) (args2 : lis
 Proof.
   intros args1 args2 Hargs; unfold handle_memcpy.
   destruct Hargs as [ | dst1 dst2 l1 l2 Hdst Hargs]; [apply I2F_Merr |].
-  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
+  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | src1 src2 l1' l2' Hsrc Hargs]; [apply I2F_Merr |].
-  destruct Hsrc as [psrc1 psrc2 Hpsrc | | | | | | | ]; try apply I2F_Merr.
+  destruct Hsrc as [psrc1 psrc2 Hpsrc | | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | sz1 sz2 l1'' l2'' Hsz Hargs]; [apply I2F_Merr |].
-  destruct Hsz as [ | szv i1 | ip1 ip2 Hip | | | | | ]; try apply I2F_Merr.
+  destruct Hsz as [ | szv i1 | ip1 ip2 Hip | | | | | | ]; try apply I2F_Merr.
   - destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
-    destruct Hvol as [ | szv2 vv1 | | | | | | ]; try apply I2F_Merr.
+    destruct Hvol as [ | szv2 vv1 | | | | | | | ]; try apply I2F_Merr.
     destruct Hargs; [ | apply I2F_Merr].
     apply I2F_memcpy; auto.
   - destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
-    destruct Hvol as [ | szv2 vv1 | | | | | | ]; try apply I2F_Merr.
+    destruct Hvol as [ | szv2 vv1 | | | | | | | ]; try apply I2F_Merr.
     destruct Hargs; [ | apply I2F_Merr].
     red in Hip; subst; cbn.
     apply I2F_memcpy; auto.
@@ -982,13 +982,13 @@ Lemma I2F_handle_memset : forall (args1 : list (@dvalue_base PInf)) (args2 : lis
 Proof.
   intros args1 args2 Hargs; unfold handle_memset.
   destruct Hargs as [ | dst1 dst2 l1 l2 Hdst Hargs]; [apply I2F_Merr |].
-  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
+  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | val1 val2 l1' l2' Hval Hargs]; [apply I2F_Merr |].
-  destruct Hval as [ | szval v1 | | | | | | ]; try apply I2F_Merr.
+  destruct Hval as [ | szval v1 | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | len1 len2 l1'' l2'' Hlen Hargs]; [apply I2F_Merr |].
-  destruct Hlen as [ | szlen ln1 | | | | | | ]; try apply I2F_Merr.
+  destruct Hlen as [ | szlen ln1 | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
-  destruct Hvol as [ | szvol vv1 | | | | | | ]; try apply I2F_Merr.
+  destruct Hvol as [ | szvol vv1 | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs; [ | apply I2F_Merr].
   destruct (Pos.eq_dec szval 8) as [e | ]; [ | apply I2F_Merr].
   subst; cbn.
@@ -1002,7 +1002,7 @@ Lemma I2F_handle_malloc : forall (args1 : list (@dvalue_base PInf)) (args2 : lis
 Proof.
   intros args1 args2 Hargs align; unfold handle_malloc.
   destruct Hargs as [ | sz1 sz2 l1 l2 Hsz Hargs]; [apply I2F_Merr |].
-  destruct Hsz as [ | szv i1 | ip1 ip2 Hip | | | | | ]; try (destruct Hargs; apply I2F_Merr).
+  destruct Hsz as [ | szv i1 | ip1 ip2 Hip | | | | | | ]; try (destruct Hargs; apply I2F_Merr).
   - destruct Hargs; [ | apply I2F_Merr].
     apply I2F_malloc_bytes, I2F_generate_num_poison_bytes.
   - destruct Hargs; [ | apply I2F_Merr].
@@ -1016,7 +1016,7 @@ Lemma I2F_handle_free : forall (args1 : list (@dvalue_base PInf)) (args2 : list 
 Proof.
   intros args1 args2 Hargs; unfold handle_free.
   destruct Hargs as [ | p1 p2 l1 l2 Hp Hargs]; [apply I2F_Merr |].
-  destruct Hp as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
+  destruct Hp as [pdst1 pdst2 Hpdst | | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs; [ | apply I2F_Merr].
   apply I2F_Free; auto.
 Qed.

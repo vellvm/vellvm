@@ -114,6 +114,18 @@ Section Convert.
    *)
   Definition double_to_float : ll_double -> ll_float := Float.to_single.
 
+  (* The half widenings and narrowings, same story one width down.
+     [Float16.to_single]/[to_double] shift the NaN payload left by 13 / 42 bits
+     (the mantissa-width differences), putting it in the high order bits and
+     zeroing the rest, and consult the same
+     [Archi.float_of_single_preserves_sNaN] knob as [float_to_double], so a
+     signaling NaN stays signaling.  [Float16.of_single]/[of_double] quiet the
+     payload before shifting it right, for the reason spelled out above. *)
+  Definition half_to_float : ll_half -> ll_float := Float16.to_single.
+  Definition half_to_double : ll_half -> ll_double := Float16.to_double.
+  Definition float_to_half : ll_float -> ll_half := Float16.of_single.
+  Definition double_to_half : ll_double -> ll_half := Float16.of_double.
+
   (** ** Typed conversion
         Performs a dynamic conversion of a [dvalue] of type [t1] to one of type [t2].
         For instance, convert an integer over 8 bits to one over 1 bit by truncation.
@@ -175,6 +187,11 @@ Section Convert.
             then ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
             else raise_error "i-to-double ill-typed Uitofp"
 
+        | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_half =>
+            if Pos.eqb sz_t sz_from
+            then ret (DVALUE_Half (Float16.of_longu (repr (unsigned i1))))
+            else raise_error "i-to-half ill-typed Uitofp"
+
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
             ret (dvp t2)
 
@@ -192,6 +209,11 @@ Section Convert.
             if Pos.eqb sz_t sz_from
             then ret (DVALUE_Double (Float.of_long (repr (signed i1))))
             else raise_error "i-to-double ill-typed Sitofp"
+
+        | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_half =>
+            if Pos.eqb sz_t sz_from
+            then ret (DVALUE_Half (Float16.of_long (repr (signed i1))))
+            else raise_error "i-to-half ill-typed Sitofp"
 
         | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
             ret (dvp t2)
@@ -215,7 +237,13 @@ Section Convert.
             | None => ret (dvp t2)
             | Some z => ret (DVALUE_I sz_t (repr z))
             end
-              
+
+        | DTYPE_FP FP_half, DVALUE_Half f, DTYPE_I sz_t =>
+            match ZofB_range _ _ f (0%Z) (@max_unsigned sz_t) with
+            | None => ret (dvp t2)
+            | Some z => ret (DVALUE_I sz_t (repr z))
+            end
+
         | DTYPE_FP _, DVALUE_Poison t, DTYPE_I _ =>
             ret (dvp t2)
 
@@ -238,7 +266,13 @@ Section Convert.
             | None => ret (dvp t2)
             | Some z => ret (DVALUE_I sz_t (repr z))
             end
-              
+
+        | DTYPE_FP FP_half, DVALUE_Half f, DTYPE_I sz_t =>
+            match ZofB_range _ _ f (@min_signed sz_t) (@max_signed sz_t) with
+            | None => ret (dvp t2)
+            | Some z => ret (DVALUE_I sz_t (repr z))
+            end
+
         | DTYPE_FP _, DVALUE_Poison t, DTYPE_I _ =>
             ret (dvp t2)
 
@@ -251,23 +285,35 @@ Section Convert.
         | DTYPE_FP FP_float, DVALUE_Float f, DTYPE_FP FP_double  =>
             ret (DVALUE_Double (float_to_double f))
 
-        | DTYPE_FP FP_float, DVALUE_Poison t, DTYPE_FP FP_double =>
+        | DTYPE_FP FP_half, DVALUE_Half f, DTYPE_FP FP_float =>
+            ret (DVALUE_Float (half_to_float f))
+
+        | DTYPE_FP FP_half, DVALUE_Half f, DTYPE_FP FP_double =>
+            ret (DVALUE_Double (half_to_double f))
+
+        | DTYPE_FP FP_float, DVALUE_Poison t, DTYPE_FP FP_double
+        | DTYPE_FP FP_half, DVALUE_Poison t, DTYPE_FP FP_float
+        | DTYPE_FP FP_half, DVALUE_Poison t, DTYPE_FP FP_double =>
             ret (dvp t2)
-           
+
         | _, _, _ => raise_error "ill-typed Fpext"
         end
 
     | Fptrunc _ =>
         (* NOTE: Does not support "fast-math" flags *)
         match t1, x, t2 with
-        (* [double] and [float] are the only floating-point types carried by
-           [dvalue_base], so double-to-float is the only narrowing there is.
-           In particular the LangRef's second example, [fptrunc double 1.0E+300
-           to half], is out of reach. *)
         | DTYPE_FP FP_double, DVALUE_Double f, DTYPE_FP FP_float =>
             ret (DVALUE_Float (double_to_float f))
 
-        | DTYPE_FP FP_double, DVALUE_Poison t, DTYPE_FP FP_float =>
+        | DTYPE_FP FP_double, DVALUE_Double f, DTYPE_FP FP_half =>
+            ret (DVALUE_Half (double_to_half f))
+
+        | DTYPE_FP FP_float, DVALUE_Float f, DTYPE_FP FP_half =>
+            ret (DVALUE_Half (float_to_half f))
+
+        | DTYPE_FP FP_double, DVALUE_Poison t, DTYPE_FP FP_float
+        | DTYPE_FP FP_double, DVALUE_Poison t, DTYPE_FP FP_half
+        | DTYPE_FP FP_float, DVALUE_Poison t, DTYPE_FP FP_half =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Fptrunc"

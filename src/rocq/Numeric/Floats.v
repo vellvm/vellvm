@@ -32,29 +32,53 @@ Set Asymmetric Patterns.
 
 Definition float := binary64. (**r the type of IEE754 double-precision FP numbers *)
 Definition float32 := binary32. (**r the type of IEE754 single-precision FP numbers *)
+Definition float16 := binary_float 11 16. (**r the type of IEEE754 half-precision FP numbers *)
 
-(** Checks whether a 64-bit float value is representable exactly as a 32-bit float *)
-Definition is_float_representable_as_float32 (f : binary_float 53 1024) : bool :=
+(** Checks whether a 64-bit float value is representable exactly in the narrower
+    IEEE754 format [(prec, emax)].  This is the gate LLVM's assembler applies to
+    floating-point literals: LangRef's "Simple Constants" only documents it for
+    the hex form ("bfloat, half and float values must, however, be exactly
+    representable"), but clang applies it to the decimal form too, by parsing the
+    literal as a double and rejecting the narrowing when [APFloat::convert]
+    reports [losesInfo].
+
+    Written once and instantiated per width below rather than transcribed per
+    width: duplicating this predicate is what let the decimal and hex paths drift
+    apart before.  The derived quantities, for a target of precision [prec] (so a
+    [prec-1]-bit mantissa field) and exponent bound [emax]:
+
+    - [shift = 53 - prec] is how many of the double's 52 mantissa bits are
+      dropped (29 for float, 42 for half);
+    - [e_max = emax - 1] and [e_min_normal = 2 - emax] bound the normal
+      unbiased exponents (127 / -126 for float, 15 / -14 for half);
+    - [e_min_sub = e_min_normal - (prec - 1)] is the smallest subnormal exponent
+      (-149 for float, -24 for half). *)
+Definition is_float_representable_at (prec emax : Z) (f : binary_float 53 1024) : bool :=
+  let shift := 53 - prec in
+  let e_max := emax - 1 in
+  let e_min_normal := 2 - emax in
+  let e_min_sub := e_min_normal - (prec - 1) in
   match f with
   | B754_zero _ => true
   | B754_infinity _ => true
   (* A NaN is NOT automatically representable: LLVM applies the exactness rule to
      the payload too.  [m] is the raw 52-bit mantissa field, and narrowing keeps
-     only its high 23 bits, so the low 29 must be zero.  Checked against clang:
-     [float 0x7FF0000020000000] is accepted (payload 2^29) whereas
+     only its high [prec-1] bits, so the low [shift] must be zero.  Checked
+     against clang: [float 0x7FF0000020000000] is accepted (payload 2^29) whereas
      [float 0x7FF0000000000001] is rejected with "floating point constant invalid
      for type". *)
-  | B754_nan _ m _ => (Z.pos m mod 2^29 =? 0)%Z
+  | B754_nan _ m _ => (Z.pos m mod 2^shift =? 0)%Z
   | B754_finite s m e_minus_52 _ =>
       (* Flocq stores the exponents offset by some amount, 52 for float64 *)
       let e := e_minus_52 + 52 in
-      (* Concisely, a float64 is exactly representable as a float32 when both of these conditions
-        hold:
-        1. the effective exponent is between -149 and 127 (capturing both the subnormal and normal
-           cases),
-        2. the lower (max 29 (-97 - e)) bits of the mantissa are zero (capturing both the subnormal
-           and normal cases).
-        Why max 29 (-97 - e)?
+      (* Concisely, a float64 is exactly representable in the target format when
+        both of these conditions hold:
+        1. the effective exponent is between [e_min_sub] and [e_max] (capturing both
+           the subnormal and normal cases),
+        2. the lower (max shift (e_min_normal + shift - e)) bits of the mantissa are
+           zero (capturing both the subnormal and normal cases).
+        Why max shift (e_min_normal + shift - e)?  Spelled out at float32, where
+        [shift = 29] and [e_min_normal + shift = -97]:
         - For large enough e (e ∈ [-126, 127]), the number is normal in float32, and this reduces to
         29, the number of bits that ought to be zero so that the mantissa fits in 23 bits (52 = 29 +
         23)
@@ -66,10 +90,29 @@ Definition is_float_representable_as_float32 (f : binary_float 53 1024) : bool :
         When e = -148, we have 1 bit left in the mantissa.
         When e = -149, we have no bit left in the mantissa.
         *)
-      let necessary_mantissa_zero_bits := (Z.max 29 (-97 - e)%Z) in
-      (-149 <=? e)%Z && (e <=? 127)%Z
+      let necessary_mantissa_zero_bits := (Z.max shift (e_min_normal + shift - e)%Z) in
+      (e_min_sub <=? e)%Z && (e <=? e_max)%Z
       && ((Z.pos m mod Z.pow 2 53) mod 2^necessary_mantissa_zero_bits =? 0)%Z
   end.
+
+(** Checks whether a 64-bit float value is representable exactly as a 32-bit float *)
+Definition is_float_representable_as_float32 : binary_float 53 1024 -> bool :=
+  is_float_representable_at 24 128.
+
+(** Checks whether a 64-bit float value is representable exactly as a 16-bit float *)
+Definition is_float_representable_as_float16 : binary_float 53 1024 -> bool :=
+  is_float_representable_at 11 16.
+
+(** The constants the two instantiations unfold to, pinned so that a change to
+    [is_float_representable_at] cannot silently move a boundary.  Read as
+    (shift, e_max, e_min_normal, e_min_normal + shift, e_min_sub). *)
+Example float32_representability_constants :
+  (53 - 24, 128 - 1, 2 - 128, (2 - 128) + (53 - 24), (2 - 128) - (24 - 1)) =
+  (29, 127, -126, -97, -149) := eq_refl.
+
+Example float16_representability_constants :
+  (53 - 11, 16 - 1, 2 - 16, (2 - 16) + (53 - 11), (2 - 16) - (11 - 1)) =
+  (42, 15, -14, 28, -24) := eq_refl.
 
 Lemma integer_representable_n :
   forall n : Z, - 2 ^ 53 <= n <= 2 ^ 53 -> integer_representable 53 1024 n.
@@ -215,6 +258,54 @@ Definition narrow_nan_32 (f : float) : {x : float32 | is_nan _ _ x = true} :=
 Definition float_to_float32 (f : float) : option float32 :=
   if is_float_representable_as_float32 f
   then Some (Bconv 53 1024 24 128 eq_refl eq_refl narrow_nan_32 mode_NE f)
+  else None.
+
+(** ** Half precision, same three helpers at [prec = 11], [emax = 16].
+
+    [Archi] is CompCert's target description and has no [default_nan_16] to
+    inherit, so the default payload is spelled out here: [nan_pl 11] bounds the
+    payload by [2^10] and the quiet bit is [2^9], matching the shape of
+    [Archi.default_nan_32 = (false, 2^22)] at [prec = 24]. *)
+
+Definition default_nan_16_payload_raw : bool * positive := (false, iter_nat xO 9 1%positive).
+
+Definition quiet_nan_16_payload (p: positive) :=
+  Z.to_pos (P_mod_two_p (Pos.lor p ((iter_nat xO 9 1%positive))) 10%nat).
+
+Lemma quiet_nan_16_proof: forall p, nan_pl 11 (quiet_nan_16_payload p) = true.
+Proof. intros; apply normalized_nan; auto; lia. Qed.
+
+Definition quiet_nan_16 (sp: bool * positive) : {x : float16 | is_nan _ _ x = true} :=
+  let (s, p) := sp in
+  exist _ (B754_nan 11 16 s (quiet_nan_16_payload p) (quiet_nan_16_proof p)) (eq_refl true).
+
+Definition default_nan_16 := quiet_nan_16 default_nan_16_payload_raw.
+
+(** As [narrow_nan_32], but dropping 42 payload bits instead of 29: the [0xH....]
+    literal is a bit-level reshaping of a 16-bit pattern, and the [0x............]
+    form at type [half] is the same reshaping from a double.  Quieting is
+    deliberately NOT applied — see the [narrow_nan_32] comment above. *)
+
+Definition narrow_nan_16_payload (p: positive) :=
+  Z.to_pos (P_mod_two_p (Pos.shiftr_nat p 42) 10%nat).
+
+Lemma narrow_nan_16_proof: forall p, nan_pl 11 (narrow_nan_16_payload p) = true.
+Proof. intros; apply normalized_nan; auto; lia. Qed.
+
+Definition narrow_nan_16 (f : float) : {x : float16 | is_nan _ _ x = true} :=
+  match f with
+  | B754_nan s p _ =>
+      exist _ (B754_nan 11 16 s (narrow_nan_16_payload p) (narrow_nan_16_proof p)) (eq_refl true)
+  | _ => default_nan_16
+  end.
+
+(** Converts a 64-bit float value to a 16-bit float, or fails if not exactly
+    representable.  Counterpart of [float_to_float32]; the guard likewise covers
+    the NaN branch, where it guarantees that the low 42 payload bits discarded by
+    [narrow_nan_16] are zero. *)
+Definition float_to_float16 (f : float) : option float16 :=
+  if is_float_representable_as_float16 f
+  then Some (Bconv 53 1024 11 16 eq_refl eq_refl narrow_nan_16 mode_NE f)
   else None.
 
 Local Notation __ := (eq_refl Datatypes.Lt).
@@ -1522,6 +1613,189 @@ Proof.
 Qed.
 
 End Float32.
+
+(** * Half-precision FP numbers *)
+
+(** Flocq ships specialized [b32_*]/[b64_*] blocks but no [b16_*] one, so the
+    [B32_Bits] section (Flocq/IEEE754/Bits.v) is mirrored here at [mw = 10],
+    [ew = 5].  This is not gratuitous duplication of [Float16] below: Vellvm's
+    [fadd]/[fsub]/[fmul]/[fdiv] deliberately go through Flocq's [b32_*]/[b64_*]
+    (see [DynamicValues.float_op]) rather than CompCert's [Float32.add], i.e.
+    through [binop_nan_pl32], which propagates the *first* NaN operand unchanged
+    and does not quiet it.  Half has to use the same convention or it would
+    silently acquire a third NaN policy — see todonotes.md §2, "Global policy:
+    propagate-first". *)
+
+Definition default_nan_pl16 : { nan : float16 | is_nan 11 16 nan = true } :=
+  exist _ (B754_nan 11 16 false (iter_nat xO 9 xH) (refl_equal true)) (refl_equal true).
+
+Definition unop_nan_pl16 (f : float16) : { nan : float16 | is_nan 11 16 nan = true } :=
+  match f with
+  | B754_nan s pl Hpl => exist _ (B754_nan 11 16 s pl Hpl) (refl_equal true)
+  | _ => default_nan_pl16
+  end.
+
+Definition binop_nan_pl16 (f1 f2 : float16) : { nan : float16 | is_nan 11 16 nan = true } :=
+  match f1, f2 with
+  | B754_nan s1 pl1 Hpl1, _ => exist _ (B754_nan 11 16 s1 pl1 Hpl1) (refl_equal true)
+  | _, B754_nan s2 pl2 Hpl2 => exist _ (B754_nan 11 16 s2 pl2 Hpl2) (refl_equal true)
+  | _, _ => default_nan_pl16
+  end.
+
+Definition b16_opp : float16 -> float16 := Bopp 11 16 unop_nan_pl16.
+Definition b16_abs : float16 -> float16 := Babs 11 16 unop_nan_pl16.
+Definition b16_sqrt : mode -> float16 -> float16 := Bsqrt 11 16 __ __ unop_nan_pl16.
+
+Definition b16_plus  : mode -> float16 -> float16 -> float16 := Bplus  11 16 __ __ binop_nan_pl16.
+Definition b16_minus : mode -> float16 -> float16 -> float16 := Bminus 11 16 __ __ binop_nan_pl16.
+Definition b16_mult  : mode -> float16 -> float16 -> float16 := Bmult  11 16 __ __ binop_nan_pl16.
+Definition b16_div   : mode -> float16 -> float16 -> float16 := Bdiv   11 16 __ __ binop_nan_pl16.
+
+Definition b16_compare : float16 -> float16 -> option Datatypes.comparison := Bcompare 11 16.
+Definition b16_of_bits : Z -> float16 := binary_float_of_bits 10 5 __ __ __.
+Definition bits_of_b16 : float16 -> Z := bits_of_binary_float 10 5.
+
+Module Float16.
+
+(** ** NaN payload manipulations, mirroring [Float]'s.
+
+    Widening (half -> float, half -> double) copies the payload into the *high*
+    order bits and zeroes the rest, and narrowing discards the low order bits
+    that do not fit — exactly the rule LangRef states for [fpext]/[fptrunc], and
+    exactly what [Pos.shiftl_nat]/[Pos.shiftr_nat] by the mantissa-width
+    difference do.  The widths: 24 - 11 = 13 bits to float, 53 - 11 = 42 bits to
+    double.
+
+    [Archi.float_of_single_preserves_sNaN] is reused for the widening direction
+    so half behaves like the float/double pair; it remains the target knob
+    flagged in todonotes.md §2 as deserving a Vellvm-level definition. *)
+
+Definition expand_nan_payload_32 (p: positive) := Pos.shiftl_nat p 13.
+
+Lemma expand_nan_proof_32 (p : positive) :
+  nan_pl 11 p = true ->
+  nan_pl 24 (expand_nan_payload_32 p) = true.
+Proof.
+  unfold nan_pl, expand_nan_payload_32. intros K.
+  rewrite Z.ltb_lt in *.
+  unfold Pos.shiftl_nat, nat_rect, Digits.digits2_pos.
+  fold (Digits.digits2_pos p).
+  zify; lia.
+Qed.
+
+Definition expand_nan_payload_64 (p: positive) := Pos.shiftl_nat p 42.
+
+Lemma expand_nan_proof_64 (p : positive) :
+  nan_pl 11 p = true ->
+  nan_pl 53 (expand_nan_payload_64 p) = true.
+Proof.
+  unfold nan_pl, expand_nan_payload_64. intros K.
+  rewrite Z.ltb_lt in *.
+  unfold Pos.shiftl_nat, nat_rect, Digits.digits2_pos.
+  fold (Digits.digits2_pos p).
+  zify; lia.
+Qed.
+
+Definition to_single_nan (f : float16) : { x : float32 | is_nan _ _ x = true } :=
+  match f with
+  | B754_nan s p H =>
+      if Archi.float_of_single_preserves_sNaN
+      then exist _ (B754_nan 24 128 s (expand_nan_payload_32 p) (expand_nan_proof_32 p H))
+             (eq_refl true)
+      else quiet_nan_32 (s, expand_nan_payload_32 p)
+  | _ => default_nan_32
+  end.
+
+Definition to_double_nan (f : float16) : { x : float | is_nan _ _ x = true } :=
+  match f with
+  | B754_nan s p H =>
+      if Archi.float_of_single_preserves_sNaN
+      then exist _ (B754_nan 53 1024 s (expand_nan_payload_64 p) (expand_nan_proof_64 p H))
+             (eq_refl true)
+      else quiet_nan_64 (s, expand_nan_payload_64 p)
+  | _ => default_nan_64
+  end.
+
+(* As in [Float.reduce_nan_payload], quieting *before* the right shift is what
+   stops the shift from producing an all-zero payload, which with the quiet bit
+   clear would denote an infinity rather than a NaN. *)
+Definition reduce_nan_payload_32 (p: positive) :=
+  Pos.shiftr_nat (quiet_nan_32_payload p) 13.
+
+Definition of_single_nan (f : float32) : { x : float16 | is_nan _ _ x = true } :=
+  match f with
+  | B754_nan s p H => quiet_nan_16 (s, reduce_nan_payload_32 p)
+  | _ => default_nan_16
+  end.
+
+Definition reduce_nan_payload_64 (p: positive) :=
+  Pos.shiftr_nat (quiet_nan_64_payload p) 42.
+
+Definition of_double_nan (f : float) : { x : float16 | is_nan _ _ x = true } :=
+  match f with
+  | B754_nan s p H => quiet_nan_16 (s, reduce_nan_payload_64 p)
+  | _ => default_nan_16
+  end.
+
+Definition neg_nan (f : float16) : { x : float16 | is_nan _ _ x = true } :=
+  match f with
+  | B754_nan s p H => exist _ (B754_nan 11 16 (negb s) p H) (eq_refl true)
+  | _ => default_nan_16
+  end.
+
+Definition abs_nan (f : float16) : { x : float16 | is_nan _ _ x = true } :=
+  match f with
+  | B754_nan s p H => exist _ (B754_nan 11 16 false p H) (eq_refl true)
+  | _ => default_nan_16
+  end.
+
+(** ** Operations over half-precision floats *)
+
+Definition zero: float16 := B754_zero _ _ false. (**r the float [+0.0] *)
+
+Definition eq_dec: forall (f1 f2: float16), {f1 = f2} + {f1 <> f2} := Beq_dec _ _.
+
+Definition neg: float16 -> float16 := Bopp _ _ neg_nan. (**r opposite (change sign) *)
+Definition abs: float16 -> float16 := Babs _ _ abs_nan. (**r absolute value (set sign to [+]) *)
+
+Definition compare (f1 f2: float16) : option Datatypes.comparison := (**r general comparison *)
+  Bcompare 11 16 f1 f2.
+Definition cmp (c:comparison) (f1 f2: float16) : bool := (**r Boolean comparison *)
+  cmp_of_comparison c (compare f1 f2).
+Definition ordered (f1 f2: float16) : bool :=
+  ordered_of_comparison (compare f1 f2).
+
+(** Conversions *)
+
+Definition to_single : float16 -> float32 := Bconv _ _ 24 128 __ __ to_single_nan mode_NE.
+Definition to_double : float16 -> float  := Bconv _ _ 53 1024 __ __ to_double_nan mode_NE.
+Definition of_single : float32 -> float16 := Bconv _ _ 11 16 __ __ of_single_nan mode_NE.
+Definition of_double : float -> float16   := Bconv _ _ 11 16 __ __ of_double_nan mode_NE.
+
+Definition to_int (f:float16): option (@bit_int 32) := (**r conversion to signed 32-bit int *)
+  option_map (@repr 32) (ZofB_range _ _ f (@min_signed 32) (@max_signed 32)).
+Definition to_intu (f:float16): option (@bit_int 32) := (**r conversion to unsigned 32-bit int *)
+  option_map (@repr 32) (ZofB_range _ _ f 0 (@max_unsigned 32)).
+Definition to_long (f:float16): option (@bit_int 64) := (**r conversion to signed 64-bit int *)
+  option_map (@repr 64) (ZofB_range _ _ f (@min_signed 64) (@max_signed 64)).
+Definition to_longu (f:float16): option (@bit_int 64) := (**r conversion to unsigned 64-bit int *)
+  option_map (@repr 64) (ZofB_range _ _ f 0 (@max_unsigned 64)).
+
+Definition of_int (n:@bit_int 32): float16 := BofZ 11 16 __ __ (signed n).
+Definition of_intu (n:@bit_int 32): float16 := BofZ 11 16 __ __ (@unsigned 32 n).
+Definition of_long (n:@bit_int 64): float16 := BofZ 11 16 __ __ (signed n).
+Definition of_longu (n:@bit_int 64): float16 := BofZ 11 16 __ __ (@unsigned 64 n).
+
+Definition from_parsed (base:positive) (intPart:positive) (expPart:Z) : float16 :=
+  Bparse 11 16 __ __ base intPart expPart.
+
+(** Conversions between floats and their concrete in-memory representation
+    as a sequence of 16 bits. *)
+
+Definition to_bits (f: float16) : @bit_int 16 := @repr 16 (bits_of_b16 f).
+Definition of_bits (b: @bit_int 16): float16 := b16_of_bits (@unsigned 16 b).
+
+End Float16.
 
 Global Opaque
   Float.zero Float.eq_dec Float.neg Float.abs Float.of_single Float.to_single

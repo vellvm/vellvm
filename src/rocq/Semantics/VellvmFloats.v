@@ -234,3 +234,48 @@ Definition float_of_float_syntax (fs:float_syntax) : option float :=
   | FS_hex _ _ => None
   end.
 
+
+(* [0xHABCD] is a raw 16-bit pattern; the lexer has already checked that there
+   are exactly four hex digits (llvm_lexer.mll:590), so the only way the range
+   check below can fail is a literal the lexer would have rejected. *)
+Definition hexadecimal_uint_to_float16 (h:Hexadecimal.uint) : option float16 :=
+  match @hexadecimal_uint_to_bit_int 16 h with
+  | Some x => Some (Float16.of_bits x)
+  | None => None
+  end.
+
+(* Denotation of a floating point literal at type [half].
+
+   Both the decimal and the 16-digit hex form go through the *double* first and
+   are then narrowed by [float_to_float16], which fails unless the value is
+   exactly representable.  That is LLVM's rule, and routing through the double
+   also gets LLVM's rounding: computing a binary16 straight from the decimal
+   rounds once, whereas LLVM rounds decimal -> binary64 -> binary16, and double
+   rounding is not in general single rounding.  Among *accepted* literals the
+   distinction is moot, since they are exact; it only matters for the ones the
+   gate rejects.
+
+   [Bits.b64_of_bits] rather than [hexadecimal_uint_to_float] for the [FH_X]
+   arm: the latter rejects literals of more than 16 digits, whereas LLVM
+   truncates mod 2^64. *)
+Definition float16_of_float_syntax (fs:float_syntax) : option float16 :=
+  match fs with
+  | FS_decimal (Decimal.Decimal (Decimal.Pos xs) ys) =>
+      float_to_float16 (positive_decimal_decimal_to_float xs ys)
+
+  | FS_decimal (Decimal.Decimal (Decimal.Neg xs) ys) =>
+      float_to_float16 (Float.neg (positive_decimal_decimal_to_float xs ys))
+
+  | FS_decimal (Decimal.DecimalExp (Decimal.Pos i) ui exp) =>
+      float_to_float16 (positive_decimal_decimal_signed_to_float i ui exp)
+
+  | FS_decimal (Decimal.DecimalExp (Decimal.Neg i) ui exp) =>
+      float_to_float16 (Float.neg (positive_decimal_decimal_signed_to_float i ui exp))
+
+  | FS_hex FH_H u => hexadecimal_uint_to_float16 u
+
+  | FS_hex FH_X u => float_to_float16 (Bits.b64_of_bits (BinInt.Z.of_hex_uint u))
+
+  | FS_hex _ _ => None
+  end.
+

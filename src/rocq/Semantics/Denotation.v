@@ -141,6 +141,11 @@ Section Denotation.
         | None   => raise_error ("bad double literal: " ++ (show f))
         | Some f => ret (DVALUE_Base (DVALUE_Double f))
         end
+    | DTYPE_FP FP_half =>
+        match float16_of_float_syntax f with
+        | None   => raise_error ("bad half literal: " ++ (show f))
+        | Some f => ret (DVALUE_Base (DVALUE_Half f))
+        end
     | DTYPE_FP _ => raise_error "unsupported float type"
     | _ => raise_error "bad type for constant float"
     end.

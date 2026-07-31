@@ -13,7 +13,12 @@ define float @fptrunc_roundoff() {
   ret float %X
 }
 
-; The LangRef's second example targets half, which Vellvm does not model.
+; The LangRef's second example, verbatim now that half is modelled.
+define half @fptrunc_overflow_half() {
+  %Y = fptrunc double 1.0E+300 to half
+  ret half %Y
+}
+
 ; double -> float overflows in the same way: 1.0E+300 is beyond float's range,
 ; so it rounds to +infinity.
 define float @fptrunc_overflow() {
@@ -35,6 +40,7 @@ define float @fptrunc_ties_to_even() {
 }
 
 ; ASSERT EQ: float 16777216.0 = call float @fptrunc_roundoff()
+; ASSERT EQ: half 0xH7C00 = call half @fptrunc_overflow_half()
 ; ASSERT EQ: float 0x7FF0000000000000 = call float @fptrunc_overflow()
 ; ASSERT EQ: float 2.5 = call float @fptrunc_exact()
 ; ASSERT EQ: float 16777220.0 = call float @fptrunc_ties_to_even()

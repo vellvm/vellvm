@@ -78,7 +78,7 @@ Lemma I2F_llvm_fabs_f32 : forall args1 args2,
 Proof.
   intros args1 args2 Hargs; unfold llvm_fabs_f32.
   destruct Hargs as [ | d1 d2 l1 l2 Hd Hargs]; [constructor |].
-  destruct Hd as [ | | | d | | | | ]; try (destruct Hargs; constructor).
+  destruct Hd as [ | | | d | | | | | ]; try (destruct Hargs; constructor).
   constructor; repeat constructor.
 Qed.
 
@@ -88,7 +88,7 @@ Lemma I2F_llvm_fabs_f64 : forall args1 args2,
 Proof.
   intros args1 args2 Hargs; unfold llvm_fabs_f64.
   destruct Hargs as [ | d1 d2 l1 l2 Hd Hargs]; [constructor |].
-  destruct Hd as [ | | | | d | | | ]; try (destruct Hargs; constructor).
+  destruct Hd as [ | | | | d | | | | ]; try (destruct Hargs; constructor).
   constructor; repeat constructor.
 Qed.
 
@@ -98,9 +98,9 @@ Lemma I2F_llvm_maxnum_f64 : forall args1 args2,
 Proof.
   intros args1 args2 Hargs; unfold llvm_maxnum_f64.
   destruct Hargs as [ | d1 d2 l1 l2 Hd Hargs]; [constructor |].
-  destruct Hd as [ | | | d1 | | | | ]; try (destruct Hargs; constructor).
+  destruct Hd as [ | | | d1 | | | | | ]; try (destruct Hargs; constructor).
   destruct Hargs as [ | d1' d2' l1' l2' Hd' Hargs]; [constructor |].
-  destruct Hd' as [ | | | d2 | | | | ]; try (destruct Hargs; constructor).
+  destruct Hd' as [ | | | d2 | | | | | ]; try (destruct Hargs; constructor).
   constructor; repeat constructor.
 Qed.
 
@@ -110,9 +110,9 @@ Lemma I2F_llvm_maxnum_f32 : forall args1 args2,
 Proof.
   intros args1 args2 Hargs; unfold llvm_maxnum_f32.
   destruct Hargs as [ | d1 d2 l1 l2 Hd Hargs]; [constructor |].
-  destruct Hd as [ | | | | d1 | | | ]; try (destruct Hargs; constructor).
+  destruct Hd as [ | | | | d1 | | | | ]; try (destruct Hargs; constructor).
   destruct Hargs as [ | d1' d2' l1' l2' Hd' Hargs]; [constructor |].
-  destruct Hd' as [ | | | | d2 | | | ]; try (destruct Hargs; constructor).
+  destruct Hd' as [ | | | | d2 | | | | ]; try (destruct Hargs; constructor).
   constructor; repeat constructor.
 Qed.
 
@@ -122,9 +122,9 @@ Lemma I2F_llvm_minimum_f64 : forall args1 args2,
 Proof.
   intros args1 args2 Hargs; unfold llvm_minimum_f64.
   destruct Hargs as [ | d1 d2 l1 l2 Hd Hargs]; [constructor |].
-  destruct Hd as [ | | | d1 | | | | ]; try (destruct Hargs; constructor).
+  destruct Hd as [ | | | d1 | | | | | ]; try (destruct Hargs; constructor).
   destruct Hargs as [ | d1' d2' l1' l2' Hd' Hargs]; [constructor |].
-  destruct Hd' as [ | | | d2 | | | | ]; try (destruct Hargs; constructor).
+  destruct Hd' as [ | | | d2 | | | | | ]; try (destruct Hargs; constructor).
   constructor; repeat constructor.
 Qed.
 
@@ -134,9 +134,9 @@ Lemma I2F_llvm_minimum_f32 : forall args1 args2,
 Proof.
   intros args1 args2 Hargs; unfold llvm_minimum_f32.
   destruct Hargs as [ | d1 d2 l1 l2 Hd Hargs]; [constructor |].
-  destruct Hd as [ | | | | d1 | | | ]; try (destruct Hargs; constructor).
+  destruct Hd as [ | | | | d1 | | | | ]; try (destruct Hargs; constructor).
   destruct Hargs as [ | d1' d2' l1' l2' Hd' Hargs]; [constructor |].
-  destruct Hd' as [ | | | | d2 | | | ]; try (destruct Hargs; constructor).
+  destruct Hd' as [ | | | | d2 | | | | ]; try (destruct Hargs; constructor).
   constructor; repeat constructor.
 Qed.
 
@@ -184,10 +184,10 @@ Ltac narrow_sz p n :=
 Ltac i2f_ushl_sat_leaf n :=
   intros args1 args2 Hargs;
   destruct Hargs as [ | d1 d2 l1 l2 Hd Hargs]; [constructor |];
-  destruct Hd as [ | sz1 i1 | | | | | | ]; try (destruct Hargs; constructor);
+  destruct Hd as [ | sz1 i1 | | | | | | | ]; try (destruct Hargs; constructor);
   narrow_sz sz1 n; cbn -[ushl_sat];
   destruct Hargs as [ | d1' d2' l1' l2' Hd' Hargs]; [constructor |];
-  destruct Hd' as [ | sz2 i2 | | | | | | ]; try (destruct Hargs; constructor);
+  destruct Hd' as [ | sz2 i2 | | | | | | | ]; try (destruct Hargs; constructor);
   narrow_sz sz2 n; cbn -[ushl_sat];
   destruct Hargs; [ | constructor];
   eapply I2F_EOU_bind; [apply I2F_ushl_sat; intros; repeat constructor |];
@@ -234,7 +234,7 @@ Proof.
   destruct Hargs; [ | i2f_va_fail].
   destruct Hva as [ | vp1 vp2 Hvp]; [i2f_va_fail |].
   destruct Hd as [b1 b2 Hb | p τ1 s1 s2 | v1' τ1 s1 s2 Hs].
-  - destruct Hb as [p1 p2 Hp | sz i | ip1 ip2 Hip | d | f | dt | | sz bits bits' Hbits].
+  - destruct Hb as [p1 p2 Hp | sz i | ip1 ip2 Hip | d | f | h | dt | | sz bits bits' Hbits].
     all: try (rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep]).
     rstep; easy.
   - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep].

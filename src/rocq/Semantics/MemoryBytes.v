@@ -98,6 +98,8 @@ Section MemoryByte.
         ret (extract_byte_Z (ptr_to_int ptr) idx)
     | DVALUE_Float f =>
         ret (extract_byte_Z (unsigned (Float32.to_bits f)) idx)
+    | DVALUE_Half f =>
+        ret (extract_byte_Z (unsigned (Float16.to_bits f)) idx)
     | DVALUE_Double d =>
         ret (extract_byte_Z (unsigned (Float.to_bits d)) idx)
     | DVALUE_Poison dt => ret Pois
@@ -239,7 +241,8 @@ Section MemoryByte.
     | DTYPE_Void =>
         raise_error "memory_bytes_to_dvalue on void type."
     | DTYPE_FP FP_half =>
-        raise_error "memory_bytes_to_dvalue: unsupported half."
+        absorb_pois (DTYPE_Base dt) (map_monad memory_byte_value dbs)
+          (fun zs => ret (DVALUE_Half (Float16.of_bits (concat_bytes_Z_vint zs))))
     | DTYPE_FP FP_bfloat =>
         raise_error "memory_bytes_to_dvalue: unsupported bfloat"
     | DTYPE_FP FP_float =>

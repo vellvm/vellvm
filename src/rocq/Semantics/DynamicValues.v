@@ -71,6 +71,7 @@ apply N.eqb_eq.
 Qed.
 
 (* SAZ - TODO make this into typeclasses the way we did with bitint? *)
+Definition ll_half   := Floats.float16.
 Definition ll_float  := Floats.float32.
 Definition ll_double := Floats.float.
 
@@ -91,6 +92,7 @@ Section DValue.
     (* TODO - this version | DVALUE_FP (fp:floating_point_variant) (x:@float_val fp) *)
   | DVALUE_Double (x:ll_double)
   | DVALUE_Float (x:ll_float)
+  | DVALUE_Half (x:ll_half)
 
   (* DESIGN CHOICE:
      - There is only one canonical representation of poison values.
@@ -132,6 +134,7 @@ Section DValue.
     | DVALUE_Iptr x => Some (DTYPE_Iptr)
     | DVALUE_Double x => Some (DTYPE_FP FP_double)
     | DVALUE_Float x => Some (DTYPE_FP FP_float)
+    | DVALUE_Half x => Some (DTYPE_FP FP_half)
     | DVALUE_Poison t =>
         match t with
         | DTYPE_Base dt => Some dt
@@ -148,6 +151,7 @@ Section DValue.
     | DVALUE_Iptr x => (DTYPE_Iptr)
     | DVALUE_Double x => (DTYPE_FP FP_double)
     | DVALUE_Float x => (DTYPE_FP FP_float)
+    | DVALUE_Half x => (DTYPE_FP FP_half)
     | DVALUE_Poison t => t
     | DVALUE_None =>  DTYPE_Void
     | DVALUE_B sz bits =>  (DTYPE_B sz)
@@ -184,6 +188,23 @@ Section DValue.
   #[global] Instance showFloat32 : Show float32
     := {| show := float_to_hex_string |}.
 
+  Fixpoint pad_left_zeros (n : nat) (s : string) : string :=
+    match n with
+    | O => s
+    | S n' => pad_left_zeros n' ("0" ++ s)
+    end.
+
+  (* Unlike [float32], a [half] is *not* shown via its double widening: clang
+     prints half constants in the 4-digit [0xH....] form, which is also the only
+     form the lexer accepts back (it checks the digit count exactly), so the
+     leading zeros have to be there. *)
+  Definition half_to_hex_string (f : float16) : string
+    := let s := NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (unsigned (Float16.to_bits f)))) in
+       "0xH" ++ pad_left_zeros (4 - String.length s) s.
+
+  #[global] Instance showFloat16 : Show float16
+    := {| show := half_to_hex_string |}.
+
   Definition show_memory_bit (mb : memory_bit) : string :=
     match mb with
     | Bit_ptr ptr n => show_ptr ptr ++ "[" ++ show n ++ "]"
@@ -201,6 +222,7 @@ Section DValue.
     | DVALUE_Iptr x => "intptr " ++ show (to_Z x)
     | DVALUE_Double x => "double " ++ show x
     | DVALUE_Float x => "float " ++ show x
+    | DVALUE_Half x => "half " ++ show x
     | DVALUE_Poison t => "poison[" ++ show_dtyp t ++ "]"
     | DVALUE_None => "none"
     | DVALUE_B sz x => "b" ++ show (Zpos sz) ++ "[" ++ show x ++ "]"
@@ -268,6 +290,8 @@ Section DValue.
       - destruct (Float.eq_dec x x0); subst; auto.
         right. intros H. inversion H. subst_existT. contradiction.
       - destruct (Float32.eq_dec x x0); subst; auto.
+        right. intros H. inversion H. subst_existT. contradiction.
+      - destruct (Float16.eq_dec x x0); subst; auto.
         right. intros H. inversion H. subst_existT. contradiction.
       - destruct (dtyp_eq_dec t t0); subst; auto.
         right. intros H. inversion H. subst_existT. contradiction.
@@ -722,13 +746,24 @@ Section DValue.
     | FRem => raise_error "unimplemented float operation"
     end.
 
+  Definition half_op (fop:fbinop) (v1:ll_half) (v2:ll_half) : EOU dvalue_base :=
+    match fop with
+    | FAdd => ret (DVALUE_Half (b16_plus FT_Rounding v1 v2))
+    | FSub => ret (DVALUE_Half (b16_minus FT_Rounding v1 v2))
+    | FMul => ret (DVALUE_Half (b16_mult FT_Rounding v1 v2))
+    | FDiv => ret (DVALUE_Half (b16_div FT_Rounding v1 v2))
+    | FRem => raise_error "unimplemented half operation"
+    end.
+
   Definition eval_fop_base (fop:fbinop) (v1:dvalue_base) (v2:dvalue_base) : EOU dvalue_base :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
+    | DVALUE_Half h1, DVALUE_Half h2     => half_op fop h1 h2
     | DVALUE_Poison t, _                 => ret (DVALUE_Poison t)
     | DVALUE_Float _, DVALUE_Poison t
     | DVALUE_Double _, DVALUE_Poison t
+    | DVALUE_Half _, DVALUE_Poison t
       =>
         if fop_is_div fop
         then raise_ub "Division by poison."
@@ -761,6 +796,7 @@ Section DValue.
     match v with
     | DVALUE_Float f  => ret (DVALUE_Float (Float32.neg f))
     | DVALUE_Double f => ret (DVALUE_Double (Float.neg f))
+    | DVALUE_Half f   => ret (DVALUE_Half (Float16.neg f))
     | DVALUE_Poison t => ret (DVALUE_Poison t)
     | _ => raise_error "ill_typed-fneg "
     end.
@@ -788,6 +824,12 @@ Section DValue.
 
   Definition ordered64 (f1 f2:ll_double) : bool :=
     andb (not_nan64 f1) (not_nan64 f2).
+
+  Definition not_nan16 (f:ll_half) : bool :=
+    negb (Flocq.IEEE754.Binary.is_nan _ _ f).
+
+  Definition ordered16 (f1 f2:ll_half) : bool :=
+    andb (not_nan16 f1) (not_nan16 f2).
 
   Definition float_cmp (fcmp:fcmp) (x:ll_float) (y:ll_float) : dvalue_base :=
     if match fcmp with
@@ -833,15 +875,40 @@ Section DValue.
     then @DVALUE_I 1 Integers.one else @DVALUE_I 1 Integers.zero.
     Arguments double_cmp _ _ _ : simpl nomatch.
 
+  Definition half_cmp (fcmp:fcmp) (x:ll_half) (y:ll_half) : dvalue_base :=
+    if match fcmp with
+       | FFalse => false
+       | FOeq => andb (ordered16 x y) (Float16.cmp Ceq x y)
+       | FOgt => andb (ordered16 x y) (Float16.cmp Cgt x y)
+       | FOge => andb (ordered16 x y) (Float16.cmp Cge x y)
+       | FOlt => andb (ordered16 x y) (Float16.cmp Clt x y)
+       | FOle => andb (ordered16 x y) (Float16.cmp Cle x y)
+       | FOne => andb (ordered16 x y) (Float16.cmp Cne x y)
+       | FOrd => ordered16 x y
+       | FUno => negb (ordered16 x y)
+       | FUeq => orb (negb (ordered16 x y)) (Float16.cmp Ceq x y)
+       | FUgt => orb (negb (ordered16 x y)) (Float16.cmp Cgt x y)
+       | FUge => orb (negb (ordered16 x y)) (Float16.cmp Cge x y)
+       | FUlt => orb (negb (ordered16 x y)) (Float16.cmp Clt x y)
+       | FUle => orb (negb (ordered16 x y)) (Float16.cmp Cle x y)
+       | FUne => orb (negb (ordered16 x y)) (Float16.cmp Cne x y)
+       | FTrue => true
+       end
+    then @DVALUE_I 1 Integers.one else @DVALUE_I 1 Integers.zero.
+    Arguments half_cmp _ _ _ : simpl nomatch.
+
   Definition eval_fcmp_base (fcmp:fcmp) (v1:dvalue_base) (v2:dvalue_base) : EOU dvalue_base :=
     match v1, v2 with
     | DVALUE_Float f1, DVALUE_Float f2 => ret (float_cmp fcmp f1 f2)
     | DVALUE_Double f1, DVALUE_Double f2 => ret (double_cmp fcmp f1 f2)
+    | DVALUE_Half f1, DVALUE_Half f2 => ret (half_cmp fcmp f1 f2)
     | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
     | DVALUE_Poison t, DVALUE_Double _ => ret (DVALUE_Poison t)
     | DVALUE_Poison t, DVALUE_Float _ => ret (DVALUE_Poison t)
+    | DVALUE_Poison t, DVALUE_Half _ => ret (DVALUE_Poison t)
     | DVALUE_Double _, DVALUE_Poison t => ret (DVALUE_Poison t)
     | DVALUE_Float _, DVALUE_Poison t => ret (DVALUE_Poison t)
+    | DVALUE_Half _, DVALUE_Poison t => ret (DVALUE_Poison t)
     | _, _ => raise_error "ill_typed-fcmp"
     end.
 
@@ -1086,6 +1153,7 @@ Section DValue.
   | DVALUE_Iptr_typ   : forall x, dvalue_base_has_dtyp_base (@DVALUE_Iptr x) DTYPE_Iptr
   | DVALUE_Double_typ : forall x, dvalue_base_has_dtyp_base (DVALUE_Double x) (DTYPE_FP FP_double)
   | DVALUE_Float_typ  : forall x, dvalue_base_has_dtyp_base (DVALUE_Float x) (DTYPE_FP FP_float)
+  | DVALUE_Half_typ   : forall x, dvalue_base_has_dtyp_base (DVALUE_Half x) (DTYPE_FP FP_half)
   | DVALUE_None_typ   : dvalue_base_has_dtyp_base DVALUE_None DTYPE_Void
   | DVALUE_Poison_typ : forall τ, NO_VOID_base τ -> dvalue_base_has_dtyp_base (DVALUE_Poison (DTYPE_Base τ)) τ
   | DVALUE_B_typ      : forall sz bits, length bits = (Pos.to_nat sz) ->
@@ -1129,6 +1197,7 @@ Section DValue.
     | DTYPE_Iptr => ret (@DVALUE_Iptr zero_iptr)
     | DTYPE_Pointer => ret (DVALUE_Pointer null)
     | DTYPE_Void => raise_error "DTYPE_Void is not a true LLVM value"
+    | DTYPE_FP FP_half => ret (DVALUE_Half Float16.zero)
     | DTYPE_FP FP_float => ret (DVALUE_Float Float32.zero)
     | DTYPE_FP FP_double => ret (DVALUE_Double (Float32.to_double Float32.zero))
     | DTYPE_FP fp => raise_error ("Unimplemented default type: floating point " ++ show fp)

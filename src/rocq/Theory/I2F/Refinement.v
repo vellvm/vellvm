@@ -97,6 +97,8 @@ Section Refinement.
     I2F_dvalue_base (DVALUE_Double d) (DVALUE_Double d)
   | I2F_dvalue_Float f :
     I2F_dvalue_base (DVALUE_Float f) (DVALUE_Float f)
+  | I2F_dvalue_Half f :
+    I2F_dvalue_base (DVALUE_Half f) (DVALUE_Half f)
   | I2F_dvalue_Poison τ :
     I2F_dvalue_base (DVALUE_Poison τ) (DVALUE_Poison τ)
   | I2F_dvalue_None :

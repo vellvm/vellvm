@@ -265,7 +265,7 @@ Proof.
   destruct Hargs; cbn; [ | unfold raise; apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto].
   unfold ITree.map.
   destruct Hu as [b1 b2 Hb | | ]; try (rbind (fun _ _ => False); [apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto | intros ?? []]); [].
-  destruct Hb as [p1 p2 Hp | sz i | p1 p2 Hp | d | f | t | | sz bits1 bits2 Hbits]; try (rbind (fun _ _ => False); [apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto | intros ?? []]); [].
+  destruct Hb as [p1 p2 Hp | sz i | p1 p2 Hp | d | f | h | t | | sz bits1 bits2 Hbits]; try (rbind (fun _ _ => False); [apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto | intros ?? []]); [].
   destruct (Pos.eq_dec 32 sz); cbn.
   - rewrite 2 Eqit.bind_bind.
     rbind TT; [rstep | intros [] [] _].
@@ -295,7 +295,7 @@ Proof.
       * intros d1 d2 Hd.
         destruct Hd as [b1 b2 Hb | | ];
           try (unfold raise; apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto); [].
-        destruct Hb as [q1 q2 Hq | sz i | q1 q2 Hq | dd | ff | tt | | sz bits1 bits2 Hbits];
+        destruct Hb as [q1 q2 Hq | sz i | q1 q2 Hq | dd | ff | hh | tt | | sz bits1 bits2 Hbits];
           try (unfold raise; apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto); [].
         repeat (destruct sz as [sz|sz|]; cbn;
           try (apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto)).
@@ -313,7 +313,7 @@ Proof.
   destruct Hargs; [ | unfold raise; apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto].
   destruct Hu as [b1 b2 Hb | | ];
     try (rbind (fun _ _ => False); [apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto | intros ?? []]); [].
-  destruct Hb as [p1 p2 Hp | sz i | p1 p2 Hp | d | f | t | | sz bits1 bits2 Hbits];
+  destruct Hb as [p1 p2 Hp | sz i | p1 p2 Hp | d | f | h | t | | sz bits1 bits2 Hbits];
     try (rbind (fun _ _ => False); [apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto | intros ?? []]); [].
   simpl; unfold ITree.map.
   rewrite !Eqit.bind_bind.

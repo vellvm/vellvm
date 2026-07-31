@@ -698,7 +698,7 @@ Lemma I2F_eval_fcmp_base : forall c v1 v2 v1' v2',
 Proof.
   intros * H1 H2.
   induction H1; induction H2; cbn; eauto;
-    unfold float_cmp, double_cmp; destruct c; cbn;
+    unfold float_cmp, double_cmp, half_cmp; destruct c; cbn;
     repeat (break_goal_fast; cbn); eauto.
 Qed.
 

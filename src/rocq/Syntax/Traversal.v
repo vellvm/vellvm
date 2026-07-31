@@ -571,7 +571,6 @@ Section TFunctor.
         | METADATA_File_info f => METADATA_File_info f
         end.
           
-               
     #[global] Instance TFunctor_exp
            `{Endo raw_id}
            `{Endo ibinop}
@@ -593,14 +592,14 @@ Section TFunctor.
       : TFunctor texp | 50 :=
       fun _ _ f '(t,e) => (f t, tfmap f e).
 
- #[global] Instance TFunctor_cmpxchg
-           `{Endo bool}
-           `{Endo icmp}
-           `{Endo int_ast}
-           `{Endo string}
-           `{Endo ordering}
-           `{TFunctor texp}
-           (* `{TFunctor typ} *)
+    #[global] Instance TFunctor_cmpxchg
+      `{Endo bool}
+      `{Endo icmp}
+      `{Endo int_ast}
+      `{Endo string}
+      `{Endo ordering}
+      `{TFunctor texp}
+      (* `{TFunctor typ} *)
       : TFunctor cmpxchg | 50 :=
       fun U V f c =>
         mk_cmpxchg
@@ -614,14 +613,14 @@ Section TFunctor.
           (endo (c_failure_ordering c))
           (endo (c_align c)).
 
-  #[global] Instance TFunctor_atomicrmw
-           `{Endo bool}
-           `{Endo atomic_rmw_operation}
-           `{Endo string}
-           `{Endo ordering}
-           `{Endo int_ast}
-           `{TFunctor texp}
-           (* `{TFunctor typ} *)
+    #[global] Instance TFunctor_atomicrmw
+      `{Endo bool}
+      `{Endo atomic_rmw_operation}
+      `{Endo string}
+      `{Endo ordering}
+      `{Endo int_ast}
+      `{TFunctor texp}
+      (* `{TFunctor typ} *)
       : TFunctor atomicrmw | 50 :=
       fun U V f a =>
         mk_atomicrmw
@@ -632,7 +631,6 @@ Section TFunctor.
           (endo (a_syncscope a))
           (endo (a_ordering a))
           (endo (a_align a)).
-
 
     #[global] Instance TFunctor_landingpad_clause
      `{TFunctor exp}
