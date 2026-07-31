@@ -52,10 +52,7 @@ Class VFloat FP : Type :=
    Bparse 24 128 __ __ base intPart expPart.
  *) 
 
-(* Converts a syntactic floating point value to a float32
-   SAZ: not sure whether the "parsed" conversion is correct
-    it maybe should fail if the number isn't exactly representable.
- *)
+(* Converts a syntactic floating point value to a float32. *)
 (* semantic comparison of uint and zero - inlined below to give better proofs. *)
 Definition uint_is_zero (us:Decimal.uint) : bool :=
   match Pos.of_uint us with
@@ -65,10 +62,10 @@ Definition uint_is_zero (us:Decimal.uint) : bool :=
 
 Definition xx := Decimal.D1 (Decimal.D2 (Decimal.D3 Decimal.Nil)).
 
-
 (*
-   The following function creates a float32 from a parsed representation of a
-   floating point value, which is a *positive* number of the form:
+   The following function creates a [float] (a 64-bit double) from a parsed
+   representation of a floating point value, which is a *positive* number of the
+   form:
       "xs.ys e exp"
    where [xs] is the integral part [ys] is the fractional part and [exp] is the exponent.
 
@@ -89,49 +86,12 @@ Definition xx := Decimal.D1 (Decimal.D2 (Decimal.D3 Decimal.Nil)).
 
     Negative floating point values are handled later by flipping the sign bit.
  *)
-Definition positive_decimal_decimal_signed_to_float32 (xs ys : Decimal.uint) (exp:Decimal.signed_int) : float32 :=
-  match Pos.of_uint xs with
-  | N0 =>
-      (* xs is 0 *)
-      match Pos.of_uint ys with
-      | N0 => (* ys is 0 *)
-          (* 000.000 *)
-          Float32.zero
-      | Npos yyy =>
-          (* 000.123e^exp = yyy * 10^(exp -|yyy|) *)
-          Float32.from_parsed 10 yyy (BinInt.Z.sub (BinInt.Z.of_int exp) (IntDef.Z.of_nat (Decimal.nb_digits ys)))
-      end          
-  | Npos xxx =>
-      match Pos.of_uint ys with
-      | N0 =>
-          (* 12.000 * 10^exp *)
-          Float32.from_parsed 10 xxx (BinInt.Z.of_int exp)
-      | Npos yyy =>
-          (* 12.345 = 12345 * 10^(exp -|yyy|) *)
-          match BinNat.N.of_nat (Decimal.nb_digits ys) with
-          | N0 => Float32.zero (* Should not happen since Pos.of_uint <> N0 *)
-          | Npos ypos =>
-              let xxx_shifted := Pos.mul xxx (pos_pow 10 ypos) in
-              let total := Pos.add xxx_shifted yyy in 
-              Float32.from_parsed 10 total (BinInt.Z.sub (BinInt.Z.of_int exp) (IntDef.Z.of_nat (Decimal.nb_digits ys)))
-          end
-      end
-  end.
-
-
-(* Same as above, but with the exponent set to 0, so that we get 123.4565 *)
-Definition positive_decimal_decimal_to_float32 (xs ys : Decimal.uint) : float32 :=
-  positive_decimal_decimal_signed_to_float32 xs ys (Nat.to_int 0).
-
 (* SAZ: I'm worried that this is going to be too inefficient for the interpreter. *)
-
-(*
-Eval vm_compute in (positive_decimal_decimal_to_float32 (Decimal.D0 Decimal.Nil) xx).
-Eval vm_compute in (positive_decimal_decimal_to_float32 xx (Decimal.D0 Decimal.Nil)).
-Eval vm_compute in (positive_decimal_decimal_to_float32 (Decimal.D0 Decimal.Nil) (Decimal.D0 Decimal.Nil)).
-*)
-
-(* Same as above, but producing a [float] (aka [double], 64-bit float, instead of a [float32]. *)
+(* There is deliberately no float32 counterpart: a decimal literal at type
+   [float] is parsed as a double by this function and then narrowed by
+   [float_to_float32], which is what LLVM does.  The former
+   [positive_decimal_decimal_{signed_,}to_float32] pair, which rounded the
+   decimal straight to binary32, was removed when that gate went in. *)
 Definition positive_decimal_decimal_signed_to_float (xs ys : Decimal.uint) (exp:Decimal.signed_int) : float :=
   match Pos.of_uint xs with
   | N0 =>
@@ -172,20 +132,48 @@ Definition hexadecimal_uint_to_float32 (h:Hexadecimal.uint) : option float32 :=
   float_to_float32 (Bits.b64_of_bits (BinInt.Z.of_hex_uint h)). 
 
 
+(** A *decimal* literal at type [float] is read the way LLVM's parser reads it:
+    parsed as a [double] first, then narrowed, and REJECTED if that narrowing
+    would lose anything.  So [float 1.5] and [float 1.0e10] are fine, whereas
+    [float 1.3], [float 3.0e38] and [float 16777217.0] are errors -- "floating
+    point constant invalid for type", as llvm-as puts it.  ([float 1.0e400] is
+    accepted: it overflows to an infinity as a double, and infinity narrows
+    exactly.)
+
+    NB this rule is NOT stated in LangRef, unlike the exactness requirement on
+    the hex form.  LangRef's "Simple Constants" claims flatly that "the
+    assembler ... accepts 1.25 but rejects 1.3", without distinguishing float
+    from double -- but LLVM accepts [double 1.3], so the documented rule is not
+    the implemented one.  What is encoded here is clang's observed behaviour
+    (LLParser parses to an APFloat and errors if [convert] reports losesInfo),
+    which is the reference [make test] is differential against.
+
+    Going through the double matters twice over.  It is what makes the gate
+    agree with LLVM's, and it also settles the rounding: computing the float32
+    straight from the decimal would round once, whereas LLVM rounds decimal ->
+    binary64 -> binary32, and double rounding is not in general single rounding.
+    On the literals we now accept the question is moot -- they are exact -- but
+    only because we reject the ones where it could have shown up. *)
+
 Definition float32_of_float_syntax (fs:float_syntax) : option float32 :=
   match fs with
-  | FS_decimal (Decimal.Decimal (Decimal.Pos xs) ys) => 
-      Some (positive_decimal_decimal_to_float32 xs ys)
-                                                        
+  | FS_decimal (Decimal.Decimal (Decimal.Pos xs) ys) =>
+      float_to_float32 (positive_decimal_decimal_to_float xs ys)
+
   | FS_decimal (Decimal.Decimal (Decimal.Neg xs) ys) =>
-      Some (Float32.neg (positive_decimal_decimal_to_float32 xs ys))
- 
+      float_to_float32 (Float.neg (positive_decimal_decimal_to_float xs ys))
+
   | FS_decimal (Decimal.DecimalExp (Decimal.Pos i) ui exp) =>
-      Some (positive_decimal_decimal_signed_to_float32 i ui exp)
+      float_to_float32 (positive_decimal_decimal_signed_to_float i ui exp)
 
   | FS_decimal (Decimal.DecimalExp (Decimal.Neg i) ui exp) =>
-      Some (Float32.neg (positive_decimal_decimal_signed_to_float32 i ui exp))
-           
+      float_to_float32 (Float.neg (positive_decimal_decimal_signed_to_float i ui exp))
+
+  (* NB: not routed through [float_of_float_syntax]'s hex arm, which rejects a
+     literal of more than 16 digits ([hexadecimal_uint_to_bit_int]'s range
+     check).  LLVM instead truncates it mod 2^64 -- clang folds
+     [float 0x1FFF8000000000000] to [0xFFF8000000000000] -- which is what
+     [b64_of_bits] does here. *)
   | FS_hex FH_X u => hexadecimal_uint_to_float32 u
 
   | FS_hex _ _ => None
