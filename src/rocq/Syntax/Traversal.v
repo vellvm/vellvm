@@ -7,6 +7,8 @@ From Vellvm Require Import
 From ITree Require Import ITree.
 (* end hide *)
 
+From Trocq Require Import Hierarchy Trocq.
+
 (** ** Definition of generic transformations on Vellvm's abstract syntax.
     The general idea is to define two functions, an endofunction and an fmap
     over each syntactic construct in the ast.
@@ -46,7 +48,19 @@ Section Endo.
   Section Syntax.
 
     Context {T: Set}.
+    Context {E_raw_id : Endo raw_id}.
+    Definition E_raw_id_map1 := Map1.BuildHas _ _ (fun x y => endo x = y) endo. 
+    Definition E_raw_id_param1 := Param10.BuildRel _ _ _ E_raw_id_map1 (Map0.BuildHas _ _ _). 
+    Trocq Logging debug.
+    
+    Trocq Register E_raw_id_param1 : raw_id ~ raw_id @ (PType map1 map0).
+    Trocq Print Translations.
+    (* Fail Trocq Register E_raw_id_map1 : raw_id ~ raw_id @ (PType map1 map0). *)
+    (* Trocq Register raw_id @ (PType map1 map0) ~ raw_id because E_raw_id_map1. *)
 
+    (* Elpi derive raw_id. *)
+    Elpi derive ident.
+    
     #[global] Instance Endo_ident
            `{Endo raw_id}
       : Endo ident | 50 :=
