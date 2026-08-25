@@ -55,7 +55,7 @@ Definition Dtyp_alignment (dt : dtyp) : alignment :=
   end.
 
 Definition max_preferred_dtyp_alignment (dts : list dtyp) : N :=
-  match maximumByOpt (fun dt1 dt2 => preferred_alignment (Dtyp_alignment dt1) <? preferred_alignment (Dtyp_alignment dt1))%N dts with
+  match maximumByOpt (fun dt1 dt2 => preferred_alignment (Dtyp_alignment dt1) <? preferred_alignment (Dtyp_alignment dt2))%N dts with
   | Some dt =>
       preferred_alignment (Dtyp_alignment dt)
   | None => 1
