@@ -1731,99 +1731,234 @@ Proof.
 Qed.  
 
 
-Lemma I2F_memory_byte_of_dvalue : forall v v',
-    I2F_dvalue v v' ->
-    forall dt idx,
-      I2F_EOU I2F_memory_byte (@memory_byte_of_dvalue PInf v dt idx) (@memory_byte_of_dvalue PFin v' dt idx).
-Proof.
-  induction v using dvalue_ind; intros v' R; inversion R; subst;
-    clear R; intros dt idx; cbn.
-  - (* Base *)
-    inversion H0; subst; repeat constructor; auto.
-    eapply I2F_memory_byte_of_dvalue_bv. constructor.
-    unfold I2F_Iptr in H. subst.
-    cbn.  constructor.
-    apply I2F_memory_byte_of_dvalue_bv; auto.
+(** * Serialization: [dvalue_to_memory_bytes]
 
-  - (* Struct: the packed flavour has no padding (capture the loops so
-         only the applied offset gets generalized); the aligned one first
-         aligns and generalizes the baked-in padding bound (freeing the
-         type list). Then induct on the related fields with the type list
-         universal; each step unfolds one iteration of both loops in
-         lockstep on shared scrutinees. *)
-    rename s2 into fields'.
-    destruct p.
-    + destruct dt as [ ? | p' ? | ? ? ? ]; auto.
-      destruct p'; auto.
-      (* packed × packed *)
-      match goal with
-      | |- I2F_EOU I2F_memory_byte (?L _ _ _ _) (?R _ _ _ _) => set (loopL := L); set (loopR := R)
+    [acc_dvalue_to_memory_bytes_h] has the same shape as [freeze]: an
+    outer [Fixpoint] over the [dvalue] with two anonymous inner loops
+    (over a struct's fields and over an array's elements). As there, we
+    name the loops and give their unfolding equations, all of which hold
+    by conversion --- [cbn] would splice the outer fix into every goal
+    and leave the recursive calls unfolded.
+
+    Note that both loops close over [pad_to] (used in their base case)
+    but not over the struct's own [pad], which the current definition
+    computes and then never uses. *)
+Section SerUnfold.
+  Context {Pa : Params}.
+
+  Definition accumulate_struct_bytes (pad_to : option N)
+    : list dvalue -> list dtyp -> N -> list memory_byte -> EOU (N * list memory_byte) :=
+    fix loop fields types (offset : N) (acc : list memory_byte) : EOU (N * list memory_byte) :=
+      match fields, types with
+      | [], [] => ret (accumulate_padding offset pad_to acc)
+      | f::fs, dt::dts =>
+          '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
+          loop fs dts offset' bs
+      | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
       end.
-      rename fields0 into ts.
-      generalize 0%N as offset. 
-      revert idx; revert IH; revert ts;
-        induction H2; intros ts IH idx offset.
-      * unfold loopL, loopR; cbn;
-          destruct ts; cbn; auto;
-          repeat (break_match_goal; cbn);
-        repeat econstructor.
-      * unfold loopL, loopR; cbn; fold loopL; fold loopR;
-        inversion IH; subst;
-        destruct ts; cbn; auto.
-        repeat (break_match_goal; cbn); auto; repeat constructor.
-    + destruct dt as [ ? | p' ? | ? ? ? ]; auto.
-      destruct p'; auto.
-      rename fields0 into ts.
-      rewrite I2F_max_alignment.
-      remember (max_preferred_dtyp_alignment ts) as m. clear Heqm.
-      generalize 0%N as offset.
-      revert idx; revert IH; revert ts;
-        induction H2; intros ts IH idx offset.
-      * destruct ts; cbn; auto;
-          repeat (break_match_goal; cbn); auto.
-        repeat constructor.
-      * inversion IH; subst;
-          destruct ts; cbn; auto;
-          repeat (break_match_goal; cbn); auto.
-        repeat constructor.
-  - (* Array *)
-    destruct dt; cbn; auto.
-    match goal with
-    | F : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ =>
-        revert idx; revert IH; induction F
-    end;
-    intros FIH fidx; cbn; auto;
-    inversion FIH; subst;
-    break_match_goal; cbn; auto.
+
+  Definition accumulate_array_bytes (pad_to : option N) (elt_t : dtyp)
+    : list dvalue -> N -> list memory_byte -> EOU (N * list memory_byte) :=
+    fix loop elts (offset : N) (acc : list memory_byte) : EOU (N * list memory_byte) :=
+      match elts with
+      | [] => ret (accumulate_padding offset pad_to acc)
+      | e::es =>
+          '(offset', bs) <- acc_dvalue_to_memory_bytes_h elt_t e offset
+                              (Some (pad_amount (preferred_alignment (dtyp_alignment elt_t)) offset)) acc ;;
+          loop es offset' bs
+      end.
+
+  Lemma ser_Base_eq : forall dtb dv offset pad_to acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Base dtb) (DVALUE_Base dv) offset pad_to acc =
+        let '(offset', bs) := acc_memory_bytes_of_dvalue_base dtb dv offset acc in
+        ret (accumulate_padding offset' pad_to bs).
+  Proof. reflexivity. Qed.
+
+  Lemma ser_Struct_eq : forall p dts b fields offset pad_to acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Struct p dts) (DVALUE_Struct b fields) offset pad_to acc =
+        accumulate_struct_bytes pad_to fields dts offset acc.
+  Proof. reflexivity. Qed.
+
+  Lemma ser_Array_eq : forall p sz elt_t b elts offset pad_to acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Array p sz elt_t) (DVALUE_Array b elts) offset pad_to acc =
+        accumulate_array_bytes pad_to elt_t elts offset acc.
+  Proof. reflexivity. Qed.
+
+  Lemma acc_struct_nil : forall pad_to offset acc,
+      accumulate_struct_bytes pad_to [] [] offset acc =
+        ret (accumulate_padding offset pad_to acc).
+  Proof. reflexivity. Qed.
+
+  Lemma acc_struct_nil_cons : forall pad_to dt dts offset acc,
+      accumulate_struct_bytes pad_to [] (dt::dts) offset acc =
+        raise_error "type-mismatch: structs / fields have different lengths".
+  Proof. reflexivity. Qed.
+
+  Lemma acc_struct_cons_nil : forall pad_to f fs offset acc,
+      accumulate_struct_bytes pad_to (f::fs) [] offset acc =
+        raise_error "type-mismatch: structs / fields have different lengths".
+  Proof. reflexivity. Qed.
+
+  Lemma acc_struct_cons : forall pad_to f fs dt dts offset acc,
+      accumulate_struct_bytes pad_to (f::fs) (dt::dts) offset acc =
+        '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
+        accumulate_struct_bytes pad_to fs dts offset' bs.
+  Proof. reflexivity. Qed.
+
+  Lemma acc_array_nil : forall pad_to elt_t offset acc,
+      accumulate_array_bytes pad_to elt_t [] offset acc =
+        ret (accumulate_padding offset pad_to acc).
+  Proof. reflexivity. Qed.
+
+  Lemma acc_array_cons : forall pad_to elt_t e es offset acc,
+      accumulate_array_bytes pad_to elt_t (e::es) offset acc =
+        '(offset', bs) <- acc_dvalue_to_memory_bytes_h elt_t e offset
+                            (Some (pad_amount (preferred_alignment (dtyp_alignment elt_t)) offset)) acc ;;
+        accumulate_array_bytes pad_to elt_t es offset' bs.
+  Proof. reflexivity. Qed.
+
+End SerUnfold.
+
+(** ** Refinement
+
+    [I2F_ser_state] is the invariant threaded through the accumulator
+    loops: the two sides agree on the running byte offset (so they make
+    the same padding decisions) and their accumulated byte lists are
+    related. *)
+
+Definition I2F_ser_state
+  (x : N * list (@memory_byte PInf)) (y : N * list (@memory_byte PFin)) : Prop :=
+  fst x = fst y /\ Forall2 I2F_memory_byte (snd x) (snd y).
+
+Lemma I2F_accumulate_poison_bytes : forall n acc acc',
+    Forall2 I2F_memory_byte acc acc' ->
+    Forall2 I2F_memory_byte
+      (@accumulate_poison_bytes PInf n acc) (@accumulate_poison_bytes PFin n acc').
+Proof.
+  intros n acc acc' HA; unfold accumulate_poison_bytes, accumulate_memory_bytes.
+  apply Forall2_rev_loop_acc; auto.
+  intros; apply I2F_poison_memory_byte.
 Qed.
 
-  
-Lemma I2F_dvalue_to_memory_bytes : forall v v' t,
-    I2F_dvalue v v' ->
-    I2F_EOU (Forall2 I2F_memory_byte)
-      (@dvalue_to_memory_bytes PInf v t)
-      (@dvalue_to_memory_bytes PFin v' t).
+Lemma I2F_accumulate_padding : forall offset pad_to acc acc',
+    Forall2 I2F_memory_byte acc acc' ->
+    I2F_ser_state (@accumulate_padding PInf offset pad_to acc)
+                  (@accumulate_padding PFin offset pad_to acc').
 Proof.
-  intros; unfold dvalue_to_memory_bytes.
-  rewrite I2F_sizeof_dtyp.
-  eapply I2F_EOU_map_monad2 with (RA:=Logic.eq).
-  apply eq_Forall2.
-  intros; subst.
-  now apply I2F_memory_byte_of_dvalue.
+  intros offset [align |] acc acc' HA; cbn; split; cbn; auto.
+  now apply I2F_accumulate_poison_bytes.
 Qed.
+
+Lemma I2F_acc_memory_bytes_of_dvalue_base : forall dtb dv dv',
+    I2F_dvalue_base dv dv' ->
+    forall offset acc acc',
+      Forall2 I2F_memory_byte acc acc' ->
+      I2F_ser_state (@acc_memory_bytes_of_dvalue_base PInf dtb dv offset acc)
+                    (@acc_memory_bytes_of_dvalue_base PFin dtb dv' offset acc').
+Proof.
+  intros dtb dv dv' H offset acc acc' HA.
+  unfold acc_memory_bytes_of_dvalue_base; split; cbn; [reflexivity |].
+  apply Forall2_rev_loop_acc; auto.
+  intros i; inversion H; subst.
+  - (* Pointer *) now constructor.
+  - (* I *) apply I2F_memory_byte_of_dvalue_bv; constructor.
+  - (* Iptr *) red in H0; subst; cbn; constructor.
+  - (* Double *) constructor.
+  - (* Float *) constructor.
+  - (* Poison *) apply I2F_poison_memory_byte.
+  - (* None *) apply I2F_poison_memory_byte.
+  - (* B *) now apply I2F_memory_byte_of_dvalue_bv.
+Qed.
+
+Local Notation SER :=
+  (fun (a : @dvalue PInf) (b : @dvalue PFin) =>
+     forall dt offset pad_to acc acc',
+       Forall2 I2F_memory_byte acc acc' ->
+       I2F_EOU I2F_ser_state
+         (@acc_dvalue_to_memory_bytes_h PInf dt a offset pad_to acc)
+         (@acc_dvalue_to_memory_bytes_h PFin dt b offset pad_to acc')).
+
+Lemma I2F_accumulate_struct_bytes : forall fields fields',
+    Forall2 SER fields fields' ->
+    forall dts pad_to offset acc acc',
+      Forall2 I2F_memory_byte acc acc' ->
+      I2F_EOU I2F_ser_state
+        (@accumulate_struct_bytes PInf pad_to fields dts offset acc)
+        (@accumulate_struct_bytes PFin pad_to fields' dts offset acc').
+Proof.
+  intros fields fields' HF; induction HF as [| f f' fs fs' Hf HF IH];
+    intros [| dt dts] pad_to offset acc acc' HA.
+  - rewrite 2 acc_struct_nil; constructor; now apply I2F_accumulate_padding.
+  - rewrite 2 acc_struct_nil_cons; constructor.
+  - rewrite 2 acc_struct_cons_nil; constructor.
+  - rewrite 2 acc_struct_cons.
+    eapply I2F_EOU_bind; [now apply Hf |].
+    intros [o1 b1] [o2 b2] [E F]; cbn in E, F; subst.
+    now apply IH.
+Qed.
+
+Lemma I2F_accumulate_array_bytes : forall elts elts',
+    Forall2 SER elts elts' ->
+    forall elt_t pad_to offset acc acc',
+      Forall2 I2F_memory_byte acc acc' ->
+      I2F_EOU I2F_ser_state
+        (@accumulate_array_bytes PInf pad_to elt_t elts offset acc)
+        (@accumulate_array_bytes PFin pad_to elt_t elts' offset acc').
+Proof.
+  intros elts elts' HF; induction HF as [| e e' es es' He HF IH];
+    intros elt_t pad_to offset acc acc' HA.
+  - rewrite 2 acc_array_nil; constructor; now apply I2F_accumulate_padding.
+  - rewrite 2 acc_array_cons.
+    eapply I2F_EOU_bind; [now apply He |].
+    intros [o1 b1] [o2 b2] [E F]; cbn in E, F; subst.
+    now apply IH.
+Qed.
+
+Lemma I2F_acc_dvalue_to_memory_bytes_h : forall v v', I2F_dvalue v v' -> SER v v'.
+Proof.
+  intros v v' HDV; induction HDV as [b b' HB | p s1 s2 HF IH | vf s1 s2 HF IH];
+    intros dt offset pad_to acc acc' HA;
+    destruct dt as [dtb | p' dts | p' sz elt_t].
+  - rewrite 2 ser_Base_eq.
+    pose proof (I2F_acc_memory_bytes_of_dvalue_base dtb HB offset HA) as HB2.
+    destruct (@acc_memory_bytes_of_dvalue_base PInf dtb b offset acc) as [o1 b1].
+    destruct (@acc_memory_bytes_of_dvalue_base PFin dtb b' offset acc') as [o2 b2].
+    destruct HB2 as [E F]; cbn in E, F; subst.
+    constructor; now apply I2F_accumulate_padding.
+  - cbn; constructor.
+  - cbn; constructor.
+  - cbn; constructor.
+  - rewrite 2 ser_Struct_eq; now apply I2F_accumulate_struct_bytes.
+  - cbn; constructor.
+  - cbn; constructor.
+  - cbn; constructor.
+  - rewrite 2 ser_Array_eq; now apply I2F_accumulate_array_bytes.
+Qed.
+
+Lemma I2F_memory_dvalue_to_memory_bytes : forall dt v v',
+    I2F_dvalue v v' ->
+    forall pad_to,
+      I2F_EOU (Forall2 I2F_memory_byte) (@dvalue_to_memory_bytes PInf dt v pad_to ) (@dvalue_to_memory_bytes PFin dt v' pad_to).
+Proof.
+  intros dt v v' HDV pad_to; unfold dvalue_to_memory_bytes.
+  eapply I2F_EOU_bind; [now apply I2F_acc_dvalue_to_memory_bytes_h |].
+  intros [o1 b1] [o2 b2] [E F]; cbn in E, F; subst.
+  constructor; apply Forall2_rev_append; auto; constructor.
+Qed.
+
 
 (** Bitcast round-trips a value through its byte representation. *)
 Lemma I2F_bitcast_bytes : forall v v' t_from t_to,
     I2F_dvalue v v' ->
     I2F_EOU I2F_dvalue
-      (dv <- (@dvalue_to_memory_bytes PInf v t_from) ;;
+      (dv <- (@dvalue_to_memory_bytes PInf t_from v None) ;;
        @memory_bytes_to_dvalue PInf dv t_to)
-      (dv <- (@dvalue_to_memory_bytes PFin v' t_from) ;;
+      (dv <- (@dvalue_to_memory_bytes PFin t_from v' None) ;;
        @memory_bytes_to_dvalue PFin dv t_to).
 Proof.
   intros.
   eapply I2F_EOU_bind with (RA:=Forall2 I2F_memory_byte).
-  apply  I2F_dvalue_to_memory_bytes; auto.
+  apply I2F_memory_dvalue_to_memory_bytes; auto.
   apply I2F_memory_bytes_to_dvalue.
 Qed.
 
@@ -1892,9 +2027,10 @@ Proof.
   - destruct (get_base_conversion_type t_from t_to) as [[? ?]|]; cbn; auto.
     specialize (@I2F_convert_pure_base cv d d0 b0 b' H) as HV.
     inversion HV; subst; auto.
-  - i2f_vec_flags; auto.
-    break_match_goal; auto.
-    destruct vector; auto.
+  - (* The vector flavour: [i2f_vec_flags] discharges the scalar-array
+       flag (a non-vector array is a diagonal error), leaving the
+       [get_vector_conversion_type] guard. *)
+    i2f_vec_flags; auto.
     destruct (get_vector_conversion_type t_from t_to) as [[? ?]|]; cbn; auto.
     (eapply I2F_EOU_bind;
         [ eapply I2F_EOU_map_monad2;
@@ -2039,51 +2175,61 @@ Lemma I2F_extract_element a1 a2 b1 b2 :
 Proof.
   intros R1 R2.
   inversion R1; subst; cbn; try (repeat constructor).
-  (* Vector *)
-  match goal with v : bool |- _ => destruct v end; cbn;
-  try (repeat constructor).
-  match goal with
-  | τ : dtyp |- _ => destruct τ as [ ? | ? ? | [|] ? ? ]
-  end; cbn; try (repeat constructor).
-  rewrite (I2F_dvalue_to_Z R2).
-  destruct (dvalue_to_Z b2) as [i |]; cbn; try (repeat constructor).
-  rewrite !split_acc_eq.
-  i2f_split_case i ltac:(auto).
+  - (* Base. [extract_element] now dispatches on the value rather than on
+       a vector type, so this case no longer vanishes: [DVALUE_Poison] is
+       the one base value it accepts, every other shape being a diagonal
+       error. *)
+    match goal with
+    | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; repeat constructor
+    end.
+  - (* Vector *)
+    match goal with v : bool |- _ => destruct v end; cbn;
+      try (repeat constructor).
+    (* The empty vector is its own arm of the match, so split the element
+       lists --- by [destruct], not by inverting the [Forall2]: the whole
+       [Forall2] has to survive for [i2f_split_case] to pick it up. The
+       ragged combinations contradict it. *)
+    destruct s1 as [| x xs], s2 as [| y ys]; cbn;
+      try (repeat constructor);
+      try (match goal with F : Forall2 I2F_dvalue _ _ |- _ => now inversion F end).
+    rewrite (I2F_dvalue_to_Z R2).
+    destruct (dvalue_to_Z b2) as [i |]; cbn; try (repeat constructor).
+    rewrite !split_acc_eq.
+    i2f_split_case i ltac:(auto).
 Qed.
 
 (** * insert_element *)
-Lemma I2F_insert_element a1 a2 a3 b1 b2 b3 :
+Lemma I2F_insert_element dt a1 a2 a3 b1 b2 b3 :
   I2F_dvalue a1 b1 ->
   I2F_dvalue a2 b2 ->
   I2F_dvalue a3 b3 ->
-  I2F_EOU I2F_dvalue (insert_element a1 a2 a3) (insert_element b1 b2 b3).
+  I2F_EOU I2F_dvalue (insert_element dt a1 a2 a3) (insert_element dt b1 b2 b3).
 Proof.
   intros R1 R2 R3.
-  inversion R1; subst; cbn; repeat constructor.
-  - (* Base: poison at vector type splits a vector of poisons *)
+  (* The vector type is now an explicit argument, so the dispatch on it
+     comes first; every non-vector type is a diagonal error. *)
+  destruct dt as [ ? | ? ? | [|] sz t ]; cbn; try (repeat constructor).
+  inversion R1; subst; cbn; try (repeat constructor).
+  - (* Base: poison at vector type stands for a vector of poisons, whose
+       length comes from the type's [sz]. *)
     match goal with
     | HB : I2F_dvalue_base _ _ |- _ =>
         inversion HB; subst; cbn; try (repeat constructor)
     end.
-    match goal with
-    | t : dtyp |- _ => destruct t as [ ? | ? ? | [|] ? ? ]
-    end; cbn; try (repeat constructor).
     rewrite (I2F_dvalue_to_Z R3).
-    destruct (dvalue_to_Z b3) as [i |]; cbn; repeat constructor.
-    match goal with
-    | |- context [repeat (DVALUE_Base (DVALUE_Poison ?dt)) ?n] =>
-        pose proof (Forall2_repeat _ _ n
-                      (I2F_dvalue_Base (I2F_dvalue_Poison dt))) as F
-    end.
+    destruct (dvalue_to_Z b3) as [i |]; cbn; try (repeat constructor).
+    (* [i2f_split_case] splits the two lists against a [Forall2] it finds
+       in the context; here the lists are implicit, so supply it. *)
+    assert (F : Forall2 I2F_dvalue
+                  (repeat (@DVALUE_Base PInf DVALUE_Poison) (N.to_nat sz))
+                  (repeat (@DVALUE_Base PFin DVALUE_Poison) (N.to_nat sz)))
+      by (apply Forall2_repeat; repeat constructor).
     rewrite !split_acc_eq.
     i2f_split_case i
       ltac:(do 2 constructor; apply Forall2_app; [auto | constructor; auto]).
   - (* Vector *)
     match goal with v : bool |- _ => destruct v end; cbn;
-    try (repeat constructor).
-    match goal with
-    | τ : dtyp |- _ => destruct τ as [ ? | ? ? | [|] ? ? ]
-    end; cbn; try (repeat constructor).
+      try (repeat constructor).
     rewrite (I2F_dvalue_to_Z R3).
     destruct (dvalue_to_Z b3) as [i |]; cbn; try (repeat constructor).
     rewrite !split_acc_eq.
@@ -2093,58 +2239,50 @@ Qed.
 
 (** * shufflevector *)
 
-(* [vector_elts] normalizes a whole vector operand (concrete array or the
-   scalar poison encoding) to its element dtyp/list; related dvalues
-   normalize to related pieces (or both fail). *)
-Lemma I2F_vector_elts : forall v1 v2,
+(* [vector_elts] normalizes a vector operand (a concrete array, or the
+   scalar poison encoding padded to the type's length) to its element
+   list; related dvalues normalize to related lists, or both fail. *)
+Lemma I2F_vector_elts : forall sz v1 v2,
     I2F_dvalue v1 v2 ->
-    match vector_elts v1, vector_elts v2 with
-    | Some (dt1, elts1), Some (dt2, elts2) => dt1 = dt2 /\ Forall2 I2F_dvalue elts1 elts2
+    match vector_elts sz v1, vector_elts sz v2 with
+    | Some elts1, Some elts2 => Forall2 I2F_dvalue elts1 elts2
     | None, None => True
     | _, _ => False
     end.
 Proof.
-  intros v1 v2 H; inversion H; subst; cbn.
+  intros sz v1 v2 H; inversion H; subst; cbn.
   - match goal with
     | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto
     end.
-    match goal with
-    | t : dtyp |- _ => destruct t as [ ? | ? ? | [|] ? ? ]
-    end; cbn; auto.
   - auto.
   - match goal with v : bool |- _ => destruct v end; cbn; auto.
-    match goal with
-    | t : dtyp |- _ => destruct t as [ ? | ? ? | [|] ? ? ]
-    end; cbn; auto.
 Qed.
 
-Lemma I2F_shuffle_vector a1 a2 a3 b1 b2 b3 :
+Lemma I2F_shuffle_vector dt a1 a2 a3 b1 b2 b3 :
   I2F_dvalue a1 b1 ->
   I2F_dvalue a2 b2 ->
   I2F_dvalue a3 b3 ->
-  I2F_EOU I2F_dvalue (shuffle_vector a1 a2 a3) (shuffle_vector b1 b2 b3).
+  I2F_EOU I2F_dvalue (shuffle_vector dt a1 a2 a3) (shuffle_vector dt b1 b2 b3).
 Proof.
   intros R1 R2 R3.
-  unfold shuffle_vector.
-  pose proof (I2F_vector_elts R1) as V1.
-  pose proof (I2F_vector_elts R2) as V2.
-  destruct (vector_elts a1) as [[dt1 elts1]|], (vector_elts b1) as [[dt1' elts1']|];
-    try contradiction; try (repeat constructor).
-  destruct (vector_elts a2) as [[dt2 elts2]|], (vector_elts b2) as [[dt2' elts2']|];
-    try contradiction; try (repeat constructor).
-  destruct V1 as [EQ1 HE1]; subst.
-  destruct V2 as [EQ2 HE2]; subst.
-  inversion R3; subst; cbn; try (repeat constructor).
-  break_match_goal; auto.
-  break_match_goal; auto.
-  break_match_goal; auto.
-  do 2 constructor.
+  destruct dt as [ ? | ? ? | [|] sz t ]; cbn; try (repeat constructor).
+  pose proof (I2F_vector_elts sz R1) as V1.
+  pose proof (I2F_vector_elts sz R2) as V2.
+  destruct (vector_elts sz a1) as [elts1|], (vector_elts sz b1) as [elts1'|];
+    try contradiction.
+  all: destruct (vector_elts sz a2) as [elts2|], (vector_elts sz b2) as [elts2'|];
+    try contradiction.
+  all: inversion R3; subst; cbn; try (repeat constructor).
+  all: try (match goal with
+            | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; repeat constructor
+            end).
+  all: match goal with v : bool |- _ => destruct v end; cbn; try (repeat constructor).
   eapply Forall2_map_rel; eauto.
   intros idxv idxv' Ridx.
   rewrite (I2F_dvalue_to_Z Ridx).
   destruct (dvalue_to_Z idxv') as [i |]; [| repeat constructor].
   destruct (i <? 0)%Z; [repeat constructor |].
-  pose proof (Forall2_nth_error (Forall2_app HE1 HE2) (Z.to_nat i)) as N.
+  pose proof (Forall2_nth_error (Forall2_app V1 V2) (Z.to_nat i)) as N.
   destruct (nth_error (elts1 ++ elts2) (Z.to_nat i)) as [?v|],
       (nth_error (elts1' ++ elts2') (Z.to_nat i)) as [v'|];
     try contradiction; [assumption | repeat constructor].
