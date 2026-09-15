@@ -645,6 +645,15 @@ Section Forall2.
     intros HRR l1 l2 F; induction F; cbn; constructor; auto.
   Qed.
 
+  (** Both loops reverse their accumulator onto the result, so the
+    accumulator invariant is just [Forall2]-compatibility of
+    [rev_append]. *)
+  Lemma Forall2_rev_append {A B} (R : A -> B -> Prop) :
+    forall l1 l2, Forall2 R l1 l2 ->
+             forall m1 m2, Forall2 R m1 m2 ->
+                      Forall2 R (rev_append l1 m1) (rev_append l2 m2).
+  Proof. induction 1; cbn; auto. Qed.
+  
 End Forall2.
 
 (** *** Interactions between monadic computations and lists *)

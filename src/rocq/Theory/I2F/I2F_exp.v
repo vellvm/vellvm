@@ -53,6 +53,105 @@ Proof. apply refine_dvalue_base_map_gen. Qed.
 
 Hint Resolve refine_dvalue_base_map : core.
 
+(** * Unfolding [freeze]
+
+    [freeze] is a [Definition] whose body is one outer [fix] over the
+    [dvalue] with two inner loops over the fields / elements. Reasoning
+    about it by [cbn] would splice the whole outer [fix] into every goal
+    (and leave the recursive calls unfolded, so no induction hypothesis
+    applies). Instead we name the two inner loops here --- [freeze_fields]
+    and [freeze_elts], phrased in terms of [freeze] itself --- and give
+    the unfolding equations, each of which holds by conversion. All of
+    [freeze]/[freeze_base]'s arguments are supplied explicitly: with a
+    [Params] that is a section *variable*, resolution of the [-<]
+    instances in this file's import environment diverges.
+
+    [reflexivity] diverges on these goals for the same reason, so each
+    proof hands the conversion check the right-hand side directly. *)
+Section FreezeUnfold.
+  Variable Pa : Params.
+  Variable E : Type -> Type.
+  Variables (HD : @DrawE Pa -< E) (HF : FailureE -< E) (HO : OOME -< E) (HU : UBE -< E).
+
+  Local Notation FRZ := (@freeze Pa E HD HF HO HU).
+  Local Notation FRZB := (@freeze_base Pa E HD HF HO HU).
+  Local Notation RAISE := (@raise E _ HF).
+  Local Notation MISMATCH := "freeze_fields: mismatched field types and values".
+
+  (** The [DVALUE_Struct] loop: walks the values and the field types in
+      lockstep, accumulating in reverse. *)
+  Definition freeze_fields : list dvalue -> list dtyp -> list dvalue -> itree E (list dvalue) :=
+    fix loop (dvs : list dvalue) (dts : list dtyp) (acc : list dvalue) : itree E (list dvalue) :=
+      match dts, dvs with
+      | [], [] => ret (rev_append acc [])
+      | t::ts, v::vs => v <- FRZ t v ;; loop vs ts (v :: acc)
+      | _, _ => RAISE MISMATCH
+      end.
+
+  (** The [DVALUE_Array] loop: same, at a single element type. *)
+  Definition freeze_elts (t : dtyp) : list dvalue -> list dvalue -> itree E (list dvalue) :=
+    fix loop (dvs : list dvalue) (acc : list dvalue) : itree E (list dvalue) :=
+      match dvs with
+      | [] => ret (rev_append acc [])
+      | v::vs => v <- FRZ t v ;; loop vs (v :: acc)
+      end.
+
+  Lemma freeze_Base_eq : forall (dt:dtyp) (v : @dvalue_base Pa),
+      FRZ dt (DVALUE_Base v) = FRZB dt v.
+  Proof. intros dt v; exact (@eq_refl _ (FRZB dt v)). Qed.
+
+  Lemma freeze_Struct_eq : forall (b:bool) (fields : list (@dvalue Pa)) (dt:dtyp),
+      FRZ dt (DVALUE_Struct b fields) =
+        match dt with
+        | DTYPE_Struct p dts => val <- freeze_fields fields dts [] ;; ret (DVALUE_Struct p val)
+        | _ => RAISE "freeze: type mismatch non-struct type"
+        end.
+  Proof.
+    intros b fields dt.
+    exact (@eq_refl _ (match dt with
+        | DTYPE_Struct p dts => val <- freeze_fields fields dts [] ;; ret (DVALUE_Struct p val)
+        | _ => RAISE "freeze: type mismatch non-struct type" end)).
+  Qed.
+
+  Lemma freeze_Array_eq : forall (b:bool) (elts : list (@dvalue Pa)) (dt:dtyp),
+      FRZ dt (DVALUE_Array b elts) =
+        match dt with
+        | DTYPE_Array v sz t => val <- freeze_elts t elts [] ;; ret (DVALUE_Array v val)
+        | _ => RAISE "freeze: type mismatch non-array type"
+        end.
+  Proof.
+    intros b elts dt.
+    exact (@eq_refl _ (match dt with
+        | DTYPE_Array v sz t => val <- freeze_elts t elts [] ;; ret (DVALUE_Array v val)
+        | _ => RAISE "freeze: type mismatch non-array type" end)).
+  Qed.
+
+  Lemma freeze_fields_nil : forall acc, freeze_fields [] [] acc = ret (rev_append acc []).
+  Proof. intros acc; exact (@eq_refl _ (ret (rev_append acc []))). Qed.
+
+  Lemma freeze_fields_nil_cons : forall t ts acc, freeze_fields [] (t::ts) acc = RAISE MISMATCH.
+  Proof. intros; exact (@eq_refl _ (RAISE MISMATCH)). Qed.
+
+  Lemma freeze_fields_cons_nil : forall v vs acc, freeze_fields (v::vs) [] acc = RAISE MISMATCH.
+  Proof. intros; exact (@eq_refl _ (RAISE MISMATCH)). Qed.
+
+  Lemma freeze_fields_cons : forall v vs t ts acc,
+      freeze_fields (v::vs) (t::ts) acc = x <- FRZ t v ;; freeze_fields vs ts (x :: acc).
+  Proof. intros; exact (@eq_refl _ (x <- FRZ t v ;; freeze_fields vs ts (x :: acc))). Qed.
+
+  Lemma freeze_elts_nil : forall t acc, freeze_elts t [] acc = ret (rev_append acc []).
+  Proof. intros t acc; exact (@eq_refl _ (ret (rev_append acc []))). Qed.
+
+  Lemma freeze_elts_cons : forall t v vs acc,
+      freeze_elts t (v::vs) acc = x <- FRZ t v ;; freeze_elts t vs (x :: acc).
+  Proof. intros; exact (@eq_refl _ (x <- FRZ t v ;; freeze_elts t vs (x :: acc))). Qed.
+
+End FreezeUnfold.
+
+Arguments freeze_fields {Pa E HD HF HO HU}.
+Arguments freeze_elts {Pa E HD HF HO HU}.
+
+
 (** Generic [freeze]/[freeze_base], parameterized over the single event
       they trigger: [draw]. The MCFG and CFG instances then differ only in
       the [draw]-refinement fed in ([I2F_draw_MCFG] / [I2F_draw_CFG]). *)
@@ -62,9 +161,9 @@ Lemma I2F_freeze_base_gen {E1 E2}
   {Rcutl : pred1 E1} {Rcutr : pred1 E2}
   {REv : prerel E1 E2} {RAns : postrel E1 E2}
   (Hdraw : forall dt, ruttc Rcutl Rcutr REv RAns I2F_dvalue (draw dt) (draw dt))
-  (a : @dvalue_base PInf) (b : @dvalue_base PFin) :
+  (dt:dtyp) (a : @dvalue_base PInf) (b : @dvalue_base PFin) :
   I2F_dvalue_base a b ->
-  ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze_base a) (freeze_base b).
+  ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze_base dt a) (freeze_base dt b).
 Proof.
   intros HDV; destruct HDV; cbn;
     try solve [ apply ruttc_ret; auto
@@ -72,20 +171,108 @@ Proof.
   apply Hdraw.
 Qed.
 
+(* SAZ: I got claude Opus 5.0 to fix the proof of freeze. *)
+
+(** The [FailureE] branches of [freeze]: a value/type shape mismatch
+    raises on *both* sides at once (the two [dvalue]s are [I2F_dvalue]-
+    related, hence of the same shape and length, and the [dtyp] is
+    shared), so all we need of [REv] is that it relates [Throw] to
+    [Throw] --- the same side condition [I2F_refine_lift_gen] asks for,
+    discharged by [I2FE_MCFG_Throw] / [I2FE_CFG_Throw]. This is the extra
+    constraint [freeze] now imposes that [freeze_base] does not: the old
+    [map_monad]-based [freeze] could not fail. *)
+Lemma I2F_raise_gen {E1 E2}
+  `{FailureE -< E1} `{FailureE -< E2}
+  {Rcutl : pred1 E1} {Rcutr : pred1 E2}
+  {REv : prerel E1 E2} {RAns : postrel E1 E2}
+  (HThrow : forall u1 u2 : unit,
+      REv void void (subevent _ (Throw u1)) (subevent _ (Throw u2)))
+  {A1 A2} (RR : A1 -> A2 -> Prop) (s1 s2 : string) :
+  ruttc Rcutl Rcutr REv RAns RR (raise s1) (raise s2).
+Proof. apply ruttc_trigger_cast, HThrow. Qed.
+
+(** The two inner loops, each by induction on the [Forall2] carrying the
+    induction hypothesis of [I2F_freeze_gen], generalized over the
+    accumulators. In [freeze_fields] the field types are consumed in
+    lockstep with the values, so the three mismatch branches
+    ([] / t::ts, v::vs / [], and the [dtyp] guard) fire simultaneously on
+    both sides. *)
+Lemma I2F_freeze_fields_gen {E1 E2}
+  `{@DrawE PInf -< E1} `{FailureE -< E1} `{OOME -< E1} `{UBE -< E1}
+  `{@DrawE PFin -< E2} `{FailureE -< E2} `{OOME -< E2} `{UBE -< E2}
+  {Rcutl : pred1 E1} {Rcutr : pred1 E2}
+  {REv : prerel E1 E2} {RAns : postrel E1 E2}
+  (HThrow : forall u1 u2 : unit,
+      REv void void (subevent _ (Throw u1)) (subevent _ (Throw u2))) :
+  forall s1 s2,
+    Forall2 (fun (a : @dvalue PInf) (b : @dvalue PFin) =>
+               forall dt, ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze dt a) (freeze dt b))
+      s1 s2 ->
+    forall dts acc1 acc2,
+      Forall2 I2F_dvalue acc1 acc2 ->
+      ruttc Rcutl Rcutr REv RAns (Forall2 I2F_dvalue)
+        (freeze_fields s1 dts acc1) (freeze_fields s2 dts acc2).
+Proof.
+  intros s1 s2 HF; induction HF as [| v1 v2 vs1 vs2 Hv HF IH];
+    intros [| t ts] acc1 acc2 HACC.
+  - rewrite 2 freeze_fields_nil; apply ruttc_ret; now apply Forall2_rev_append.
+  - rewrite 2 freeze_fields_nil_cons; now apply I2F_raise_gen.
+  - rewrite 2 freeze_fields_cons_nil; now apply I2F_raise_gen.
+  - rewrite 2 freeze_fields_cons.
+    rbind I2F_dvalue; [apply Hv |].
+    intros r1 r2 HR; apply IH; now constructor.
+Qed.
+
+Lemma I2F_freeze_elts_gen {E1 E2}
+  `{@DrawE PInf -< E1} `{FailureE -< E1} `{OOME -< E1} `{UBE -< E1}
+  `{@DrawE PFin -< E2} `{FailureE -< E2} `{OOME -< E2} `{UBE -< E2}
+  {Rcutl : pred1 E1} {Rcutr : pred1 E2}
+  {REv : prerel E1 E2} {RAns : postrel E1 E2} :
+  forall t s1 s2,
+    Forall2 (fun (a : @dvalue PInf) (b : @dvalue PFin) =>
+               forall dt, ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze dt a) (freeze dt b))
+      s1 s2 ->
+    forall acc1 acc2,
+      Forall2 I2F_dvalue acc1 acc2 ->
+      ruttc Rcutl Rcutr REv RAns (Forall2 I2F_dvalue)
+        (freeze_elts t s1 acc1) (freeze_elts t s2 acc2).
+Proof.
+  intros t s1 s2 HF; induction HF as [| v1 v2 vs1 vs2 Hv HF IH];
+    intros acc1 acc2 HACC.
+  - rewrite 2 freeze_elts_nil; apply ruttc_ret; now apply Forall2_rev_append.
+  - rewrite 2 freeze_elts_cons.
+    rbind I2F_dvalue; [apply Hv |].
+    intros r1 r2 HR; apply IH; now constructor.
+Qed.
+
+(** The aggregate flag of the result ([DVALUE_Struct p] / [DVALUE_Array v])
+    is read off the *type*, which is shared, so the two sides agree on it
+    without any appeal to the relation between the input values. *)
 Lemma I2F_freeze_gen {E1 E2}
   `{@DrawE PInf -< E1} `{FailureE -< E1} `{OOME -< E1} `{UBE -< E1}
   `{@DrawE PFin -< E2} `{FailureE -< E2} `{OOME -< E2} `{UBE -< E2}
   {Rcutl : pred1 E1} {Rcutr : pred1 E2}
   {REv : prerel E1 E2} {RAns : postrel E1 E2}
   (Hdraw : forall dt, ruttc Rcutl Rcutr REv RAns I2F_dvalue (draw dt) (draw dt))
-  (a : @dvalue PInf) (b : @dvalue PFin) :
+  (HThrow : forall u1 u2 : unit,
+      REv void void (subevent _ (Throw u1)) (subevent _ (Throw u2)))
+  (dt:dtyp) (a : @dvalue PInf) (b : @dvalue PFin) :
   I2F_dvalue a b ->
-  ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze a) (freeze b).
+  ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze dt a) (freeze dt b).
 Proof.
-  intros HDV; induction HDV; cbn.
-  - now apply (I2F_freeze_base_gen Hdraw).
-  - eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto | intros ?? HR; apply ruttc_ret; now constructor].
-  - eapply ruttc_bind; [apply ruttc_map_monad_gen; eauto | intros ?? HR; apply ruttc_ret; now constructor].
+  intros HDV; revert dt.
+  induction HDV as [b1 b2 HB | p s1 s2 HF IH | v s1 s2 HF IH]; intros dt.
+  - rewrite 2 freeze_Base_eq; now apply (I2F_freeze_base_gen Hdraw).
+  - rewrite 2 freeze_Struct_eq.
+    destruct dt; try now apply I2F_raise_gen.
+    rbind (Forall2 I2F_dvalue).
+    + now apply I2F_freeze_fields_gen.
+    + intros ?? HR; apply ruttc_ret; now constructor.
+  - rewrite 2 freeze_Array_eq.
+    destruct dt; try now apply I2F_raise_gen.
+    rbind (Forall2 I2F_dvalue).
+    + now apply I2F_freeze_elts_gen.
+    + intros ?? HR; apply ruttc_ret; now constructor.
 Qed.
 
 (** [draw] refined by itself at the MCFG signature --- the sole
@@ -94,15 +281,18 @@ Lemma I2F_draw_MCFG : forall dt,
     I2F_refine_MCFG I2F_dvalue (draw dt) (draw dt).
 Proof. intros; unfold I2F_refine_MCFG, draw; rstep. Qed.
 
-Lemma I2F_freeze_base a b :
+Lemma I2F_freeze_base dt a b :
   I2F_dvalue_base a b ->
-  I2F_refine (freeze_base a) (freeze_base b).
+  I2F_refine (freeze_base dt a) (freeze_base dt b).
 Proof. intros H; unfold I2F_refine, I2F_refine_MCFG; now apply (I2F_freeze_base_gen I2F_draw_MCFG). Qed.
 
-Lemma I2F_freeze a b :
+Lemma I2F_freeze dt a b :
   I2F_dvalue a b ->
-  I2F_refine (freeze a) (freeze b).
-Proof. intros H; unfold I2F_refine, I2F_refine_MCFG; now apply (I2F_freeze_gen I2F_draw_MCFG). Qed.
+  I2F_refine (freeze dt a) (freeze dt b).
+Proof.
+  intros H; unfold I2F_refine, I2F_refine_MCFG;
+    now apply (I2F_freeze_gen I2F_draw_MCFG I2FE_MCFG_Throw).
+Qed.
 
 (** The pure content of the [EXP_Integer] case, and the one place where
       the 14-way case analysis on [dtyp] happens. *)
@@ -736,11 +926,11 @@ Definition I2F_memory_byte (b : @memory_byte PInf) (b' : @memory_byte PFin) : Pr
 
 #[local] Arguments absorb_pois : simpl never.
 
-Lemma I2F_absorb_pois {A1 A2} (RR : A1 -> A2 -> Prop) (dt : dtyp) (c1 : EOUP A1) (c2 : EOUP A2)
+Lemma I2F_absorb_pois {A1 A2} (RR : A1 -> A2 -> Prop) (c1 : EOUP A1) (c2 : EOUP A2)
   (k1 : A1 -> EOU (@dvalue_base PInf)) (k2 : A2 -> EOU (@dvalue_base PFin)) :
   I2F_EOUP RR c1 c2 ->
   (forall a1 a2, RR a1 a2 -> I2F_EOU I2F_dvalue_base (k1 a1) (k2 a2)) ->
-  I2F_EOU I2F_dvalue_base (@absorb_pois PInf A1 dt c1 k1) (@absorb_pois PFin A2 dt c2 k2).
+  I2F_EOU I2F_dvalue_base (@absorb_pois PInf A1 c1 k1) (@absorb_pois PFin A2 c2 k2).
 Proof.
   intros HC K; unfold absorb_pois.
   eapply I2F_EOUP_EOU in HC.
@@ -1055,6 +1245,266 @@ Proof.
 Qed.      
       
 
+(** * Deserialization at the byte type [DTYPE_B]
+
+    [memory_bytes_to_dvalue_base] at [DTYPE_B] goes through
+    [all_poison_bytes] and [memory_bytes_to_byte_value]; the latter is
+    the one place in deserialization that *inspects* the result of
+    [memory_bytes_to_int] / [memory_bytes_to_pointer] and falls through
+    to the next representation rather than propagating it. The three
+    groups of lemmas below supply, in order: the bit-level [Forall2]
+    plumbing, the agreement of the poison test, and the branch alignment
+    that the fall-through needs. *)
+
+(** [rev_loop_acc] is built from [N.recursion], which does not reduce on
+    [N.succ]; one unfolding equation makes it usable by induction. *)
+Lemma rev_loop_acc_succ {A} (f : N -> A) n :
+  N.rev_loop_acc f (N.succ n) = (fun i acc => N.rev_loop_acc f n (1+i)%N (f i :: acc)).
+Proof.
+  unfold N.rev_loop_acc.
+  apply (@N.recursion_succ (N -> list A -> list A) Logic.eq); auto.
+  repeat intro; subst; auto.
+Qed.
+
+Lemma Forall2_rev_loop_acc {A B} (R : A -> B -> Prop) (f : N -> A) (g : N -> B)
+  (HR : forall i, R (f i) (g i)) :
+  forall n i acc acc', Forall2 R acc acc' ->
+    Forall2 R (N.rev_loop_acc f n i acc) (N.rev_loop_acc g n i acc').
+Proof.
+  intros n; induction n using N.peano_ind; intros i acc acc' HA.
+  - cbn; auto.
+  - rewrite !rev_loop_acc_succ; cbn.
+    apply IHn; constructor; auto.
+Qed.
+
+(** ** Bit-level plumbing *)
+Lemma I2F_memory_byte_to_memory_bits mb mb' :
+  I2F_memory_byte mb mb' ->
+  Forall2 I2F_memory_bit (memory_byte_to_memory_bits mb) (memory_byte_to_memory_bits mb').
+Proof.
+  intros H; red in H; inversion H; subst.
+  - (* BYTE__I *)
+    apply Forall2_rev_append; [| constructor].
+    apply Forall2_rev_loop_acc; [intros; constructor; auto | constructor].
+  - (* BYTE_Pointer *)
+    apply Forall2_rev_append; [| constructor].
+    apply Forall2_rev_loop_acc; [intros; constructor; auto | constructor].
+  - (* BYTE_Mixed *)
+    assumption.
+Qed.
+
+Lemma I2F_get_bits_of_memory_byte_list dbs dbs' :
+  Forall2 I2F_memory_byte dbs dbs' ->
+  forall bit_sz acc acc',
+    Forall2 I2F_memory_bit acc acc' ->
+    Forall2 I2F_memory_bit
+      (get_bits_of_memory_byte_list bit_sz dbs acc)
+      (get_bits_of_memory_byte_list bit_sz dbs' acc').
+Proof.
+  intros F; induction F as [| b b' bs bs' HB F IH]; intros bit_sz acc acc' HA; cbn.
+  - break_match_goal.
+    + auto. 
+    + apply Forall2_rev_loop_acc; intros; auto.
+  - assert (HBITS : Forall2 I2F_memory_bit
+                      (memory_byte_to_memory_bits b) (memory_byte_to_memory_bits b'))
+      by (apply I2F_memory_byte_to_memory_bits; auto).
+    break_match_goal.
+    + apply Forall2_rev_append; auto; now apply Forall2_take.
+    + apply IH; now apply Forall2_rev_append.
+Qed.
+
+(** ** The poison test agrees on related byte lists
+
+    [all_poison_bytes] guards the [DVALUE_Poison] short-circuit, so the
+    two sides must take the same branch of the [if]. *)
+Lemma I2F_is_poison_bit b b' :
+  I2F_memory_bit b b' -> is_poison_bit b = is_poison_bit b'.
+Proof. intros H; inversion H; subst; reflexivity. Qed.
+
+Lemma I2F_all_poison_bits bits bits' :
+  Forall2 I2F_memory_bit bits bits' -> all_poison_bits bits = all_poison_bits bits'.
+Proof.
+  intros F; unfold all_poison_bits; induction F; cbn; auto.
+  erewrite I2F_is_poison_bit by eauto; now rewrite IHF.
+Qed.
+
+Lemma I2F_is_all_poison_byte mb mb' :
+  I2F_memory_byte mb mb' -> is_all_poison_byte mb = is_all_poison_byte mb'.
+Proof.
+  intros H; red in H; inversion H; subst; cbn [is_all_poison_byte]; auto.
+  now apply I2F_all_poison_bits.
+Qed.
+
+Lemma I2F_all_poison_bytes dbs dbs' :
+  Forall2 I2F_memory_byte dbs dbs' -> all_poison_bytes dbs = all_poison_bytes dbs'.
+Proof.
+  intros F; unfold all_poison_bytes; induction F; cbn; auto.
+  erewrite I2F_is_all_poison_byte by eauto; now rewrite IHF.
+Qed.
+
+(** ** Branch alignment
+
+    [I2F_EOUP]'s cuts (UB on the left, OOM on the right) let the two
+    sides diverge, which is fine wherever the computation is used
+    monadically --- but [memory_bytes_to_byte_value] pattern-matches on
+    [memory_bytes_to_int] / [memory_bytes_to_pointer] and silently falls
+    through on anything that is not a [NoPois] return, so a cut on one
+    side would send the two sides down different branches. Neither
+    computation can actually be UB or OOM ([no_cut] below), which
+    collapses [I2F_EOUP] to the three lockstep shapes. *)
+
+Definition no_cut {A} (c : @EOU A) : Prop :=
+  match c with
+  | raise_ub _ => False
+  | raise_oom _ => False
+  | _ => True
+  end.
+
+Lemma no_cut_ret {A} (a : A) : no_cut (raise_ret a).
+Proof. exact I. Qed.
+
+Lemma no_cut_bind_EOUP {A B} (c : EOUP A) (k : A -> EOUP B) :
+  no_cut c -> (forall a, no_cut (k a)) -> no_cut (bind (m := EOUP) c k).
+Proof. destruct c as [s|s|s|[|a]]; cbn; auto; contradiction. Qed.
+
+Lemma no_cut_map_monad_EOUP {A B} (f : A -> EOUP B) :
+  (forall a, no_cut (f a)) -> forall l, no_cut (map_monad (m := EOUP) f l).
+Proof.
+  intros Hf l; induction l as [| a l IH]; [exact I |].
+  cbn [map_monad].
+  apply no_cut_bind_EOUP; auto; intros b.
+  apply no_cut_bind_EOUP; auto; intros bs; exact I.
+Qed.
+
+Section NoCut.
+  Context {Pa : Params}.
+
+  Lemma no_cut_memory_bit_to_bit mb : no_cut (memory_bit_to_bit mb).
+  Proof. destruct mb; exact I. Qed.
+
+  Lemma no_cut_memory_bits_to_Z bits : no_cut (memory_bits_to_Z bits).
+  Proof.
+    unfold memory_bits_to_Z.
+    apply no_cut_bind_EOUP; [| intros; exact I].
+    apply no_cut_map_monad_EOUP, no_cut_memory_bit_to_bit.
+  Qed.
+
+  Lemma no_cut_memory_byte_to_Z mb : no_cut (memory_byte_to_Z mb).
+  Proof. destruct mb; try exact I; apply no_cut_memory_bits_to_Z. Qed.
+
+  (* One unfolding step; [cbn] would reduce two levels deep. *)
+  Lemma concat_bytes_Z_mixed_cons2 extra acc b d rest :
+    concat_bytes_Z_mixed extra acc (b :: d :: rest) =
+      z <- memory_byte_to_Z b ;; concat_bytes_Z_mixed extra (acc + z)%Z (d :: rest).
+  Proof. destruct b; reflexivity. Qed.
+
+  Lemma no_cut_concat_bytes_Z_mixed extra : forall dbs acc,
+      no_cut (concat_bytes_Z_mixed extra acc dbs).
+  Proof.
+    induction dbs as [| b rest IH]; intros acc; [exact I |].
+    destruct rest as [| d rest'].
+    - destruct b; try exact I.
+      cbn; apply no_cut_bind_EOUP; [apply no_cut_memory_bits_to_Z | intros; exact I].
+    - rewrite concat_bytes_Z_mixed_cons2.
+      apply no_cut_bind_EOUP; [apply no_cut_memory_byte_to_Z | intros; apply IH].
+  Qed.
+
+  Lemma no_cut_memory_bytes_to_int sz dbs : no_cut (memory_bytes_to_int sz dbs).
+  Proof.
+    unfold memory_bytes_to_int; break_match_goal.
+    - apply no_cut_concat_bytes_Z_mixed.
+    - apply no_cut_bind_EOUP; [| intros; exact I].
+      apply no_cut_map_monad_EOUP, no_cut_memory_byte_to_Z.
+  Qed.
+
+  Lemma no_cut_valid_pointer_bits p base : forall bits offset,
+      no_cut (valid_pointer_bits p base offset bits).
+  Proof.
+    induction bits as [| b bits IH]; intros offset; [exact I |].
+    destruct b; try exact I.
+    cbn; repeat break_match_goal; try exact I; apply IH.
+  Qed.
+
+  Lemma no_cut_valid_pointer_byte p idx mb : no_cut (valid_pointer_byte p idx mb).
+  Proof.
+    destruct mb as [q i | x | bits]; cbn.
+    - break_match_goal; exact I.
+    - exact I.
+    - apply no_cut_valid_pointer_bits.
+  Qed.
+
+  Lemma no_cut_valid_pointer_bytes p : forall bytes idx,
+      no_cut (valid_pointer_bytes p idx bytes).
+  Proof.
+    induction bytes as [| b bs IH]; intros idx; [exact I |].
+    cbn [valid_pointer_bytes].
+    apply no_cut_bind_EOUP; [apply no_cut_valid_pointer_byte |].
+    intros []; [apply IH | exact I].
+  Qed.
+
+  Lemma no_cut_memory_bytes_to_pointer dbs : no_cut (memory_bytes_to_pointer dbs).
+  Proof.
+    unfold memory_bytes_to_pointer; repeat break_match_goal; try exact I.
+    all: apply no_cut_bind_EOUP; [apply no_cut_valid_pointer_bytes |];
+         intros []; exact I.
+  Qed.
+End NoCut.
+
+(** ** Putting it together *)
+
+Lemma I2F_EOUP_no_cut_inv {A1 A2} (RR : A1 -> A2 -> Prop) c1 c2 :
+  I2F_EOUP RR c1 c2 -> no_cut c1 -> no_cut c2 ->
+  (exists a1 a2, c1 = raise_ret (NoPois a1) /\ c2 = raise_ret (NoPois a2) /\ RR a1 a2)
+  \/ (c1 = raise_ret (@Pois A1) /\ c2 = raise_ret (@Pois A2))
+  \/ (exists s1 s2, c1 = raise_error s1 /\ c2 = raise_error s2).
+Proof. intros [] N1 N2; eauto 10; contradiction. Qed.
+
+Lemma I2F_mixed_fallback sz dbs dbs' :
+  Forall2 I2F_memory_byte dbs dbs' ->
+  I2F_dvalue_bv
+    (@BYTE_Mixed PInf sz (rev_append (get_bits_of_memory_byte_list (N.pos sz) dbs []) []))
+    (@BYTE_Mixed PFin sz (rev_append (get_bits_of_memory_byte_list (N.pos sz) dbs' []) [])).
+Proof.
+  intros F; constructor.
+  apply Forall2_rev_append; [| constructor].
+  apply I2F_get_bits_of_memory_byte_list; auto.
+Qed.
+
+Lemma I2F_memory_bytes_to_byte_value sz dbs dbs' :
+  Forall2 I2F_memory_byte dbs dbs' ->
+  I2F_EOU I2F_dvalue_bv
+    (@memory_bytes_to_byte_value PInf sz dbs)
+    (@memory_bytes_to_byte_value PFin sz dbs').
+Proof.
+  intros F.
+  assert (PTR : I2F_EOU I2F_dvalue_bv
+     (match @memory_bytes_to_pointer PInf dbs with
+      | raise_ret (NoPois p) => ret (@BYTE_Pointer PInf sz p 0)
+      | _ => ret (@BYTE_Mixed PInf sz
+                    (rev_append (get_bits_of_memory_byte_list (N.pos sz) dbs []) []))
+      end)
+     (match @memory_bytes_to_pointer PFin dbs' with
+      | raise_ret (NoPois p) => ret (@BYTE_Pointer PFin sz p 0)
+      | _ => ret (@BYTE_Mixed PFin sz
+                    (rev_append (get_bits_of_memory_byte_list (N.pos sz) dbs' []) []))
+      end)).
+  { pose proof (I2F_EOUP_memory_bytes_to_pointer F) as HP.
+    apply I2F_EOUP_no_cut_inv in HP;
+      [| apply (@no_cut_memory_bytes_to_pointer PInf)
+       | apply (@no_cut_memory_bytes_to_pointer PFin) ].
+    destruct HP as [(p1 & p2 & -> & -> & HA) | [(-> & ->) | (s1 & s2 & -> & ->)]]; cbn.
+    - constructor; now constructor.
+    - constructor; now apply I2F_mixed_fallback.
+    - constructor; now apply I2F_mixed_fallback. }
+  unfold memory_bytes_to_byte_value.
+  pose proof (I2F_memory_bytes_to_int sz F) as HI.
+  apply I2F_EOUP_no_cut_inv in HI;
+    [| apply (@no_cut_memory_bytes_to_int PInf)
+     | apply (@no_cut_memory_bytes_to_int PFin) ].
+  destruct HI as [(x1 & x2 & -> & -> & <-) | [(-> & ->) | (s1 & s2 & -> & ->)]]; cbn; auto.
+  constructor; constructor.
+Qed.
+
 (** Deserialization at base types: every arm funnels through the shared
       [EOUP] stream of [memory_byte_value]s (equal by [I2F_mbyte]);
       [DTYPE_Iptr] and [DTYPE_Pointer] then run the finite in-range
@@ -1099,6 +1549,12 @@ Proof.
     intros.
     apply Forall2_eq in H. subst.
     repeat constructor.
+  - (* DTYPE_B *)
+    erewrite I2F_all_poison_bytes by eauto.
+    break_match_goal; [repeat constructor |].
+    pose proof (I2F_memory_bytes_to_byte_value sz F) as HB.
+    destruct HB as [a1 a2 HA | s1 s2 | s m | m s]; cbn; constructor.
+    now constructor.
 Qed.
 
 (** Deserialization: related byte lists deserialize to related values;

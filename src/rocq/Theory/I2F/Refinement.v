@@ -108,8 +108,8 @@ Section Refinement.
     I2F_dvalue_base (DVALUE_Double d) (DVALUE_Double d)
   | I2F_dvalue_Float f :
     I2F_dvalue_base (DVALUE_Float f) (DVALUE_Float f)
-  | I2F_dvalue_Poison τ :
-    I2F_dvalue_base (DVALUE_Poison τ) (DVALUE_Poison τ)
+  | I2F_dvalue_Poison :
+    I2F_dvalue_base (DVALUE_Poison) (DVALUE_Poison)
   | I2F_dvalue_None :
     I2F_dvalue_base DVALUE_None DVALUE_None
   | I2F_dvalue_B sz bv bv' :
@@ -125,9 +125,9 @@ Section Refinement.
   | I2F_dvalue_Struct p s1 s2 :
     Forall2 I2F_dvalue s1 s2 ->
     I2F_dvalue (DVALUE_Struct p s1) (DVALUE_Struct p s2)
-  | I2F_dvalue_Array v τ s1 s2 :
+  | I2F_dvalue_Array v s1 s2 :
     Forall2 I2F_dvalue s1 s2 ->
-    I2F_dvalue (DVALUE_Array v τ s1) (DVALUE_Array v τ s2)
+    I2F_dvalue (DVALUE_Array v s1) (DVALUE_Array v s2)
   .
   Set Elimination Schemes.
 
@@ -135,7 +135,7 @@ Section Refinement.
     forall P : @dvalue PInf -> @dvalue PFin -> Prop,
       (forall b b', I2F_dvalue_base b b' -> P (DVALUE_Base b) (DVALUE_Base b')) ->
       (forall p (s1 s2 : list dvalue), Forall2 I2F_dvalue s1 s2 -> Forall2 P s1 s2 -> P (DVALUE_Struct p s1) (DVALUE_Struct p s2)) ->
-      (forall v (τ : dtyp) (s1 s2 : list dvalue), Forall2 I2F_dvalue s1 s2 -> Forall2 P s1 s2 -> P (DVALUE_Array v τ s1) (DVALUE_Array v τ s2)) ->
+      (forall v (s1 s2 : list dvalue), Forall2 I2F_dvalue s1 s2 -> Forall2 P s1 s2 -> P (DVALUE_Array v s1) (DVALUE_Array v s2)) ->
       forall [d d0 : dvalue], I2F_dvalue d d0 -> P d d0.
   Proof.
     intros P HB HS HA d.

@@ -457,8 +457,8 @@ Section MemoryByte.
 
   Definition memory_byte_to_memory_bits (mb : memory_byte) : list memory_bit :=
     match mb with
-    | BYTE_Pointer p idx => rev_append (N.rev_loop_acc (fun i => Bit_ptr p i) (8 * idx) 8 []) []
-    | BYTE_I x  => rev_append (N.rev_loop_acc (fun i => Bit_bit (repr (extract_bit_vint x i))) 0 8 []) []
+    | BYTE_Pointer p idx => rev_append (N.rev_loop_acc (fun i => Bit_ptr p i) 8 (8 * idx) []) []
+    | BYTE_I x  => rev_append (N.rev_loop_acc (fun i => Bit_bit (repr (extract_bit_vint x i))) 8 0 []) []
     | BYTE_Mixed bits => bits
     end.
 
@@ -468,7 +468,7 @@ Section MemoryByte.
              acc
            else
              (* still need poison bits as padding *)
-             N.rev_loop_acc (fun _ => Bit_psn) 0 bit_sz acc 
+             N.rev_loop_acc (fun _ => Bit_psn) bit_sz 0 acc 
     | b::bs =>
         let bits := memory_byte_to_memory_bits b in
         if (N.ltb bit_sz 8) then
