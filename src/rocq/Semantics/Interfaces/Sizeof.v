@@ -34,7 +34,7 @@ Class Sizeof : Type :=
 
 Definition max_preferred_dtyp_alignment {S : Sizeof} (dts : list dtyp) : N :=
   match
-    maximumByOpt (fun dt1 dt2 => preferred_alignment (dtyp_alignment dt1) <? preferred_alignment (dtyp_alignment dt1))%N dts with
+    maximumByOpt (fun dt1 dt2 => preferred_alignment (dtyp_alignment dt1) <? preferred_alignment (dtyp_alignment dt2))%N dts with
   | Some dt =>
       preferred_alignment (dtyp_alignment dt)
   | None => 1
