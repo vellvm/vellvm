@@ -45,13 +45,27 @@ Definition Dtyp_base_alignment (dt : dtyp_base) : alignment :=
   end.  
 
 (* Default alignment matching LLVMs defaults *)
-Definition Dtyp_alignment (dt : dtyp) : alignment :=
+Definition max_alignment (a b : alignment) : alignment :=
+  Build_alignment
+    (N.max (abi_alignment a) (abi_alignment b))
+    (N.max (preferred_alignment a) (preferred_alignment b)).
+
+Fixpoint Dtyp_alignment (dt : dtyp) : alignment :=
+  (* TODO: 64-bit+ vectors should be 128-bit aligned *)
   match dt with
   | DTYPE_Base t => Dtyp_base_alignment t
-      (* Alignment depends on the size of the vector types *)
-      (* TODO: 64-bit+ vectors should be 128-bit aligned *)
-  | DTYPE_Struct p fields => Build_alignment 8 8
-  | DTYPE_Array v sz t => Build_alignment 8 8
+  (* "Structures may optionally be “packed” structures, which indicate that the alignment of the
+     struct is one byte, and that there is no padding between the elements." *)
+  | DTYPE_Struct true fields => Build_alignment 1 1
+  (* "Structures and unions assume the alignment of their most strictly aligned component." *)
+  | DTYPE_Struct false fields =>
+      fold_left (fun acc f => max_alignment acc (Dtyp_alignment f)) fields
+        (Build_alignment 1 1)
+  (* "An array uses the same alignment as its elements, except that a local or global array variable
+     of length at least 16 bytes or a C99 variable-length array variable always has alignment of at
+     least 16 bytes."
+     Exception not implemented. *)
+  | DTYPE_Array v sz t => Dtyp_alignment t
   end.
 
 Definition max_preferred_dtyp_alignment (dts : list dtyp) : N :=

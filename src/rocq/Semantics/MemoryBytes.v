@@ -279,7 +279,7 @@ Section MemoryByte.
             accumulate_struct_bytes pad fields dts offset acc
         | _ => raise_error "acc_dvalue_to_memory_bytes_h: type-mismatch non-struct value"
         end
-    | DTYPE_Array p sz elt_t =>
+    | DTYPE_Array _vector sz elt_t =>
         match dv with
         | DVALUE_Array v elts =>
             dvalue_extract_array_bytes elt_t elts offset acc
