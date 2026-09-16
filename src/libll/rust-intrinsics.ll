@@ -1203,3 +1203,90 @@ define { i8, i1 } @llvm.uadd.with.overflow.i8(i8 noundef %0, i8 noundef %1) loca
   %fullres = insertvalue {i8, i1} %base, i1 %overflow, 1
   ret {i8, i1} %fullres
 }
+
+; This was LLM-generated, but was exhaustively tested.
+define float @llvm.sqrt.f32(float %x) {
+entry:
+  %is_nan = fcmp uno float %x, %x
+  br i1 %is_nan, label %silence_nan, label %chk1
+
+chk1:
+  %is_neg = fcmp olt float %x, 0.000000e+00
+  br i1 %is_neg, label %ret_nan, label %chk2
+
+chk2:
+  ; covers +0.0, -0.0 (sign preserved via ret_x), and +inf
+  %is_zero = fcmp oeq float %x, 0.000000e+00
+  %is_inf  = fcmp oeq float %x, 0x7FF0000000000000
+  %trivial = or i1 %is_zero, %is_inf
+  br i1 %trivial, label %ret_x, label %compute
+
+compute:
+  ; The fast-inverse-sqrt bit trick assumes a *normalized* float (implicit
+  ; leading 1 + biased exponent). Subnormals have exponent field 0 and no
+  ; implicit 1, so the magic-constant seed is wildly wrong and Newton-Raphson
+  ; overflows to +inf. Fix: if x is subnormal (x < 2^-126, the smallest
+  ; normal), scale it up into the normalized range by 2^96, run the algorithm,
+  ; then scale the result back down by 2^48 since sqrt(x*2^96) = sqrt(x)*2^48.
+  %smallest_normal = bitcast i32 8388608 to float      ; 0x00800000 = 2^-126
+  %is_sub    = fcmp olt float %x, %smallest_normal
+  %scale_up_c   = bitcast i32 1870659584 to float      ; 0x6F800000 = 2^96
+  %scale_down_c = bitcast i32 662700032 to float       ; 0x27800000 = 2^-48
+  %scale_up   = select i1 %is_sub, float %scale_up_c,   float 1.000000e+00
+  %scale_down = select i1 %is_sub, float %scale_down_c, float 1.000000e+00
+  %xs = fmul float %x, %scale_up
+
+  ; initial guess for 1/sqrt(xs): i = 0x5f3759df - (bits(xs) >> 1)
+  %ibits  = bitcast float %xs to i32
+  %ishift = lshr i32 %ibits, 1
+  %iguess = sub i32 1597463007, %ishift        ; 0x5f3759df
+  %y0     = bitcast i32 %iguess to float
+
+  %half = fmul float %xs, 5.000000e-01
+
+  ; Newton-Raphson on rsqrt, x3
+  %y0sq  = fmul float %y0, %y0
+  %t0    = fmul float %half, %y0sq
+  %c0    = fsub float 1.500000e+00, %t0
+  %y1    = fmul float %y0, %c0
+
+  %y1sq  = fmul float %y1, %y1
+  %t1    = fmul float %half, %y1sq
+  %c1    = fsub float 1.500000e+00, %t1
+  %y2    = fmul float %y1, %c1
+
+  %y2sq  = fmul float %y2, %y2
+  %t2    = fmul float %half, %y2sq
+  %c2    = fsub float 1.500000e+00, %t2
+  %y3    = fmul float %y2, %c2
+
+  ; sqrt(xs) = xs * rsqrt(xs)
+  %r0 = fmul float %xs, %y3
+
+  ; one Newton step directly on sqrt to shave off remaining error
+  %r0d   = fdiv float %xs, %r0
+  %rsum  = fadd float %r0, %r0d
+  %result_scaled = fmul float %rsum, 5.000000e-01
+
+  ; undo the scaling (no-op when x was already normal: scale_down = 1.0)
+  %result = fmul float %result_scaled, %scale_down
+  br label %ret_val
+
+silence_nan:
+  ; quiet the NaN by setting the most-significant mantissa bit (bit 22),
+  ; which silences a signaling NaN while preserving its sign and payload
+  %nan_bits    = bitcast float %x to i32
+  %quiet_bits  = or i32 %nan_bits, 4194304        ; 0x00400000
+  %quiet_nan   = bitcast i32 %quiet_bits to float
+  ret float %quiet_nan
+
+ret_nan:
+  %nan = fdiv float 0.000000e+00, 0.000000e+00   ; generate qNaN, no hex literal needed
+  ret float %nan
+
+ret_x:
+  ret float %x
+
+ret_val:
+  ret float %result
+}
