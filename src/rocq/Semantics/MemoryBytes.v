@@ -239,10 +239,10 @@ Section MemoryByte.
         match fields, types with
         | [], [] => ret (accumulate_padding offset pad_to acc)
         | f::fs, dt::dts =>
-            let field_pad := None
-              (* if pad *)
-              (* then Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset) *)
-              (* else None *)
+            let field_pad := 
+              if pad
+              then Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset)
+              else None
             in
             '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset field_pad acc ;;
             loop fs dts offset' bs
@@ -267,11 +267,15 @@ Section MemoryByte.
             ret (accumulate_padding offset' pad_to bs)
         | _ => raise_error "acc_dvalue_to_memory_bytes_h: type-mismatch non-base value"
         end
-    | DTYPE_Struct p dts =>
+    | DTYPE_Struct packed dts =>
         match dv with
           (* TODO: could check that the type and dvalue packed flag agree *)
         | DVALUE_Struct _ fields =>
-            let pad := if p then (Some (max_preferred_dtyp_alignment dts)) else None in        
+            (* A *packed* struct gets no inter-field padding; an unpacked one
+               lays its fields out at their preferred alignments. This matches
+               [sizeof_dtyp_Packed_struct] / [sizeof_dtyp_Struct] and the
+               [DTYPE_Struct true/false] cases of [handle_gep_h]. *)
+            let pad := if packed then None else Some (max_preferred_dtyp_alignment dts) in
             accumulate_struct_bytes pad fields dts offset acc
         | _ => raise_error "acc_dvalue_to_memory_bytes_h: type-mismatch non-struct value"
         end

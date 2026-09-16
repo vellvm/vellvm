@@ -1746,13 +1746,18 @@ Qed.
 Section SerUnfold.
   Context {Pa : Params}.
 
-  Definition accumulate_struct_bytes (pad_to : option N)
+  Definition accumulate_struct_bytes (pad_to : option N) (pad : option N)
     : list dvalue -> list dtyp -> N -> list memory_byte -> EOU (N * list memory_byte) :=
     fix loop fields types (offset : N) (acc : list memory_byte) : EOU (N * list memory_byte) :=
       match fields, types with
       | [], [] => ret (accumulate_padding offset pad_to acc)
       | f::fs, dt::dts =>
-          '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
+          let field_pad :=
+            if pad
+            then Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset)
+            else None
+          in
+          '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset field_pad acc ;;
           loop fs dts offset' bs
       | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
       end.
@@ -1774,9 +1779,11 @@ Section SerUnfold.
         ret (accumulate_padding offset' pad_to bs).
   Proof. reflexivity. Qed.
 
-  Lemma ser_Struct_eq : forall p dts b fields offset pad_to acc,
-      acc_dvalue_to_memory_bytes_h (DTYPE_Struct p dts) (DVALUE_Struct b fields) offset pad_to acc =
-        accumulate_struct_bytes pad_to fields dts offset acc.
+  Lemma ser_Struct_eq : forall packed dts b fields offset pad_to acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Struct packed dts) (DVALUE_Struct b fields) offset pad_to acc =
+        accumulate_struct_bytes pad_to
+          (if packed then None else Some (max_preferred_dtyp_alignment dts))
+          fields dts offset acc.
   Proof. reflexivity. Qed.
 
   Lemma ser_Array_eq : forall p sz elt_t b elts offset pad_to acc,
@@ -1784,25 +1791,28 @@ Section SerUnfold.
         accumulate_array_bytes pad_to elt_t elts offset acc.
   Proof. reflexivity. Qed.
 
-  Lemma acc_struct_nil : forall pad_to offset acc,
-      accumulate_struct_bytes pad_to [] [] offset acc =
+  Lemma acc_struct_nil : forall pad_to pad offset acc,
+      accumulate_struct_bytes pad_to pad [] [] offset acc =
         ret (accumulate_padding offset pad_to acc).
   Proof. reflexivity. Qed.
 
-  Lemma acc_struct_nil_cons : forall pad_to dt dts offset acc,
-      accumulate_struct_bytes pad_to [] (dt::dts) offset acc =
+  Lemma acc_struct_nil_cons : forall pad_to pad dt dts offset acc,
+      accumulate_struct_bytes pad_to pad [] (dt::dts) offset acc =
         raise_error "type-mismatch: structs / fields have different lengths".
   Proof. reflexivity. Qed.
 
-  Lemma acc_struct_cons_nil : forall pad_to f fs offset acc,
-      accumulate_struct_bytes pad_to (f::fs) [] offset acc =
+  Lemma acc_struct_cons_nil : forall pad_to pad f fs offset acc,
+      accumulate_struct_bytes pad_to pad (f::fs) [] offset acc =
         raise_error "type-mismatch: structs / fields have different lengths".
   Proof. reflexivity. Qed.
 
-  Lemma acc_struct_cons : forall pad_to f fs dt dts offset acc,
-      accumulate_struct_bytes pad_to (f::fs) (dt::dts) offset acc =
-        '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
-        accumulate_struct_bytes pad_to fs dts offset' bs.
+  Lemma acc_struct_cons : forall pad_to pad f fs dt dts offset acc,
+      accumulate_struct_bytes pad_to pad (f::fs) (dt::dts) offset acc =
+        '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset
+                            (if pad
+                             then Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset)
+                             else None) acc ;;
+        accumulate_struct_bytes pad_to pad fs dts offset' bs.
   Proof. reflexivity. Qed.
 
   Lemma acc_array_nil : forall pad_to elt_t offset acc,
@@ -1880,14 +1890,14 @@ Local Notation SER :=
 
 Lemma I2F_accumulate_struct_bytes : forall fields fields',
     Forall2 SER fields fields' ->
-    forall dts pad_to offset acc acc',
+    forall dts pad_to pad offset acc acc',
       Forall2 I2F_memory_byte acc acc' ->
       I2F_EOU I2F_ser_state
-        (@accumulate_struct_bytes PInf pad_to fields dts offset acc)
-        (@accumulate_struct_bytes PFin pad_to fields' dts offset acc').
+        (@accumulate_struct_bytes PInf pad_to pad fields dts offset acc)
+        (@accumulate_struct_bytes PFin pad_to pad fields' dts offset acc').
 Proof.
   intros fields fields' HF; induction HF as [| f f' fs fs' Hf HF IH];
-    intros [| dt dts] pad_to offset acc acc' HA.
+    intros [| dt dts] pad_to pad offset acc acc' HA.
   - rewrite 2 acc_struct_nil; constructor; now apply I2F_accumulate_padding.
   - rewrite 2 acc_struct_nil_cons; constructor.
   - rewrite 2 acc_struct_cons_nil; constructor.

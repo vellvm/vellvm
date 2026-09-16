@@ -38,10 +38,11 @@ Section GEP.
             | DTYPE_Array v _ ta =>
                 handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'                          
             | DTYPE_Struct false ts =>
-                let offset := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + sizeof_dtyp t)%N (firstn n ts) 0%N in
                 match nth_error ts n with
                 | None => raise_error "overflow"
                 | Some t' =>
+                    let end_of_prev_field := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + sizeof_dtyp t)%N (firstn n ts) 0%N in
+                    let offset := pad_to_align (dtyp_alignment t') end_of_prev_field in
                     handle_gep_h t' (off + Z.of_N offset) vs'
                 end
             | DTYPE_Struct true ts =>
