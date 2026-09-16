@@ -759,12 +759,12 @@ Qed.
 Lemma I2F_write_dvalue : forall (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p2 : @ptr (@PROV PFin) (@PTR PFin)),
     I2F_Addr p1 p2 ->
     forall dt v1 v2, I2F_dvalue v1 v2 ->
-    I2F_memS I2F_State (fun (_ _ : unit) => True) (write_dvalue dt p1 v1) (write_dvalue dt p2 v2).
+    I2F_memS I2F_State (fun (_ _ : unit) => True) (write_dvalue p1 dt v1) (write_dvalue p2 dt v2).
 Proof.
   intros p1 p2 Hp dt v1 v2 Hv; unfold write_dvalue.
   eapply I2F_memS_bind with (RX:=Forall2 I2F_memory_byte).
   apply I2F_memS_lift.
-  apply I2F_dvalue_to_memory_bytes; auto.
+  apply I2F_memory_dvalue_to_memory_bytes; auto.
   apply I2F_write_bytes; auto.
 Qed.
 
@@ -838,14 +838,14 @@ Lemma I2F_convert_impure : forall conv t_from t_to v1 v2,
       (@convert_impure PInf _ conv t_from v1 t_to) (@convert_impure PFin _ conv t_from v2 t_to).
 Proof.
   intros conv t_from t_to v1 v2 Hv; unfold convert_impure.
-  destruct Hv as [b1 b2 Hb | p s1 s2 Hs | v τ s1 s2 Hs].
+  destruct Hv as [b1 b2 Hb | p s1 s2 Hs | v s1 s2 Hs].
   - destruct (get_base_conversion_type t_from t_to) as [[tf' tt']|]; cbn; [| apply I2F_Merr].
     eapply I2F_memS_bind; [apply I2F_convert_impure_base; auto |].
     intros b1' b2' Hb'; apply I2F_Mret; constructor; auto.
   - cbn; apply I2F_Merr.
-  - destruct v; cbn; [| apply I2F_Merr ..].
-    destruct τ as [ | | vector sz τ]; cbn; [ apply I2F_Merr | apply I2F_Merr | ].
-    destruct vector; cbn; [ | apply I2F_Merr ].
+  - (* The vector element type is no longer carried by the value; the
+       array flag alone decides, exactly as in [I2F_convert_pure]. *)
+    destruct v; cbn; [| apply I2F_Merr ..].
     destruct (get_vector_conversion_type t_from t_to) as [[tf' tt']|]; cbn; [| apply I2F_Merr].
     eapply I2F_memS_bind.
     { apply I2F_memS_lift, I2F_EOU_map_monad2 with (RA := I2F_dvalue); auto.
@@ -887,7 +887,7 @@ Proof.
       repeat constructor; auto.
   - (* Load *)
     destruct H as [Ht Ha]; subst.
-    destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1 τ1 s1 s2 Hs].
+    destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1 s1 s2 Hs].
     + destruct Hb as [p1 p2 Hp | | | | | | | ]; [ | apply I2F_Mub_l ..].
       eapply I2F_memS_mono; [ | apply I2F_read_dvalue; auto].
       intros; simp I2FA_Memory; auto.
@@ -895,7 +895,7 @@ Proof.
     + apply I2F_Mub_l.
   - (* Store *)
     destruct H as [Ht [Ha Hv]]; subst.
-    destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1' τ1 s1 s2 Hs].
+    destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1' s1 s2 Hs].
     + destruct Hb as [p1 p2 Hp | | | | | | | ]; [ | apply I2F_Mub_l ..].
       eapply I2F_memS_mono; [ | apply I2F_write_dvalue; auto].
       intros; simp I2FA_Memory; auto.

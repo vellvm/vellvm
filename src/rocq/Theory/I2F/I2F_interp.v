@@ -233,8 +233,8 @@ Proof.
   destruct Hargs as [ | d1 d2 l1 l2 Hd Hargs]; [i2f_va_fail |].
   destruct Hargs; [ | i2f_va_fail].
   destruct Hva as [ | vp1 vp2 Hvp]; [i2f_va_fail |].
-  destruct Hd as [b1 b2 Hb | p τ1 s1 s2 | v1' τ1 s1 s2 Hs].
-  - destruct Hb as [p1 p2 Hp | sz i | ip1 ip2 Hip | d | f | dt | | sz bits bits' Hbits].
+  destruct Hd as [b1 b2 Hb | p s1 s2 Hs | v1' s1 s2 Hs'].
+  - destruct Hb as [p1 p2 Hp | sz i | ip1 ip2 Hip | d | f | | | sz bits bits' Hbits].
     all: try (rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep]).
     rstep; easy.
   - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep].

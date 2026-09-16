@@ -2289,87 +2289,85 @@ Proof.
 Qed.
 
 (** * extract_value *)
-Lemma I2F_extract_value a b idxs :
+Lemma I2F_extract_value dt a b idxs :
   I2F_dvalue a b ->
-  I2F_EOU I2F_dvalue (extract_value a (map denote_int_syntax idxs))
-    (extract_value b (map denote_int_syntax idxs)).
+  I2F_EOU I2F_dvalue (extract_value dt a (map denote_int_syntax idxs))
+    (extract_value dt b (map denote_int_syntax idxs)).
 Proof.
-  intros R; revert a b R.
+  revert dt a b.
   generalize (map denote_int_syntax idxs) as l; clear idxs.
-  induction l as [| i l IH]; intros a b R; cbn; auto.
-  inversion R; subst; cbn; try (repeat constructor).
-  - (* Base: only poison at struct type computes, splitting the shared
-         type list *)
-    match goal with
-    | HB : I2F_dvalue_base _ _ |- _ =>
-        inversion HB; subst; cbn; try (repeat constructor)
-    end.
-    match goal with
-    | t : dtyp |- _ => destruct t
-    end; cbn; try (repeat constructor).
-    match goal with
-    | |- context [split [] i ?ts] =>
-        destruct (split [] i ts) as [[[? ?] ?] |]
-    end; cbn; auto.
-  - (* Struct *)
-    i2f_split_case i ltac:(apply IH; auto).
-  - (* Array: only the non-vector flavour computes *)
-    match goal with v : bool |- _ => destruct v end; cbn;
-    [repeat constructor|].
-    i2f_split_case i ltac:(apply IH; auto).
+  induction l as [| i l IH]; intros dt a b R; cbn; auto.
+  destruct dt as [ dtb | p ts | [|] sz t ]; cbn; try (repeat constructor).
+  - (* struct type *)
+    destruct (split [] i ts) as [[[pre_t sub_t] post_t] |]; cbn;
+      try (repeat constructor).
+    inversion R; subst; cbn; try (repeat constructor).
+    + match goal with
+      | HB : I2F_dvalue_base _ _ |- _ =>
+          inversion HB; subst; cbn; try (repeat constructor)
+      end.
+      apply IH; repeat constructor.
+    + i2f_split_case i ltac:(apply IH; auto).
+  - (* array type *)
+    inversion R; subst; cbn; try (repeat constructor).
+    + match goal with
+      | HB : I2F_dvalue_base _ _ |- _ =>
+          inversion HB; subst; cbn; try (repeat constructor)
+      end.
+      apply IH; repeat constructor.
+    + match goal with v : bool |- _ => destruct v end; cbn;
+        try (repeat constructor).
+      i2f_split_case i ltac:(apply IH; auto).
 Qed.
-
+  
 (** * insert_value *)
 
-Lemma Forall2_map_Poison : forall ts,
-    Forall2 I2F_dvalue
-      (map (fun t => @DVALUE_Base PInf (DVALUE_Poison t)) ts)
-      (map (fun t => @DVALUE_Base PFin (DVALUE_Poison t)) ts).
-Proof.
-  induction ts; cbn; auto.
-Qed.
-
 Lemma I2F_insert_value idxs :
-  forall a1 a2 b1 b2,
+  forall dt a1 a2 b1 b2,
     I2F_dvalue a1 b1 ->
     I2F_dvalue a2 b2 ->
-    I2F_EOU I2F_dvalue (insert_value a1 a2 (map denote_int_syntax idxs))
-      (insert_value b1 b2 (map denote_int_syntax idxs)).
+    I2F_EOU I2F_dvalue (insert_value dt a1 a2 (map denote_int_syntax idxs))
+      (insert_value dt b1 b2 (map denote_int_syntax idxs)).
 Proof.
   generalize (map denote_int_syntax idxs) as l; clear idxs.
-  induction l as [| i l IH]; intros a1 a2 b1 b2 R1 R2; cbn; auto.
-  inversion R1; subst; cbn; try (repeat constructor).
-  - (* Base: poison at struct type splits the shared type list and
-         rebuilds with poisons *)
-    match goal with
-    | HB : I2F_dvalue_base _ _ |- _ =>
-        inversion HB; subst; cbn; try (repeat constructor)
-    end.
-    match goal with
-    | t : dtyp |- _ => destruct t
-    end; cbn; try (repeat constructor).
-    match goal with
-    | |- context [split [] i ?ts] =>
-        destruct (split [] i ts) as [[[? ?] ?] |]
-    end; cbn; auto.
-    eapply I2F_EOU_bind; [apply IH; auto|].
-    intros; do 2 constructor.
-    apply Forall2_app; [apply Forall2_map_Poison |].
-    constructor; [auto | apply Forall2_map_Poison].
-  - (* Struct: split, modify the subfield recursively, reassemble *)
-    i2f_split_case i
-      ltac:(eapply I2F_EOU_bind; [apply IH; auto|];
-            intros; do 2 constructor;
-            apply Forall2_app; [auto | constructor; auto]).
-  - (* Array: only the non-vector flavour computes *)
-    match goal with v : bool |- _ => destruct v end; cbn;
-    [repeat constructor|].
-    i2f_split_case i
-      ltac:(eapply I2F_EOU_bind; [apply IH; auto|];
-            intros; do 2 constructor;
-            apply Forall2_app; [auto | constructor; auto]).
+  induction l as [| i l IH]; intros dt a1 a2 b1 b2 R1 R2; cbn; auto.
+  destruct dt as [ dtb | p ts | [|] sz t ]; cbn; try (repeat constructor).
+  - (* struct type *)
+    destruct (split [] i ts) as [[[pre_t sub_t] post_t] |]; cbn;
+      try (repeat constructor).
+    inversion R1; subst; cbn; try (repeat constructor).
+    + match goal with
+      | HB : I2F_dvalue_base _ _ |- _ =>
+          inversion HB; subst; cbn; try (repeat constructor)
+      end.
+      eapply I2F_EOU_bind; [apply IH; [repeat constructor | auto] |].
+      intros; do 2 constructor.
+      apply Forall2_app; [apply Forall2_map2; intros; repeat constructor |].
+      constructor; [auto | apply Forall2_map2; intros; repeat constructor].
+    + i2f_split_case i
+        ltac:(eapply I2F_EOU_bind; [apply IH; auto|];
+              intros; do 2 constructor;
+              apply Forall2_app; [auto | constructor; auto]).
+  - (* array type *)
+    inversion R1; subst; cbn; try (repeat constructor).
+    + match goal with
+      | HB : I2F_dvalue_base _ _ |- _ =>
+          inversion HB; subst; cbn; try (repeat constructor)
+      end.
+      destruct (split_indices i sz) as [[pre post] |]; cbn;
+        try (repeat constructor).
+      eapply I2F_EOU_bind; [apply IH; [repeat constructor | auto] |].
+      intros; do 2 constructor.
+      apply Forall2_app; [apply Forall2_repeatN; repeat constructor |].
+      constructor; [auto | apply Forall2_repeatN; repeat constructor].
+    + match goal with v : bool |- _ => destruct v end; cbn;
+        try (repeat constructor).
+      i2f_split_case i
+        ltac:(eapply I2F_EOU_bind; [apply IH; auto|];
+              intros; do 2 constructor;
+              apply Forall2_app; [auto | constructor; auto]).
 Qed.
-
+  
 (** * eval_select *)
 (** The scalar select: the shared [i1] test picks a side; the poison
       condition computes the (equal) result type of the first operand. *)
@@ -2413,31 +2411,30 @@ Proof.
     rewrite IHUS by assumption; reflexivity.
   - (* Array *)
     match goal with
-    | τ : dtyp |- _ => destruct τ as [ ? | ? ? | ? ? ? ]
+    | F2 : Forall2 I2F_dvalue _ _ |- _ =>
+        inversion F2 as [| u u' us us' HU HUS]; subst
     end; cbn; auto.
-    break_match_goal; cbn; auto.
     match goal with
-    | F2 : Forall2 I2F_dvalue ?l1 ?l2 |- _ =>
-        match goal with
-        | |- context [forallb ?f l1] =>
-            match goal with
-            | |- context [forallb ?g l2] =>
-                assert (FB : forallb f l1 = forallb g l2);
-                [| assert (LEN : length l1 = length l2)
-                  by (eapply Forall2_length; eauto);
-                   rewrite FB, LEN; reflexivity ]
-            end
-        end
+    | IHl : Forall _ (_ :: _) |- _ => inversion IHl as [| ? ? HP HPS]; subst
     end.
-    match goal with
-    | F2 : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ =>
-        revert IH; induction F2 as [| u u' us us' HU HUS IHUS]
-    end; intros FIH; cbn; auto.
-    inversion FIH; subst.
-    match goal with
-    | HP : forall _, I2F_dvalue u _ -> _ |- _ => rewrite (HP _ HU)
-    end.
-    rewrite IHUS by assumption; reflexivity.
+    rewrite (HP _ HU).
+    destruct (@dtyp_of_dvalue PFin u') as [ ? | ? | ? | t ]; cbn; auto.
+    destruct (@NO_VOID_dec t); cbn; auto.
+    assert (EQF : forallb (fun e => match @dtyp_of_dvalue PInf e with
+                                 | raise_ret t' => dtyp_eqb t t' | _ => false end) us
+                  = forallb (fun e => match @dtyp_of_dvalue PFin e with
+                                   | raise_ret t' => dtyp_eqb t t' | _ => false end) us').
+    { clear - HUS HPS.
+      induction HUS; cbn; auto.
+      inversion HPS; subst.
+      match goal with
+      | HQ : forall _, I2F_dvalue _ _ -> _ |- _ => rewrite (HQ _ ltac:(eassumption))
+      end.
+      rewrite IHHUS by assumption; reflexivity. }
+    rewrite EQF.
+    assert (LEN : Datatypes.length us = Datatypes.length us')
+      by (eapply Forall2_length; eauto).
+    cbn; rewrite LEN; reflexivity.
 Qed.
 
 Lemma I2F_eval_select_base_dvalue : forall c c' v1 v2 v1' v2',
@@ -2452,17 +2449,13 @@ Proof.
   inversion RC; subst; cbn; try (repeat constructor).
   - (* I sz: the width test then the shared i1 test *)
     repeat (break_goal_fast; cbn); auto.
-  - (* Poison: align the (equal) result types, then reduce the shared
-         scrutinees in lockstep *)
-    rewrite (I2F_dtyp_of_dvalue_eq R1).
-    repeat (break_goal_fast; cbn); auto.
 Qed.
 
-Lemma I2F_eval_select a1 a2 a3 b1 b2 b3 :
+Lemma I2F_eval_select dt a1 a2 a3 b1 b2 b3 :
   I2F_dvalue a1 b1 ->
   I2F_dvalue a2 b2 ->
   I2F_dvalue a3 b3 ->
-  I2F_EOU I2F_dvalue (eval_select a1 a2 a3) (eval_select b1 b2 b3).
+  I2F_EOU I2F_dvalue (eval_select a1 dt a2 a3) (eval_select b1 dt b2 b3).
 Proof.
   intros R1 R2 R3.
   inversion R1; subst; cbn; try ((repeat constructor); eauto; fail).
@@ -2470,77 +2463,61 @@ Proof.
     now apply I2F_eval_select_base_dvalue.
   - (* Vector of conditions *)
     match goal with v : bool |- _ => destruct v end; cbn;
-    [| repeat constructor; eauto].
+      [| repeat constructor; eauto].
+    destruct dt as [ ? | ? ? | [|] sz t ]; cbn; try (repeat constructor).
     eapply I2F_EOU_bind;
       [eapply I2F_EOU_map_monad2;
        [eauto | intros; apply I2F_dvalue_to_dvalue_base; auto]|].
     intros cs cs' FCS.
-    induction R2; subst; cbn; repeat constructor.
-    + (* v1 base: only poison at vector type computes *)
+    inversion R2; subst; cbn; try (repeat constructor).
+    + (* v1 base *)
       match goal with
       | HB : I2F_dvalue_base _ _ |- _ =>
-          induction HB; subst; cbn; repeat constructor
+          inversion HB; subst; cbn; try (repeat constructor)
       end.
-      match goal with
-      | t : dtyp |- _ => destruct t as [ ? | ? ? | [|] ? ? ]
-      end; cbn; try (repeat constructor).
-      induction R3; subst; cbn; repeat constructor.
-      * (* poison / base: only poison at vector type computes,
-             diagonally *)
-        match goal with
+      inversion R3; subst; cbn; try (repeat constructor).
+      * match goal with
         | HB : I2F_dvalue_base _ _ |- _ =>
-            induction HB; subst; cbn; repeat constructor
+            inversion HB; subst; cbn; repeat constructor
         end.
-        match goal with
-        | t : dtyp |- _ => destruct t as [ ? | ? ? | [|] ? ? ]
-        end; cbn; repeat constructor.
-      * (* poison / vector *)
-        match goal with v : bool |- _ => destruct v end; cbn;
-        [| repeat constructor].
+      * match goal with v : bool |- _ => destruct v end; cbn;
+          [| repeat constructor].
         eapply I2F_EOU_bind.
         { eapply I2F_EOU_vec_loop with (RB := prod_rel I2F_dvalue I2F_dvalue).
           - eapply Forall2_combine; [eassumption|].
-            eapply Forall2_combine;
-              [apply Forall2_repeat; auto | eassumption].
+            eapply Forall2_combine; [apply Forall2_repeat; auto | eassumption].
           - intros c p c' p' HC HP;
               destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn.
             apply I2F_eval_select_base_dvalue; auto. }
         intros; do 2 constructor; auto.
     + (* v1 vector *)
-      inversion R3; subst; cbn; try (repeat constructor).
-      * (* vector / base: only poison at vector type computes *)
-        match goal with v : bool |- _ => destruct v end; cbn;
+      match goal with v : bool |- _ => destruct v end; cbn;
         [| repeat constructor].
-        match goal with
+      inversion R3; subst; cbn; try (repeat constructor).
+      * match goal with
         | HB : I2F_dvalue_base _ _ |- _ =>
             inversion HB; subst; cbn; try (repeat constructor)
         end.
-        match goal with
-        | t : dtyp |- _ => destruct t as [ ? | ? ? | [|] ? ? ]
-        end; cbn; try (repeat constructor).
         eapply I2F_EOU_bind.
         { eapply I2F_EOU_vec_loop with (RB := prod_rel I2F_dvalue I2F_dvalue).
           - eapply Forall2_combine; [eassumption|].
-            eapply Forall2_combine;
-              [eassumption | apply Forall2_repeat; auto].
+            eapply Forall2_combine; [eassumption | apply Forall2_repeat; auto].
           - intros c p c' p' HC HP;
               destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn.
             apply I2F_eval_select_base_dvalue; auto. }
         intros; do 2 constructor; auto.
-      * (* vector / vector *)
-        i2f_vec_flags; repeat constructor.
-      * (* vector / vector *)
-        i2f_vec_flags; repeat constructor.
-        all: eapply I2F_EOU_bind;
-          [ eapply I2F_EOU_vec_loop with (RB := prod_rel I2F_dvalue I2F_dvalue);
-            [ eapply Forall2_combine; [eassumption|];
-              eapply Forall2_combine; eassumption
-            | intros c p c' p' HC HP;
-              destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn;
-              apply I2F_eval_select_base_dvalue; auto ]
-          | intros; do 2 constructor; auto ].
+      * match goal with v : bool |- _ => destruct v end; cbn;
+          [| repeat constructor].
+        eapply I2F_EOU_bind.
+        { eapply I2F_EOU_vec_loop with (RB := prod_rel I2F_dvalue I2F_dvalue).
+          - eapply Forall2_combine; [eassumption|].
+            eapply Forall2_combine; eassumption.
+          - intros c p c' p' HC HP;
+              destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn.
+            apply I2F_eval_select_base_dvalue; auto. }
+        intros; do 2 constructor; auto.
 Qed.
-
+    
 Lemma I2F_denote_exp :
   forall (e : exp dtyp) τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e).
 Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).

@@ -48,15 +48,18 @@ Lemma I2F_draw_CFG : forall dt,
     I2F_refine_CFG I2F_dvalue (draw dt) (draw dt).
 Proof. intros; unfold I2F_refine_CFG, draw; rstep. Qed.
 
-Lemma I2F_freeze_base' a b :
+Lemma I2F_freeze_base' dt a b :
   I2F_dvalue_base a b ->
-  I2F_refine_CFG I2F_dvalue (freeze_base a) (freeze_base b).
+  I2F_refine_CFG I2F_dvalue (freeze_base dt a) (freeze_base dt b).
 Proof. intros H; unfold I2F_refine_CFG; now apply (I2F_freeze_base_gen I2F_draw_CFG). Qed.
 
-Lemma I2F_freeze' a b :
+Lemma I2F_freeze' dt a b :
   I2F_dvalue a b ->
-  I2F_refine_CFG I2F_dvalue (freeze a) (freeze b).
-Proof. intros H; unfold I2F_refine_CFG; now apply (I2F_freeze_gen I2F_draw_CFG). Qed.
+  I2F_refine_CFG I2F_dvalue (freeze dt a) (freeze dt b).
+Proof.
+  intros H; unfold I2F_refine_CFG;
+    now apply (I2F_freeze_gen I2F_draw_CFG I2FE_CFG_Throw).
+Qed.
 
 Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
   I2F_EOU RR m1 m2 ->
