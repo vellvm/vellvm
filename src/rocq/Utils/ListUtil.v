@@ -132,17 +132,11 @@ Section Standard.
         auto.
   Qed.
 
-  Definition option_pick_large {A} (leq : A -> A -> bool) (a b : option A) : option A
-    := match a, b with
-       | Some x, Some y =>
-           if leq x y then b else a
-       | Some a, _      => Some a
-       | _, Some b      => Some b
-       | None, None     => None
-       end.
-
   Definition maximumByOpt {A} (leq : A -> A -> bool) (l : list A) : option A :=
-    fold_left (option_pick_large leq) (map Some l) None.
+    match l with
+    | [] => None
+    | x::xs => Some (fold_left (fun a b => if leq a b then b else a) xs x)
+    end.
 
   Definition rev_tail_rec {A} (xs : list A)
     := fold_left (fun acc x => x :: acc) xs [].

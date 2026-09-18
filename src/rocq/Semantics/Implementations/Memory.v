@@ -168,7 +168,7 @@ Section MemoryModel.
           match a with
           | DVALUE_Base (DVALUE_Pointer a) =>
               read_dvalue t a
-          | _ => mub "Loading from something that isn't an ptress."
+          | _ => mub "Loading from something that isn't an address."
           end
       | Store t a v =>
           match a with
@@ -373,7 +373,7 @@ Section Implementation.
     (aid : allocationId) (bytes : list memory_byte) : list byte :=
     map (fun b => (b, aid)) bytes.
 
-  (* Register a concrete ptress in a frame *)
+  (* Register a concrete address in a frame *)
   Definition add_to_frame (m : memory_stack) (k : ptr) : memory_stack :=
     let '(mkMemoryStack m s h) := m in
     match s with

@@ -295,22 +295,6 @@ Section MemoryByte.
     (* reverse the list *)
     ret (rev_append bytes []).
 
-  
-  (* (* Walk through a list *) *)
-  (* (* Returns field index + number of bytes remaining *) *)
-  (* Fixpoint extract_field_byte_helper (fields : list dtyp) (field_idx : N) (byte_idx : N) : EOU (dtyp * (N * N))%type *)
-  (*   := match fields with *)
-  (*      | [] => *)
-  (*          raise_error "No fields left for byte-indexing..." *)
-  (*      | (x::xs) => *)
-  (*          let sz := sizeof_dtyp x *)
-  (*          in if N.ltb byte_idx sz *)
-  (*             then ret (x, (field_idx, byte_idx)) *)
-  (*             else extract_field_byte_helper xs (N.succ field_idx) (byte_idx - sz) *)
-  (*      end. *)
-
-  (* Definition extract_field_byte (fields : list dtyp) (byte_idx : N) : EOU (dtyp * (N * N))%type *)
-  (*   := extract_field_byte_helper fields 0 byte_idx. *)
 
   (* Need the type of the dvalue in order to know how big fields and array elements are.
 
@@ -595,9 +579,6 @@ Section MemoryByte.
     match dt with
     | DTYPE_Base dt => DVALUE_Base <$> (memory_bytes_to_dvalue_base dbs dt)
 
-    (* NOTE: arrays and vectors are decorated with their whole type, which contains
-         necessary size information.
-     *)
     | DTYPE_Array v sz t =>
         let sz' := sizeof_dtyp t in
         let elt_bytes :=
@@ -615,25 +596,5 @@ Section MemoryByte.
         (DVALUE_Struct true) <$> (list_memory_bytes_to_dvalue None 0 fields dbs)
     end.
 
-(*
-  Lemma round_trip_memory_bytes_to_dvalue_base (dt : dtyp_base) (dv : dvalue_base) i bs :
-    dv <> DVALUE_None ->
-    dtyp_base_of_dvalue_base dv = Some dt ->
-      (acc_memory_bytes_of_dvalue_base dv i []) = (sizeof_dtyp (DTYPE_Base dt) + i, bs) <->
-        memory_bytes_to_dvalue_base bs dt = raise_ret dv.
-  Proof.
-    intros HN HT.
-    split; intros H.
-    - unfold acc_memory_bytes_of_dvalue_base in H.
-      inversion H; clear H.
-      destruct dv; simpl in HT; inversion HT; subst; clear HT; simpl.
-      6 : { destruct t; inversion H0. subst. clear HN H0.
-            
-            
-      7 : { contradiction. }
-      7 : { 
-*)      
-
-  
 End MemoryByte.
 
