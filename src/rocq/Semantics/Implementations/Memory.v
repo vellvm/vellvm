@@ -215,7 +215,7 @@ Section MemoryModel.
     then
       mub "memset given negative length."
     else
-      let byte := BYTE_I (repr 0) in
+      let byte := BYTE_I val in
       write_bytes dst (repeatN (Z.to_N len) byte).
   
   Definition handle_memcpy (args : list dvalue_base) : memM unit :=

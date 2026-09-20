@@ -1638,25 +1638,67 @@ Proof.
       specialize (GO 0%N dbs dbs' F).
       revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
         intros m1 m2 GO; destruct GO; cbn; auto.
-  - (* DTYPE_Array *)
+  - (* DTYPE_Array / vector: the element loop walks [N.to_nat sz] slots,
+       reading [store_size_dtyp t] bytes from each and advancing by the
+       flavour's stride (alloc size for arrays, store size for vectors).
+       Same [goL]/[goR] treatment as the struct field loop above; the two
+       flavours differ only in that stride, so the scripts coincide. *)
     cbn.
     break_match_goal_safe.
-    + eapply I2F_EOU_bind;
-        [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_memory_byte);
-          [ apply Forall2_repeatN; constructor
-          | intros ? ? ?; auto ]
-        | intros ? ? ?; do 2 constructor; auto ].
-    + eapply I2F_EOU_bind;
-        [ eapply I2F_EOU_map_monad2 with (RA := Forall2 I2F_memory_byte);
-          [ apply Forall2_split_every_nil; auto
-          | intros ? ? ?; auto ]
-        | intros ? ? ?; do 2 constructor; auto ].
+    + (* vector *)
+      match goal with
+      | |- context [?L (N.to_nat sz) dbs] => set (goL := L)
+      end;
+      match goal with
+      | |- context [?R (N.to_nat sz) dbs'] => set (goR := R)
+      end;
+      assert (GO : forall n xs ys,
+                 Forall2 I2F_memory_byte xs ys ->
+                 I2F_EOU (Forall2 I2F_dvalue) (goL n xs) (goR n ys));
+      [ intros n; induction n as [| n IHn]; intros xs ys F0;
+        [ unfold goL, goR; cbn; repeat constructor
+        | unfold goL, goR; cbn; fold goL; fold goR;
+          eapply I2F_EOU_bind; [ apply IHt; now apply Forall2_take |];
+          intros e1 e2 He;
+          eapply I2F_EOU_bind; [ apply IHn; now apply Forall2_drop |];
+          intros r1 r2 Hr; do 2 constructor; auto ]
+      | specialize (GO (N.to_nat sz) dbs dbs' F);
+        revert GO; generalize (goL (N.to_nat sz) dbs) (goR (N.to_nat sz) dbs');
+        intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto ].
+    + (* array *)
+      match goal with
+      | |- context [?L (N.to_nat sz) dbs] => set (goL := L)
+      end;
+      match goal with
+      | |- context [?R (N.to_nat sz) dbs'] => set (goR := R)
+      end;
+      assert (GO : forall n xs ys,
+                 Forall2 I2F_memory_byte xs ys ->
+                 I2F_EOU (Forall2 I2F_dvalue) (goL n xs) (goR n ys));
+      [ intros n; induction n as [| n IHn]; intros xs ys F0;
+        [ unfold goL, goR; cbn; repeat constructor
+        | unfold goL, goR; cbn; fold goL; fold goR;
+          eapply I2F_EOU_bind; [ apply IHt; now apply Forall2_take |];
+          intros e1 e2 He;
+          eapply I2F_EOU_bind; [ apply IHn; now apply Forall2_drop |];
+          intros r1 r2 Hr; do 2 constructor; auto ]
+      | specialize (GO (N.to_nat sz) dbs dbs' F);
+        revert GO; generalize (goL (N.to_nat sz) dbs) (goR (N.to_nat sz) dbs');
+        intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto ].
 Qed.
 
 (* The two models share their [Sizeof] instance, but its uses appear
      behind distinct [Params] projections; align them syntactically. *)
 Lemma I2F_store_size_dtyp : forall t,
     @store_size_dtyp (@SIZE PInf) t = @store_size_dtyp (@SIZE PFin) t.
+Proof. reflexivity. Qed.
+
+Lemma I2F_dtyp_alignment : forall t,
+    @dtyp_alignment (@SIZE PInf) t = @dtyp_alignment (@SIZE PFin) t.
+Proof. reflexivity. Qed.
+
+Lemma I2F_alloc_size_dtyp : forall t,
+    @alloc_size_dtyp (@SIZE PInf) t = @alloc_size_dtyp (@SIZE PFin) t.
 Proof. reflexivity. Qed.
 
 Lemma I2F_max_alignment : forall ts,
@@ -1746,85 +1788,97 @@ Qed.
 Section SerUnfold.
   Context {Pa : Params}.
 
-  Definition accumulate_struct_bytes (pad_to : option N) (pad : option N)
+  (* [pad] is [Some a] for an unpacked struct and [None] for a packed one;
+     [tail_align] is the caller's extra request.  Mirrors
+     [MemoryBytes.acc_dvalue_to_memory_bytes_h]. *)
+  Definition accumulate_struct_bytes (tail_align : option N) (pad : option N)
     : list dvalue -> list dtyp -> N -> list memory_byte -> EOU (N * list memory_byte) :=
     fix loop fields types (offset : N) (acc : list memory_byte) : EOU (N * list memory_byte) :=
       match fields, types with
-      | [], [] => ret (accumulate_padding offset pad_to acc)
+      | [], [] =>
+          let '(offset, acc) := accumulate_padding offset pad acc in
+          ret (accumulate_padding offset tail_align acc)
       | f::fs, dt::dts =>
-          let field_pad :=
-            if pad
-            then Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset)
-            else None
-          in
-          '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset field_pad acc ;;
-          loop fs dts offset' bs
+          let a := preferred_alignment (dtyp_alignment dt) in
+          let '(offset, acc) :=
+            accumulate_padding offset (if pad then Some a else None) acc in
+          '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
+          let '(offset'', bs') :=
+            accumulate_padding_bytes offset' (alloc_size_dtyp dt - store_size_dtyp dt) bs in
+          loop fs dts offset'' bs'
       | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
       end.
 
-  Definition accumulate_array_bytes (pad_to : option N) (elt_t : dtyp)
+  Definition accumulate_array_bytes (tail_align : option N) (vector : bool) (elt_t : dtyp)
     : list dvalue -> N -> list memory_byte -> EOU (N * list memory_byte) :=
     fix loop elts (offset : N) (acc : list memory_byte) : EOU (N * list memory_byte) :=
       match elts with
-      | [] => ret (accumulate_padding offset pad_to acc)
+      | [] => ret (accumulate_padding offset tail_align acc)
       | e::es =>
-          '(offset', bs) <- acc_dvalue_to_memory_bytes_h elt_t e offset
-                              (Some (pad_amount (preferred_alignment (dtyp_alignment elt_t)) offset)) acc ;;
-          loop es offset' bs
+          '(offset', bs) <- acc_dvalue_to_memory_bytes_h elt_t e offset None acc ;;
+          let '(offset'', bs') :=
+            accumulate_padding_bytes offset'
+              (if vector then 0%N else (alloc_size_dtyp elt_t - store_size_dtyp elt_t)%N) bs in
+          loop es offset'' bs'
       end.
 
-  Lemma ser_Base_eq : forall dtb dv offset pad_to acc,
-      acc_dvalue_to_memory_bytes_h (DTYPE_Base dtb) (DVALUE_Base dv) offset pad_to acc =
+  Lemma ser_Base_eq : forall dtb dv offset tail_align acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Base dtb) (DVALUE_Base dv) offset tail_align acc =
         let '(offset', bs) := acc_memory_bytes_of_dvalue_base dtb dv offset acc in
-        ret (accumulate_padding offset' pad_to bs).
+        ret (accumulate_padding offset' tail_align bs).
   Proof. reflexivity. Qed.
 
-  Lemma ser_Struct_eq : forall packed dts b fields offset pad_to acc,
-      acc_dvalue_to_memory_bytes_h (DTYPE_Struct packed dts) (DVALUE_Struct b fields) offset pad_to acc =
-        accumulate_struct_bytes pad_to
+  Lemma ser_Struct_eq : forall packed dts b fields offset tail_align acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Struct packed dts) (DVALUE_Struct b fields) offset tail_align acc =
+        accumulate_struct_bytes tail_align
           (if packed then None else Some (max_preferred_dtyp_alignment dts))
           fields dts offset acc.
   Proof. reflexivity. Qed.
 
-  Lemma ser_Array_eq : forall p sz elt_t b elts offset pad_to acc,
-      acc_dvalue_to_memory_bytes_h (DTYPE_Array p sz elt_t) (DVALUE_Array b elts) offset pad_to acc =
-        accumulate_array_bytes pad_to elt_t elts offset acc.
+  Lemma ser_Array_eq : forall p sz elt_t b elts offset tail_align acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Array p sz elt_t) (DVALUE_Array b elts) offset tail_align acc =
+        accumulate_array_bytes tail_align p elt_t elts offset acc.
   Proof. reflexivity. Qed.
 
-  Lemma acc_struct_nil : forall pad_to pad offset acc,
-      accumulate_struct_bytes pad_to pad [] [] offset acc =
-        ret (accumulate_padding offset pad_to acc).
+  Lemma acc_struct_nil : forall tail_align pad offset acc,
+      accumulate_struct_bytes tail_align pad [] [] offset acc =
+        let '(offset, acc) := accumulate_padding offset pad acc in
+        ret (accumulate_padding offset tail_align acc).
   Proof. reflexivity. Qed.
 
-  Lemma acc_struct_nil_cons : forall pad_to pad dt dts offset acc,
-      accumulate_struct_bytes pad_to pad [] (dt::dts) offset acc =
+  Lemma acc_struct_nil_cons : forall tail_align pad dt dts offset acc,
+      accumulate_struct_bytes tail_align pad [] (dt::dts) offset acc =
         raise_error "type-mismatch: structs / fields have different lengths".
   Proof. reflexivity. Qed.
 
-  Lemma acc_struct_cons_nil : forall pad_to pad f fs offset acc,
-      accumulate_struct_bytes pad_to pad (f::fs) [] offset acc =
+  Lemma acc_struct_cons_nil : forall tail_align pad f fs offset acc,
+      accumulate_struct_bytes tail_align pad (f::fs) [] offset acc =
         raise_error "type-mismatch: structs / fields have different lengths".
   Proof. reflexivity. Qed.
 
-  Lemma acc_struct_cons : forall pad_to pad f fs dt dts offset acc,
-      accumulate_struct_bytes pad_to pad (f::fs) (dt::dts) offset acc =
-        '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset
-                            (if pad
-                             then Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset)
-                             else None) acc ;;
-        accumulate_struct_bytes pad_to pad fs dts offset' bs.
+  Lemma acc_struct_cons : forall tail_align pad f fs dt dts offset acc,
+      accumulate_struct_bytes tail_align pad (f::fs) (dt::dts) offset acc =
+        let a := preferred_alignment (dtyp_alignment dt) in
+        let '(offset, acc) :=
+          accumulate_padding offset (if pad then Some a else None) acc in
+        '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
+        let '(offset'', bs') :=
+          accumulate_padding_bytes offset' (alloc_size_dtyp dt - store_size_dtyp dt) bs in
+        accumulate_struct_bytes tail_align pad fs dts offset'' bs'.
   Proof. reflexivity. Qed.
 
-  Lemma acc_array_nil : forall pad_to elt_t offset acc,
-      accumulate_array_bytes pad_to elt_t [] offset acc =
-        ret (accumulate_padding offset pad_to acc).
+  Lemma acc_array_nil : forall tail_align vector elt_t offset acc,
+      accumulate_array_bytes tail_align vector elt_t [] offset acc =
+        ret (accumulate_padding offset tail_align acc).
   Proof. reflexivity. Qed.
 
-  Lemma acc_array_cons : forall pad_to elt_t e es offset acc,
-      accumulate_array_bytes pad_to elt_t (e::es) offset acc =
-        '(offset', bs) <- acc_dvalue_to_memory_bytes_h elt_t e offset
-                            (Some (pad_amount (preferred_alignment (dtyp_alignment elt_t)) offset)) acc ;;
-        accumulate_array_bytes pad_to elt_t es offset' bs.
+  Lemma acc_array_cons : forall tail_align vector elt_t e es offset acc,
+      accumulate_array_bytes tail_align vector elt_t (e::es) offset acc =
+        '(offset', bs) <- acc_dvalue_to_memory_bytes_h elt_t e offset None acc ;;
+        let '(offset'', bs') :=
+          accumulate_padding_bytes offset'
+            (if vector then 0%N else (alloc_size_dtyp elt_t - store_size_dtyp elt_t)%N) bs in
+        accumulate_array_bytes tail_align vector elt_t es offset'' bs'.
   Proof. reflexivity. Qed.
 
 End SerUnfold.
@@ -1848,6 +1902,15 @@ Proof.
   intros n acc acc' HA; unfold accumulate_poison_bytes, accumulate_memory_bytes.
   apply Forall2_rev_loop_acc; auto.
   intros; apply I2F_poison_memory_byte.
+Qed.
+
+Lemma I2F_accumulate_padding_bytes : forall offset n acc acc',
+    Forall2 I2F_memory_byte acc acc' ->
+    I2F_ser_state (@accumulate_padding_bytes PInf offset n acc)
+                  (@accumulate_padding_bytes PFin offset n acc').
+Proof.
+  intros offset n acc acc' HA; unfold accumulate_padding_bytes; split; cbn;
+    [reflexivity | now apply I2F_accumulate_poison_bytes].
 Qed.
 
 Lemma I2F_accumulate_padding : forall offset pad_to acc acc',
@@ -1890,37 +1953,75 @@ Local Notation SER :=
 
 Lemma I2F_accumulate_struct_bytes : forall fields fields',
     Forall2 SER fields fields' ->
-    forall dts pad_to pad offset acc acc',
+    forall dts tail_align pad offset acc acc',
       Forall2 I2F_memory_byte acc acc' ->
       I2F_EOU I2F_ser_state
-        (@accumulate_struct_bytes PInf pad_to pad fields dts offset acc)
-        (@accumulate_struct_bytes PFin pad_to pad fields' dts offset acc').
+        (@accumulate_struct_bytes PInf tail_align pad fields dts offset acc)
+        (@accumulate_struct_bytes PFin tail_align pad fields' dts offset acc').
 Proof.
   intros fields fields' HF; induction HF as [| f f' fs fs' Hf HF IH];
-    intros [| dt dts] pad_to pad offset acc acc' HA.
-  - rewrite 2 acc_struct_nil; constructor; now apply I2F_accumulate_padding.
+    intros [| dt dts] tail_align pad offset acc acc' HA.
+  - rewrite 2 acc_struct_nil.
+    (* the struct's own tail padding, then the caller's *)
+    destruct (I2F_accumulate_padding offset pad HA) as [E F]; cbn in E, F.
+    destruct (@accumulate_padding PInf offset pad acc) as [o1 b1].
+    destruct (@accumulate_padding PFin offset pad acc') as [o2 b2].
+    cbn in E, F; subst.
+    constructor; now apply I2F_accumulate_padding.
   - rewrite 2 acc_struct_nil_cons; constructor.
   - rewrite 2 acc_struct_cons_nil; constructor.
-  - rewrite 2 acc_struct_cons.
+  - rewrite 2 acc_struct_cons; cbn zeta.
+    (* Leading padding to the field's alignment.  The alignment argument is
+       read out of the goal rather than written: spelling [dtyp_alignment dt]
+       here would leave its [Sizeof] unconstrained (the goal has [PInf] on one
+       side and [PFin] on the other), and resolution diverges. *)
+    (* The two sides' padding arguments are convertible but not syntactically
+       equal ([@SIZE PInf] vs [@SIZE PFin]), so a single [?p] would bind only
+       the left one and leave the right occurrence untouched.  Align them
+       first. *)
+    rewrite ?I2F_dtyp_alignment.
+    match goal with
+    | |- context [@accumulate_padding PInf offset ?p acc] =>
+        destruct (I2F_accumulate_padding offset p HA) as [E F];
+        destruct (@accumulate_padding PInf offset p acc) as [o1 b1];
+        destruct (@accumulate_padding PFin offset p acc') as [o2 b2]
+    end; cbn in E, F; subst.
     eapply I2F_EOU_bind; [now apply Hf |].
-    intros [o1 b1] [o2 b2] [E F]; cbn in E, F; subst.
+    intros [p1 c1] [p2 c2] [E2 F2]; cbn in E2, F2; subst.
+    (* pad the field out to its alloc size -- same, the byte count comes from
+       the goal *)
+    rewrite ?I2F_alloc_size_dtyp, ?I2F_store_size_dtyp.
+    match goal with
+    | |- context [@accumulate_padding_bytes PInf p2 ?n c1] =>
+        destruct (I2F_accumulate_padding_bytes p2 n F2) as [E3 F3];
+        destruct (@accumulate_padding_bytes PInf p2 n c1) as [q1 d1];
+        destruct (@accumulate_padding_bytes PFin p2 n c2) as [q2 d2]
+    end; cbn in E3, F3; subst.
     now apply IH.
 Qed.
 
 Lemma I2F_accumulate_array_bytes : forall elts elts',
     Forall2 SER elts elts' ->
-    forall elt_t pad_to offset acc acc',
+    forall vector elt_t tail_align offset acc acc',
       Forall2 I2F_memory_byte acc acc' ->
       I2F_EOU I2F_ser_state
-        (@accumulate_array_bytes PInf pad_to elt_t elts offset acc)
-        (@accumulate_array_bytes PFin pad_to elt_t elts' offset acc').
+        (@accumulate_array_bytes PInf tail_align vector elt_t elts offset acc)
+        (@accumulate_array_bytes PFin tail_align vector elt_t elts' offset acc').
 Proof.
   intros elts elts' HF; induction HF as [| e e' es es' He HF IH];
-    intros elt_t pad_to offset acc acc' HA.
+    intros vector elt_t tail_align offset acc acc' HA.
   - rewrite 2 acc_array_nil; constructor; now apply I2F_accumulate_padding.
   - rewrite 2 acc_array_cons.
     eapply I2F_EOU_bind; [now apply He |].
-    intros [o1 b1] [o2 b2] [E F]; cbn in E, F; subst.
+    intros [p1 c1] [p2 c2] [E2 F2]; cbn in E2, F2; subst.
+    (* byte count taken from the goal, not written -- see the struct case *)
+    rewrite ?I2F_alloc_size_dtyp, ?I2F_store_size_dtyp.
+    match goal with
+    | |- context [@accumulate_padding_bytes PInf p2 ?n c1] =>
+        destruct (I2F_accumulate_padding_bytes p2 n F2) as [E3 F3];
+        destruct (@accumulate_padding_bytes PInf p2 n c1) as [q1 d1];
+        destruct (@accumulate_padding_bytes PFin p2 n c2) as [q2 d2]
+    end; cbn in E3, F3; subst.
     now apply IH.
 Qed.
 

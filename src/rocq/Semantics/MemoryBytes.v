@@ -96,6 +96,15 @@ Section MemoryByte.
   Definition accumulate_poison_bytes (num_bytes : N) :=
     accumulate_memory_bytes poison_memory_byte num_bytes.
 
+  (* Emit exactly [n] poison padding bytes.  Distinct from
+     [accumulate_padding], which aligns an absolute offset: a field must be
+     padded out to its *alloc size* by a fixed number of bytes, which is only
+     the same thing when the field happens to start aligned (it does not, in a
+     packed struct). *)
+  Definition accumulate_padding_bytes (offset : N) (n : N) (acc : list memory_byte)
+    : N * (list memory_byte) :=
+    ((offset + n)%N, accumulate_poison_bytes n acc).
+
   Definition accumulate_padding (offset : N) (pad_to : option N) (acc : list memory_byte) : N * (list memory_byte) :=
     match pad_to with
     | None => (offset, acc)
@@ -234,29 +243,40 @@ Section MemoryByte.
     (tail_align : option N) (acc : list memory_byte)
     {struct dv}
     : EOU (N * (list memory_byte)) :=
+    (* [pad] is [Some a] for an unpacked struct (a = its own alignment) and
+       [None] for a packed one.  Each field is laid out as LLVM's
+       [StructLayout] does: align the offset (unpacked only), emit the field,
+       then pad it out to its *alloc* size.  The [], [] case emits the
+       struct's own tail padding, which is part of its store size. *)
     let accumulate_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> list memory_byte -> EOU (N * list memory_byte) :=
       fix loop fields types (offset : N) (acc : list memory_byte) {struct fields} : EOU (N * list memory_byte) :=
         match fields, types with
-        | [], [] => ret (accumulate_padding offset tail_align acc)
+        | [], [] =>
+            let '(offset, acc) := accumulate_padding offset pad acc in
+            ret (accumulate_padding offset tail_align acc)
         | f::fs, dt::dts =>
-            let field_pad := 
-              if pad
-              then Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset)
-              else None
-            in
-            '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset field_pad acc ;;
-            loop fs dts offset' bs
+            let a := preferred_alignment (dtyp_alignment dt) in
+            let '(offset, acc) :=
+              accumulate_padding offset (if pad then Some a else None) acc in
+            '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
+            let '(offset'', bs') :=
+              accumulate_padding_bytes offset' (alloc_size_dtyp dt - store_size_dtyp dt) bs in
+            loop fs dts offset'' bs'
         | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
         end
     in
-    let dvalue_extract_array_bytes dt :=
+    (* Array elements sit at their alloc size; vector elements are contiguous
+       at their store size. *)
+    let dvalue_extract_array_bytes (vector : bool) dt :=
       fix loop (elts : list dvalue) offset (acc : list memory_byte) {struct elts}  :=
         match elts with
         | [] => ret (accumulate_padding offset tail_align acc)
         | e::es =>
-            let padding := Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset) in
-            '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt e offset padding acc ;; 
-            loop es offset' bs 
+            '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt e offset None acc ;;
+            let '(offset'', bs') :=
+              accumulate_padding_bytes offset'
+                (if vector then 0%N else (alloc_size_dtyp dt - store_size_dtyp dt)%N) bs in
+            loop es offset'' bs'
         end
     in
     match dt with
@@ -282,7 +302,7 @@ Section MemoryByte.
     | DTYPE_Array _vector sz elt_t =>
         match dv with
         | DVALUE_Array v elts =>
-            dvalue_extract_array_bytes elt_t elts offset acc
+            dvalue_extract_array_bytes _vector elt_t elts offset acc
         | _ => raise_error ("acc_dvalue_to_memory_bytes_h: type-mismatch non-array value: "  ++ (show dv))
         end
     end.
@@ -693,34 +713,45 @@ Section MemoryByte.
             (* Long term we'll have to include padding bytes in the dvalue *)
             ret []
         | (dt::dts) =>
+            (* mirror of the writer: skip the field's leading padding, read its
+               store-size bytes, then advance by its alloc size *)
             let padding :=
               if pad
               then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
               else 0%N
             in
-            let sz := store_size_dtyp dt in
-            (* Skip any padding bytes *)
             let dbs' := drop padding dbs in
-            let init_bytes := take sz dbs' in
-            let rest_bytes := drop sz dbs' in
-            let offset' := offset + padding in
+            let init_bytes := take (store_size_dtyp dt) dbs' in
+            let rest_bytes := drop (alloc_size_dtyp dt) dbs' in
             f <- memory_bytes_to_dvalue init_bytes dt ;;
-            rest <- go (offset' + sz) dts rest_bytes ;;
+            rest <- go (offset + padding + alloc_size_dtyp dt) dts rest_bytes ;;
             ret (f :: rest)
+        end
+    in
+    (* Array/vector elements: stride is the alloc size for arrays and the store
+       size for vectors; in both cases only the first [store_size_dtyp t] bytes
+       of each slot carry the value. *)
+    let array_elts_to_dvalue (stride : N) (t : dtyp) :=
+      fix go (n : nat) (dbs : list memory_byte) : EOU (list dvalue) :=
+        match n with
+        | O => ret []
+        | S n' =>
+            e <- memory_bytes_to_dvalue (take (store_size_dtyp t) dbs) t ;;
+            rest <- go n' (drop stride dbs) ;;
+            ret (e :: rest)
         end
     in
     match dt with
     | DTYPE_Base dt => DVALUE_Base <$> (memory_bytes_to_dvalue_base dbs dt)
 
-    | DTYPE_Array v sz t =>
-        let sz' := store_size_dtyp t in
-        let elt_bytes :=
-          if N.eqb sz' 0
-          then repeatN sz []
-          else split_every_nil sz' dbs
-        in
-        elts <- map_monad (fun es => memory_bytes_to_dvalue es t) elt_bytes;;
-        ret (DVALUE_Array v elts)
+    | DTYPE_Array true sz t =>
+        (* vector: contiguous elements *)
+        elts <- array_elts_to_dvalue (store_size_dtyp t) t (N.to_nat sz) dbs ;;
+        ret (DVALUE_Array true elts)
+
+    | DTYPE_Array false sz t =>
+        elts <- array_elts_to_dvalue (alloc_size_dtyp t) t (N.to_nat sz) dbs ;;
+        ret (DVALUE_Array false elts)
 
     | DTYPE_Struct false fields =>
         (DVALUE_Struct false) <$> (list_memory_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
