@@ -1840,6 +1840,23 @@ Section SerUnfold.
         accumulate_array_bytes tail_align p elt_t elts offset acc.
   Proof. reflexivity. Qed.
 
+  (* Poison at an aggregate type: the whole type's worth of poison bytes. *)
+  Lemma ser_Struct_poison_eq : forall packed dts offset tail_align acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Struct packed dts) (DVALUE_Base DVALUE_Poison)
+        offset tail_align acc =
+        let '(offset', bs) :=
+          accumulate_padding_bytes offset (store_size_dtyp (DTYPE_Struct packed dts)) acc in
+        ret (accumulate_padding offset' tail_align bs).
+  Proof. reflexivity. Qed.
+
+  Lemma ser_Array_poison_eq : forall v sz elt_t offset tail_align acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Array v sz elt_t) (DVALUE_Base DVALUE_Poison)
+        offset tail_align acc =
+        let '(offset', bs) :=
+          accumulate_padding_bytes offset (store_size_dtyp (DTYPE_Array v sz elt_t)) acc in
+        ret (accumulate_padding offset' tail_align bs).
+  Proof. reflexivity. Qed.
+
   Lemma acc_struct_nil : forall tail_align pad offset acc,
       accumulate_struct_bytes tail_align pad [] [] offset acc =
         let '(offset, acc) := accumulate_padding offset pad acc in
@@ -2036,8 +2053,23 @@ Proof.
     destruct (@acc_memory_bytes_of_dvalue_base PFin dtb b' offset acc') as [o2 b2].
     destruct HB2 as [E F]; cbn in E, F; subst.
     constructor; now apply I2F_accumulate_padding.
-  - cbn; constructor.
-  - cbn; constructor.
+  - (* base value at struct type: poison serializes to the struct's worth of
+       poison bytes, every other base value is a diagonal error.  The poison
+       script has to be tried *first*: a bare [constructor] would pick
+       [I2F_EOU_ret] on that goal and leave a different one behind. *)
+    inversion HB; subst;
+      try (rewrite 2 ser_Struct_poison_eq, ?I2F_store_size_dtyp;
+           unfold accumulate_padding_bytes; cbn zeta;
+           constructor; apply I2F_accumulate_padding;
+           now apply I2F_accumulate_poison_bytes);
+      cbn; constructor.
+  - (* base value at array type: likewise *)
+    inversion HB; subst;
+      try (rewrite 2 ser_Array_poison_eq, ?I2F_store_size_dtyp;
+           unfold accumulate_padding_bytes; cbn zeta;
+           constructor; apply I2F_accumulate_padding;
+           now apply I2F_accumulate_poison_bytes);
+      cbn; constructor.
   - cbn; constructor.
   - rewrite 2 ser_Struct_eq; now apply I2F_accumulate_struct_bytes.
   - cbn; constructor.

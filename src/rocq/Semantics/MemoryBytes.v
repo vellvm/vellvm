@@ -297,12 +297,24 @@ Section MemoryByte.
                [DTYPE_Struct true/false] cases of [handle_gep_h]. *)
             let pad := if packed then None else Some (max_preferred_dtyp_alignment dts) in
             accumulate_struct_bytes pad fields dts offset acc
+        | DVALUE_Base DVALUE_Poison =>
+            (* Poison inhabits every type ([DVALUE_Poison_typ_agg]), so a
+               poison at aggregate type is well-typed: it serializes to the
+               type's worth of poison bytes. *)
+            let '(offset', bs) := accumulate_padding_bytes offset (store_size_dtyp dt) acc in
+            ret (accumulate_padding offset' tail_align bs)
         | _ => raise_error "acc_dvalue_to_memory_bytes_h: type-mismatch non-struct value"
         end
     | DTYPE_Array _vector sz elt_t =>
         match dv with
         | DVALUE_Array v elts =>
             dvalue_extract_array_bytes _vector elt_t elts offset acc
+        | DVALUE_Base DVALUE_Poison =>
+            (* Poison inhabits every type ([DVALUE_Poison_typ_agg]), so a
+               poison at aggregate type is well-typed: it serializes to the
+               type's worth of poison bytes. *)
+            let '(offset', bs) := accumulate_padding_bytes offset (store_size_dtyp dt) acc in
+            ret (accumulate_padding offset' tail_align bs)
         | _ => raise_error ("acc_dvalue_to_memory_bytes_h: type-mismatch non-array value: "  ++ (show dv))
         end
     end.
