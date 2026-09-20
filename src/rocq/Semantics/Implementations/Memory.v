@@ -60,7 +60,7 @@ Section MemoryModel.
     map_monad_acc read_byte ptrs.
   
   Definition read_dvalue (dt : dtyp) (p : ptr) : memM dvalue :=
-    bytes <- read_bytes p (sizeof_dtyp dt);;
+    bytes <- read_bytes p (store_size_dtyp dt);;
     lift (memory_bytes_to_dvalue bytes dt).
 
   (** Writing dvalues *)
@@ -88,7 +88,7 @@ Section MemoryModel.
     generate_num_poison_bytes_h 0 num.
 
   Definition generate_poison_bytes (dt : dtyp) : list memory_byte :=
-    generate_num_poison_bytes (sizeof_dtyp dt).
+    generate_num_poison_bytes (store_size_dtyp dt).
 
   (** Allocating dtyps *)
   Definition allocate_bytes (init_bytes : list memory_byte) (align : N) : memM ptr :=
@@ -157,9 +157,15 @@ Section MemoryModel.
       | MemPush => mempush
       | MemPop => mempop
       | Alloca t n align =>
+          (* SAZ: double check the alignment when an alignment is specified, that is a _minimal_
+             guarantee.  If the "natural" alignment of the type is larger, that might be used
+             instead.  We need to figure out whether `allocate_dtyp` is responsible for that
+             or whether to put that logic here.  Currently it seems that no place
+             properly handles that.
+           *)
           let align :=
             match align with
-            | None => 8%N
+            | None => 8%N  (* TODO: This should probably depend on some configuration *)
             | Some align => align
             end in
           ptr <- allocate_dtyp t n align;;

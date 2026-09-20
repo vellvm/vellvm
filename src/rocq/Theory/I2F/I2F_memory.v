@@ -164,7 +164,7 @@ Lemma I2F_generate_poison_bytes : forall dt,
       (@generate_poison_bytes PFin dt).
 Proof.
   intros; unfold generate_poison_bytes.
-  rewrite I2F_sizeof_dtyp.
+  rewrite I2F_store_size_dtyp.
   apply I2F_generate_num_poison_bytes.
 Qed.
 

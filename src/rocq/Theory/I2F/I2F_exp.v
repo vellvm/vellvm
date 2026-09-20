@@ -1655,8 +1655,8 @@ Qed.
 
 (* The two models share their [Sizeof] instance, but its uses appear
      behind distinct [Params] projections; align them syntactically. *)
-Lemma I2F_sizeof_dtyp : forall t,
-    @sizeof_dtyp (@SIZE PInf) t = @sizeof_dtyp (@SIZE PFin) t.
+Lemma I2F_store_size_dtyp : forall t,
+    @store_size_dtyp (@SIZE PInf) t = @store_size_dtyp (@SIZE PFin) t.
 Proof. reflexivity. Qed.
 
 Lemma I2F_max_alignment : forall ts,
@@ -1695,7 +1695,7 @@ Proof.
   intros H.
   inversion H; subst.
   - unfold memory_byte_of_dvalue_bv.
-    destruct (negb (N.pos bit_sz mod 8 =? 0)%N && (idx + 1 =? sizeof_dtyp (DTYPE_I bit_sz))%N).
+    destruct (negb (N.pos bit_sz mod 8 =? 0)%N && (idx + 1 =? store_size_dtyp (DTYPE_I bit_sz))%N).
     repeat constructor.
     apply Forall2_app.
     apply Forall2_map2.

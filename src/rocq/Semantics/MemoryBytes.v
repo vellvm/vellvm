@@ -153,7 +153,7 @@ Section MemoryByte.
     | BYTE_I x =>
         (* If bit_sz isn't divisible by 8 and this is the last index, there is bit-level padding *)
         let extra_bits := N.modulo (Npos bit_sz) 8 in
-        if negb (N.eqb extra_bits 0) && (N.eqb (idx + 1) (sizeof_dtyp (DTYPE_Base (DTYPE_I bit_sz))))  then
+        if negb (N.eqb extra_bits 0) && (N.eqb (idx + 1) (store_size_dtyp (DTYPE_Base (DTYPE_I bit_sz))))  then
           let pad_bits := 8 - extra_bits in
           let pad := repeat Bit_psn (N.to_nat pad_bits) in
           let mbits := map (fun i => Z_to_memory_bit (Z.of_N (extract_bit_N (Z.to_N (unsigned x)) i))) (Nseq (8 * idx) (N.to_nat extra_bits))
@@ -185,7 +185,7 @@ Section MemoryByte.
   Definition acc_memory_bytes_of_dvalue_base (dt:dtyp_base)
     (dv:dvalue_base) (offset : N) (acc : list memory_byte)
     : N * (list memory_byte)  :=
-    let byte_size := sizeof_dtyp dt in
+    let byte_size := store_size_dtyp dt in
     let byte_gen := 
       match dv with
       | DVALUE_I sz x => memory_byte_of_dvalue_bv (BYTE_I x)
@@ -231,13 +231,13 @@ Section MemoryByte.
   Fixpoint acc_dvalue_to_memory_bytes_h
     (dt:dtyp)
     (dv : dvalue) (offset : N)
-    (pad_to : option N) (acc : list memory_byte)
+    (tail_align : option N) (acc : list memory_byte)
     {struct dv}
     : EOU (N * (list memory_byte)) :=
     let accumulate_struct_bytes (pad : option N) : list dvalue -> list dtyp -> N -> list memory_byte -> EOU (N * list memory_byte) :=
       fix loop fields types (offset : N) (acc : list memory_byte) {struct fields} : EOU (N * list memory_byte) :=
         match fields, types with
-        | [], [] => ret (accumulate_padding offset pad_to acc)
+        | [], [] => ret (accumulate_padding offset tail_align acc)
         | f::fs, dt::dts =>
             let field_pad := 
               if pad
@@ -252,7 +252,7 @@ Section MemoryByte.
     let dvalue_extract_array_bytes dt :=
       fix loop (elts : list dvalue) offset (acc : list memory_byte) {struct elts}  :=
         match elts with
-        | [] => ret (accumulate_padding offset pad_to acc)
+        | [] => ret (accumulate_padding offset tail_align acc)
         | e::es =>
             let padding := Some (pad_amount (preferred_alignment (dtyp_alignment dt)) offset) in
             '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt e offset padding acc ;; 
@@ -264,7 +264,7 @@ Section MemoryByte.
         match dv with
         | DVALUE_Base dv =>
             let '(offset', bs) := acc_memory_bytes_of_dvalue_base dtb dv offset acc in
-            ret (accumulate_padding offset' pad_to bs)
+            ret (accumulate_padding offset' tail_align bs)
         | _ => raise_error "acc_dvalue_to_memory_bytes_h: type-mismatch non-base value"
         end
     | DTYPE_Struct packed dts =>
@@ -287,20 +287,111 @@ Section MemoryByte.
         end
     end.
   
-  
-  
-  (* Toplevel operation to convert a dvalue into a list of memory_bytes. *)
-  Definition dvalue_to_memory_bytes (dt:dtyp) (dv : dvalue) (pad_to : option N) : EOU (list memory_byte) :=
-    '(offset, bytes) <- acc_dvalue_to_memory_bytes_h dt dv 0 pad_to [] ;;
+
+  (** ** Serializing a [dvalue]: the layout model
+
+      [dvalue_to_memory_bytes dt dv tail_align] lays [dv] out as the bytes of a
+      value of type [dt], as they would appear in memory.
+
+      *** Why the type is needed
+      The value alone does not determine the layout: [DVALUE_Poison] inhabits
+      every type ([DVALUE_Poison_typ_agg]), so its width comes from [dt], and
+      so does every padding decision inside an aggregate.
+
+      *** The layout law
+      Writing [|bs|] for the number of bytes produced, the intended invariant is
+
+        dvalue_has_dtyp dv dt ->
+        dvalue_to_memory_bytes dt dv None = ret bs ->
+        |bs| = store_size_dtyp dt
+
+      (and [pad_to a (store_size_dtyp dt)] for [tail_align = Some a]).  This is
+      [dvalue_to_memory_bytes_sizeof] below.  Case by case, matching
+      [SizeofTheory]:
+
+      - [DTYPE_Base dtb] emits [store_size_dtyp dtb] bytes, no padding.
+
+      - [DTYPE_Struct true dts] (*packed*) emits the fields back to back with no
+        padding anywhere -- [sizeof_dtyp_Packed_struct].
+
+      - [DTYPE_Struct false dts] (unpacked) emits, for each field of type [t],
+        *leading* padding up to [preferred_alignment (dtyp_alignment t)] and
+        then [store_size_dtyp t] bytes; after the last field, *trailing* padding up
+        to [max_preferred_dtyp_alignment dts].  That is exactly
+        [sizeof_dtyp_Struct]:
+          pad_to (max_preferred_dtyp_alignment dts)
+                 (fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc
+                                          + store_size_dtyp t) dts 0)
+        The trailing padding is *intrinsic* to the struct -- it is part of its
+        [store_size_dtyp] -- so it must be emitted whatever the caller asks for.
+        It is NOT the same thing as [tail_align].
+
+      - [DTYPE_Array _ sz t] emits [sz] elements of [store_size_dtyp t] bytes each
+        with no padding between them -- [sizeof_dtyp_array].  An element's own
+        trailing padding is already inside [store_size_dtyp t], which is what makes
+        a contiguous layout correct.
+
+      *** Preconditions
+      - [dvalue_has_dtyp dv dt].  The element-count part matters: the array case
+        loops over the elements it is given and ignores [sz], so a short array
+        value serializes without complaint and yields too few bytes.
+      - Bytes are laid out relative to offset [0] and are assumed to be written
+        at an address that is a multiple of
+        [preferred_alignment (dtyp_alignment dt)].  All padding is computed from
+        the offset *within* the value, so this assumption is what makes the
+        result correctly aligned once in memory.
+
+      *** [tail_align]
+      [Some a] asks for extra padding so the value occupies a multiple of [a]
+      bytes; [None] asks for none.  It is a request from the caller, and is
+      independent of whether the value is a packed struct.  Both callers in the
+      development ([write_dvalue] and the bitcast case of [convert]) pass
+      [None], so the [Some] case is currently unexercised.
+      (Previously named [pad_to], which collides with [Sizeof.pad_to].)
+
+      *** Status: the definition below does NOT yet satisfy the layout law.
+      Measured against [store_size_dtyp] (all values well-typed, [tail_align = None]):
+
+        type                  store_size_dtyp   emitted
+        { i64, i64 }               16          16   ok
+        packed { i32, i64 }        12          12   ok
+        { i32, i64 }               16          12   missing leading padding
+        { i64, i32 }               16          12   missing trailing padding
+        { { i64, i32 }, i8 }       24          13   both, nested
+        [ 2 x { i64, i32 } ]       32          24   2x the element's trailing
+
+      Two independent causes, both in [accumulate_struct_bytes]:
+      (a) the field padding is passed as [acc_dvalue_to_memory_bytes_h]'s
+          [tail_align], so it lands *after* the field rather than before it, and
+          it is a byte count where [accumulate_padding] expects an alignment;
+      (b) the struct's own trailing padding is never emitted -- the [[], []]
+          case pads to the caller's [tail_align] instead of to
+          [max_preferred_dtyp_alignment dts].
+      A third, separate gap: [DVALUE_Base DVALUE_Poison] at an aggregate type is
+      well-typed but raises "type-mismatch non-struct/array value" here.
+   *)
+  Definition dvalue_to_memory_bytes (dt:dtyp) (dv : dvalue) (tail_align : option N)
+    : EOU (list memory_byte) :=
+    '(offset, bytes) <- acc_dvalue_to_memory_bytes_h dt dv 0 tail_align [] ;;
     (* reverse the list *)
     ret (rev_append bytes []).
 
 
-  (* Need the type of the dvalue in order to know how big fields and array elements are.
+  (* Sanity check for the layout model above.  NB: this is currently FALSE of
+     the definition (see the table); it is the property the padding fix should
+     establish. *)
+  Lemma dvalue_to_memory_bytes_sizeof :
+    forall dt dv tail_align bytes,
+      dvalue_has_dtyp dv dt ->
+      dvalue_to_memory_bytes dt dv tail_align = raise_ret bytes ->
+      (N.of_nat (List.length bytes)) =
+        match tail_align with
+        | None => store_size_dtyp dt
+        | Some a => pad_to a (store_size_dtyp dt)
+        end.
+  Proof.
+  Admitted.
 
-         It's not possible to use the dvalue alone, as DVALUE_Poison's
-         size depends on the type.
-   *)
 
   (* This function may essentially compute poison, but without a dvalue to embed it into yet.
      We take an adhoc lightweigh way to handle this currently with the following option return type.
@@ -405,7 +496,7 @@ Section MemoryByte.
 
   Fixpoint valid_pointer_bytes (p:ptr) (idx:N) (bytes : list memory_byte) : EOUP bool :=
     match bytes with
-    | [] => ret (N.eqb idx (sizeof_dtyp (DTYPE_Base DTYPE_Pointer)))
+    | [] => ret (N.eqb idx (store_size_dtyp (DTYPE_Base DTYPE_Pointer)))
     | b::rest =>
         v <- valid_pointer_byte p idx b ;;
         if v then valid_pointer_bytes p (1+idx) rest else ret false
@@ -551,6 +642,48 @@ Section MemoryByte.
     end.
 
   
+  (** ** Deserializing: [memory_bytes_to_dvalue dbs dt]
+
+      The inverse of [dvalue_to_memory_bytes], and it has to agree with it byte
+      for byte.  Where the writer *emits* padding, the reader *skips* it.
+
+      *** Precondition
+      [dbs] is expected to be exactly [store_size_dtyp dt] bytes, which is what
+      [read_dvalue] supplies ([read_bytes p (store_size_dtyp dt)]).  The array case
+      depends on it: [split_every_nil (store_size_dtyp t) dbs] chops *all* of [dbs],
+      so a longer [dbs] yields more than [sz] elements rather than an error.
+
+      *** Where the padding goes
+      - Structs: [list_memory_bytes_to_dvalue] drops
+        [pad_amount (preferred_alignment (dtyp_alignment t)) offset] bytes
+        before each field and then consumes [store_size_dtyp t] -- the exact mirror
+        of the writer's *leading* padding.  It is called with
+        [Some (max_preferred_dtyp_alignment fields)] for an unpacked struct and
+        [None] for a packed one, so the packed/unpacked decision is taken from
+        the type on both sides.
+      - Arrays: no padding between elements; the split is at [store_size_dtyp t].
+      - Trailing padding is *ignored*: the [[]] case of the field loop returns
+        without inspecting what is left, so surplus bytes at the end are
+        dropped.  This is why a writer that omits a struct's trailing padding
+        still round-trips at the top level, and why the bug is only visible in
+        fields that follow a misaligned one.
+
+      *** Round trip
+      The intended statement is
+
+        dvalue_has_dtyp dv dt ->
+        dvalue_to_memory_bytes dt dv None = ret bs ->
+        exists dv', memory_bytes_to_dvalue bs dt = ret dv' /\ <dv' agrees with dv>
+
+      It is deliberately not the identity.  Padding bytes are written as poison
+      and are not recorded in the dvalue, and deserialization is lossy in two
+      further ways: a field whose bytes are all poison comes back as
+      [DVALUE_Poison] rather than as the original shape
+      (see [all_poison_bytes]), and [memory_bytes_to_byte_value] re-canonicalises
+      a byte sequence (integer, then pointer, then mixed bits), so a value may
+      come back under a different [dvalue_bv] constructor than it went in.
+      Pinning down "<dv' agrees with dv>" is the open part of this model.
+   *)
   Fixpoint memory_bytes_to_dvalue (dbs : list memory_byte) (dt : dtyp) : EOU dvalue :=
     let list_memory_bytes_to_dvalue (pad : option N) :=
       fix go (offset : N) dts dbs :=
@@ -565,7 +698,7 @@ Section MemoryByte.
               then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
               else 0%N
             in
-            let sz := sizeof_dtyp dt in
+            let sz := store_size_dtyp dt in
             (* Skip any padding bytes *)
             let dbs' := drop padding dbs in
             let init_bytes := take sz dbs' in
@@ -580,7 +713,7 @@ Section MemoryByte.
     | DTYPE_Base dt => DVALUE_Base <$> (memory_bytes_to_dvalue_base dbs dt)
 
     | DTYPE_Array v sz t =>
-        let sz' := sizeof_dtyp t in
+        let sz' := store_size_dtyp t in
         let elt_bytes :=
           if N.eqb sz' 0
           then repeatN sz []

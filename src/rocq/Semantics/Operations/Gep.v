@@ -27,7 +27,7 @@ Section GEP.
             let k := signed i in
             match t with
             | DTYPE_Array v _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'                
+                handle_gep_h ta (off + k * (Z.of_N (alloc_size_dtyp ta))) vs'                
             | _ => raise_error ("non-i8-indexable type")
             end
         | DVALUE_Base (DVALUE_I 32 i) =>
@@ -36,17 +36,17 @@ Section GEP.
             let n := BinIntDef.Z.to_nat k in
             match t with
             | DTYPE_Array v _ ta =>
-                handle_gep_h ta (off + ks * (Z.of_N (sizeof_dtyp ta))) vs'                          
+                handle_gep_h ta (off + ks * (Z.of_N (alloc_size_dtyp ta))) vs'                          
             | DTYPE_Struct false ts =>
                 match nth_error ts n with
                 | None => raise_error "overflow"
                 | Some t' =>
-                    let end_of_prev_field := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + sizeof_dtyp t)%N (firstn n ts) 0%N in
+                    let end_of_prev_field := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + alloc_size_dtyp t)%N (firstn n ts) 0%N in
                     let offset := pad_to_align (dtyp_alignment t') end_of_prev_field in
                     handle_gep_h t' (off + Z.of_N offset) vs'
                 end
             | DTYPE_Struct true ts =>
-                let offset := fold_left (fun acc t => acc + sizeof_dtyp t)%N
+                let offset := fold_left (fun acc t => acc + alloc_size_dtyp t)%N
                                 (firstn n ts) 0%N in
                 match nth_error ts n with
                 | None => raise_error "overflow"
@@ -61,16 +61,16 @@ Section GEP.
             let k := signed i in
             match t with
             | DTYPE_Array false _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+                handle_gep_h ta (off + k * (Z.of_N (alloc_size_dtyp ta))) vs'
             | DTYPE_Array true _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'
+                handle_gep_h ta (off + k * (Z.of_N (alloc_size_dtyp ta))) vs'
             | _ => raise_error ("non-i64-indexable type")
             end
         | DVALUE_Base (DVALUE_Iptr i) =>
             let k := to_Z i in
             match t with
             | DTYPE_Array v  _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (sizeof_dtyp ta))) vs'                
+                handle_gep_h ta (off + k * (Z.of_N (alloc_size_dtyp ta))) vs'                
             | _ => raise_error ("non-iptr-indexable type")
             end
               
@@ -88,16 +88,16 @@ Section GEP.
     let prov := ptr_provenance a in
     match vs with
     | DVALUE_Base (DVALUE_I 8 i) :: vs' =>
-        ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
+        ptr' <- handle_gep_h t (ptr + Z.of_N (alloc_size_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
     | DVALUE_Base (DVALUE_I 32 i) :: vs' =>
-        ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
+        ptr' <- handle_gep_h t (ptr + Z.of_N (alloc_size_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
     | DVALUE_Base (DVALUE_I 64 i) :: vs' =>
-        ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (signed i)) vs' ;;
+        ptr' <- handle_gep_h t (ptr + Z.of_N (alloc_size_dtyp t) * (signed i)) vs' ;;
         int_to_ptr ptr' prov
     | DVALUE_Base (DVALUE_Iptr i) :: vs' =>
-        ptr' <- handle_gep_h t (ptr + Z.of_N (sizeof_dtyp t) * (to_Z i)) vs' ;;
+        ptr' <- handle_gep_h t (ptr + Z.of_N (alloc_size_dtyp t) * (to_Z i)) vs' ;;
         int_to_ptr ptr' prov
     | [] => raise_error "handle_gep_ptr: no indices"
     | _ => raise_error "handle_gep_ptr: unsupported index type"
@@ -110,7 +110,7 @@ Section GEP.
     intros dt p.
     cbn.
     rewrite to_Z_0.
-    replace (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * 0)%Z with (ptr_to_int p) by lia.
+    replace (ptr_to_int p + Z.of_N (alloc_size_dtyp dt) * 0)%Z with (ptr_to_int p) by lia.
     rewrite int_to_ptr_ptr_to_int; auto.
   Qed.
 
@@ -125,7 +125,7 @@ Section GEP.
   Lemma handle_gep_ptr_ix :
     forall (dt : dtyp) (p p' : ptr) ix,
       handle_gep_ptr dt p [DVALUE_Base (DVALUE_Iptr ix)] = ret p' ->
-      ptr_to_int p' = (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z.
+      ptr_to_int p' = (ptr_to_int p + Z.of_N (alloc_size_dtyp dt) * to_Z ix)%Z.
   Proof.
     intros dt p p' ix GEP.
     cbn in *.
@@ -137,7 +137,7 @@ Section GEP.
     forall (dt : dtyp) (p p' : ptr) ix msg,
       handle_gep_ptr dt p [DVALUE_Base (DVALUE_Iptr ix)] = raise_oom msg ->
       exists msg',
-        int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (ptr_provenance p) = raise_oom msg'.
+        int_to_ptr (ptr_to_int p + Z.of_N (alloc_size_dtyp dt) * to_Z ix)%Z (ptr_provenance p) = raise_oom msg'.
   Proof.
     intros dt p p' ix msg GEP.
     cbn in *.
@@ -148,7 +148,7 @@ Section GEP.
 
   Lemma handle_gep_ptr_ix' :
     forall (dt : dtyp) (p p' : ptr) ix,
-      ret p' = int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (ptr_provenance p) ->
+      ret p' = int_to_ptr (ptr_to_int p + Z.of_N (alloc_size_dtyp dt) * to_Z ix)%Z (ptr_provenance p) ->
       handle_gep_ptr dt p [DVALUE_Base (DVALUE_Iptr ix)] = ret p'.
   Proof.
     intros dt p p' ix IX.
@@ -159,7 +159,7 @@ Section GEP.
 
   Lemma handle_gep_ptr_ix'_OOM :
     forall (dt : dtyp) (p p' : ptr) ix msg,
-      int_to_ptr (ptr_to_int p + Z.of_N (sizeof_dtyp dt) * to_Z ix)%Z (ptr_provenance p) = raise_oom msg ->
+      int_to_ptr (ptr_to_int p + Z.of_N (alloc_size_dtyp dt) * to_Z ix)%Z (ptr_provenance p) = raise_oom msg ->
       exists msg', handle_gep_ptr dt p [DVALUE_Base (DVALUE_Iptr ix)] = raise_oom msg'.
   Proof.
     intros dt p p' ix msg IX.
