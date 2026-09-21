@@ -38,6 +38,25 @@ Module N.
       (fun _ rec i acc => rec (1+i)%N ((f i)::acc))
       n.
 End N.
+
+(** [rev_loop_acc] is built from [N.recursion], which does not reduce on
+    [N.succ]; this unfolding equation makes it usable by induction. *)
+Lemma rev_loop_acc_succ {A} (f : N -> A) n :
+  N.rev_loop_acc f (N.succ n) = (fun i acc => N.rev_loop_acc f n (1+i)%N (f i :: acc)).
+Proof.
+  unfold N.rev_loop_acc.
+  apply (@N.recursion_succ (N -> list A -> list A) Logic.eq); auto.
+  repeat intro; subst; auto.
+Qed.
+
+(** It appends exactly [n] elements. *)
+Lemma rev_loop_acc_length {A} (f : N -> A) :
+  forall n i acc, length (N.rev_loop_acc f n i acc) = (N.to_nat n + length acc)%nat.
+Proof.
+  intros n; induction n using N.peano_ind; intros i acc; [reflexivity |].
+  rewrite rev_loop_acc_succ; cbn.
+  rewrite IHn; cbn; lia.
+Qed.
   
 (** * Collection of misc definitions and lemmas over lists *)
 

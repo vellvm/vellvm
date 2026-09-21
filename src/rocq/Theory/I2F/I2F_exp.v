@@ -1256,16 +1256,6 @@ Qed.
     plumbing, the agreement of the poison test, and the branch alignment
     that the fall-through needs. *)
 
-(** [rev_loop_acc] is built from [N.recursion], which does not reduce on
-    [N.succ]; one unfolding equation makes it usable by induction. *)
-Lemma rev_loop_acc_succ {A} (f : N -> A) n :
-  N.rev_loop_acc f (N.succ n) = (fun i acc => N.rev_loop_acc f n (1+i)%N (f i :: acc)).
-Proof.
-  unfold N.rev_loop_acc.
-  apply (@N.recursion_succ (N -> list A -> list A) Logic.eq); auto.
-  repeat intro; subst; auto.
-Qed.
-
 Lemma Forall2_rev_loop_acc {A B} (R : A -> B -> Prop) (f : N -> A) (g : N -> B)
   (HR : forall i, R (f i) (g i)) :
   forall n i acc acc', Forall2 R acc acc' ->
@@ -1879,8 +1869,11 @@ Section SerUnfold.
           let asz := alloc_size_dtyp dt in
           let '(offset, acc) :=
             accumulate_padding offset (if pad then Some a else None) acc in
-          '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
-          let '(offset'', bs') := accumulate_padding_bytes offset' (asz - ssz) bs in
+          (* the field is laid out from its own start; the parent adds its
+             extent (see [MemoryBytes.acc_dvalue_to_memory_bytes_h]) *)
+          '(coff, bs) <- acc_dvalue_to_memory_bytes_h dt f 0%N None acc ;;
+          let '(offset'', bs') :=
+            accumulate_padding_bytes (offset + coff)%N (asz - ssz) bs in
           loop fs dts offset'' bs'
       | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
       end.
@@ -1893,8 +1886,9 @@ Section SerUnfold.
       match elts with
       | [] => ret (accumulate_padding offset tail_align acc)
       | e::es =>
-          '(offset', bs) <- acc_dvalue_to_memory_bytes_h elt_t e offset None acc ;;
-          let '(offset'', bs') := accumulate_padding_bytes offset' elt_pad bs in
+          '(coff, bs) <- acc_dvalue_to_memory_bytes_h elt_t e 0%N None acc ;;
+          let '(offset'', bs') :=
+            accumulate_padding_bytes (offset + coff)%N elt_pad bs in
           loop es offset'' bs'
       end.
 
@@ -1954,9 +1948,10 @@ Section SerUnfold.
         let a := preferred_alignment (dtyp_alignment dt) in
         let '(offset, acc) :=
           accumulate_padding offset (if pad then Some a else None) acc in
-        '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
+        '(coff, bs) <- acc_dvalue_to_memory_bytes_h dt f 0%N None acc ;;
         let '(offset'', bs') :=
-          accumulate_padding_bytes offset' (alloc_size_dtyp dt - store_size_dtyp dt) bs in
+          accumulate_padding_bytes (offset + coff)%N
+            (alloc_size_dtyp dt - store_size_dtyp dt) bs in
         accumulate_struct_bytes tail_align pad fs dts offset'' bs'.
   Proof. reflexivity. Qed.
 
@@ -1967,9 +1962,9 @@ Section SerUnfold.
 
   Lemma acc_array_cons : forall tail_align vector elt_t e es offset acc,
       accumulate_array_bytes tail_align vector elt_t (e::es) offset acc =
-        '(offset', bs) <- acc_dvalue_to_memory_bytes_h elt_t e offset None acc ;;
+        '(coff, bs) <- acc_dvalue_to_memory_bytes_h elt_t e 0%N None acc ;;
         let '(offset'', bs') :=
-          accumulate_padding_bytes offset'
+          accumulate_padding_bytes (offset + coff)%N
             (if vector then 0%N else (alloc_size_dtyp elt_t - store_size_dtyp elt_t)%N) bs in
         accumulate_array_bytes tail_align vector elt_t es offset'' bs'.
   Proof. reflexivity. Qed.
@@ -2006,10 +2001,10 @@ Proof.
     [reflexivity | now apply I2F_accumulate_poison_bytes].
 Qed.
 
-Lemma I2F_accumulate_padding : forall offset pad_to acc acc',
+Lemma I2F_accumulate_padding : forall offset opt_align acc acc',
     Forall2 I2F_memory_byte acc acc' ->
-    I2F_ser_state (@accumulate_padding PInf offset pad_to acc)
-                  (@accumulate_padding PFin offset pad_to acc').
+    I2F_ser_state (@accumulate_padding PInf offset opt_align acc)
+                  (@accumulate_padding PFin offset opt_align acc').
 Proof.
   intros offset [align |] acc acc' HA; cbn; split; cbn; auto.
   now apply I2F_accumulate_poison_bytes.
@@ -2085,10 +2080,10 @@ Proof.
        the goal *)
     rewrite ?I2F_alloc_size_dtyp, ?I2F_store_size_dtyp.
     match goal with
-    | |- context [@accumulate_padding_bytes PInf p2 ?n c1] =>
-        destruct (I2F_accumulate_padding_bytes p2 n F2) as [E3 F3];
-        destruct (@accumulate_padding_bytes PInf p2 n c1) as [q1 d1];
-        destruct (@accumulate_padding_bytes PFin p2 n c2) as [q2 d2]
+    | |- context [@accumulate_padding_bytes PInf ?o ?n c1] =>
+        destruct (I2F_accumulate_padding_bytes o n F2) as [E3 F3];
+        destruct (@accumulate_padding_bytes PInf o n c1) as [q1 d1];
+        destruct (@accumulate_padding_bytes PFin o n c2) as [q2 d2]
     end; cbn in E3, F3; subst.
     now apply IH.
 Qed.
@@ -2110,10 +2105,10 @@ Proof.
     (* byte count taken from the goal, not written -- see the struct case *)
     rewrite ?I2F_alloc_size_dtyp, ?I2F_store_size_dtyp.
     match goal with
-    | |- context [@accumulate_padding_bytes PInf p2 ?n c1] =>
-        destruct (I2F_accumulate_padding_bytes p2 n F2) as [E3 F3];
-        destruct (@accumulate_padding_bytes PInf p2 n c1) as [q1 d1];
-        destruct (@accumulate_padding_bytes PFin p2 n c2) as [q2 d2]
+    | |- context [@accumulate_padding_bytes PInf ?o ?n c1] =>
+        destruct (I2F_accumulate_padding_bytes o n F2) as [E3 F3];
+        destruct (@accumulate_padding_bytes PInf o n c1) as [q1 d1];
+        destruct (@accumulate_padding_bytes PFin o n c2) as [q2 d2]
     end; cbn in E3, F3; subst.
     now apply IH.
 Qed.

@@ -105,13 +105,16 @@ Section MemoryByte.
     : N * (list memory_byte) :=
     ((offset + n)%N, accumulate_poison_bytes n acc).
 
-  Definition accumulate_padding (offset : N) (pad_to : option N) (acc : list memory_byte) : N * (list memory_byte) :=
-    match pad_to with
+  (* Align an absolute offset: emit [pad_amount] poison bytes so that the
+     offset becomes [pad_to align offset].  [None] means "no alignment
+     requested" and is the identity. *)
+  Definition accumulate_padding (offset : N) (opt_align : option N) (acc : list memory_byte)
+    : N * (list memory_byte) :=
+    match opt_align with
     | None => (offset, acc)
     | Some align =>
-        let extra_bytes :=  N.modulo offset align in
-        let num_padding_bytes := if negb (N.eqb extra_bytes 0) then align - extra_bytes else 0%N in
-        (num_padding_bytes + offset, accumulate_poison_bytes num_padding_bytes acc)
+        let n := pad_amount align offset in
+        ((offset + n)%N, accumulate_poison_bytes n acc)
     end.
 
   (* Given a type, there is a "bijection" between lists of memory bytes (of the
@@ -262,8 +265,16 @@ Section MemoryByte.
             let asz := alloc_size_dtyp dt in
             let '(offset, acc) :=
               accumulate_padding offset (if pad then Some a else None) acc in
-            '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
-            let '(offset'', bs') := accumulate_padding_bytes offset' (asz - ssz) bs in
+            (* The field is laid out relative to *its own* start, so the
+               recursive call begins at 0 and the parent adds the field's
+               extent.  Passing the absolute [offset] down would make a
+               nested unpacked aggregate pad itself against the enclosing
+               offset, which disagrees with [store_size_dtyp] (and with LLVM,
+               and with the reader) whenever that offset is not a multiple of
+               the field's alignment -- as inside a packed struct. *)
+            '(coff, bs) <- acc_dvalue_to_memory_bytes_h dt f 0%N None acc ;;
+            let '(offset'', bs') :=
+              accumulate_padding_bytes (offset + coff)%N (asz - ssz) bs in
             loop fs dts offset'' bs'
         | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
         end
@@ -280,8 +291,10 @@ Section MemoryByte.
         match elts with
         | [] => ret (accumulate_padding offset tail_align acc)
         | e::es =>
-            '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt e offset None acc ;;
-            let '(offset'', bs') := accumulate_padding_bytes offset' elt_pad bs in
+            (* as in the struct loop: the element is laid out from 0 *)
+            '(coff, bs) <- acc_dvalue_to_memory_bytes_h dt e 0%N None acc ;;
+            let '(offset'', bs') :=
+              accumulate_padding_bytes (offset + coff)%N elt_pad bs in
             loop es offset'' bs'
         end
     in
@@ -415,9 +428,386 @@ Section MemoryByte.
     ret (rev_append bytes []).
 
 
-  (* Sanity check for the layout model above.  NB: this is currently FALSE of
-     the definition (see the table); it is the property the padding fix should
-     establish. *)
+  (* Sanity check for the layout model above: proved as
+     [dvalue_to_memory_bytes_sizeof] at the end of this section. *)
+  (** [tapad ta x] is [x] rounded up to [a] when the caller asked for a
+      trailing alignment, and [x] otherwise. *)
+  Definition tapad (ta : option N) (x : N) : N :=
+    match ta with
+    | None => x
+    | Some a => pad_to a x
+    end.
+
+  (** The byte-accumulating primitives all satisfy the same invariant: the
+      offset advances by exactly the number of bytes appended to [acc]. *)
+
+  Lemma accumulate_poison_bytes_length : forall n acc,
+      length (accumulate_poison_bytes n acc) = (N.to_nat n + length acc)%nat.
+  Proof.
+    intros n acc; unfold accumulate_poison_bytes, accumulate_memory_bytes.
+    apply rev_loop_acc_length.
+  Qed.
+
+  Lemma accumulate_padding_spec : forall offset ta acc,
+      fst (accumulate_padding offset ta acc) = tapad ta offset
+      /\ N.of_nat (length (snd (accumulate_padding offset ta acc)))
+         = (N.of_nat (length acc) + (tapad ta offset - offset))%N.
+  Proof.
+    intros offset [a|] acc; cbn; [| split; [reflexivity | lia]].
+    unfold pad_to; split; [reflexivity |].
+    rewrite accumulate_poison_bytes_length; lia.
+  Qed.
+
+  Lemma accumulate_padding_bytes_spec : forall offset n acc,
+      fst (accumulate_padding_bytes offset n acc) = (offset + n)%N
+      /\ N.of_nat (length (snd (accumulate_padding_bytes offset n acc)))
+         = (N.of_nat (length acc) + n)%N.
+  Proof.
+    intros offset n acc; unfold accumulate_padding_bytes; cbn.
+    rewrite accumulate_poison_bytes_length; split; [reflexivity | lia].
+  Qed.
+
+  Lemma acc_memory_bytes_of_dvalue_base_spec : forall dtb dv offset acc,
+      fst (acc_memory_bytes_of_dvalue_base dtb dv offset acc)
+      = (store_size_dtyp (DTYPE_Base dtb) + offset)%N
+      /\ N.of_nat (length (snd (acc_memory_bytes_of_dvalue_base dtb dv offset acc)))
+         = (N.of_nat (length acc) + store_size_dtyp (DTYPE_Base dtb))%N.
+  Proof.
+    intros dtb dv offset acc; unfold acc_memory_bytes_of_dvalue_base; cbn.
+    rewrite rev_loop_acc_length; split; [reflexivity | lia].
+  Qed.
+
+  (** Unfolding equations for the non-loop branches of the serializer.  Used
+      instead of [cbn], which reduces the helpers away and leaves a goal that
+      no longer mentions them. *)
+  (* Top-level copies of the two loops that [acc_dvalue_to_memory_bytes_h]
+     defines locally, abstracted over the recursive call [ser] so that they
+     can be reasoned about by induction.  Everything the local loops capture
+     ([tail_align], [pad], the element type and its padding) is a section
+     variable, so each [Fixpoint] elaborates to a [fix] over exactly the
+     arguments the local one takes -- which is what makes the [ser_*_unfold]
+     equations below hold by [reflexivity]. *)
+  Section SerStructLoop.
+    Variable ser : dtyp -> dvalue -> N -> option N -> list memory_byte ->
+                   EOU (N * list memory_byte).
+    Variable tail_align : option N.
+    Variable pad : option N.
+
+    Fixpoint struct_bytes_loop (fields : list dvalue) (types : list dtyp)
+      (offset : N) (acc : list memory_byte) {struct fields}
+      : EOU (N * list memory_byte) :=
+      match fields, types with
+      | [], [] =>
+          let '(offset, acc) := accumulate_padding offset pad acc in
+          ret (accumulate_padding offset tail_align acc)
+      | f::fs, dt::dts =>
+          let a := preferred_alignment (dtyp_alignment dt) in
+          let ssz := store_size_dtyp dt in
+          let asz := alloc_size_dtyp dt in
+          let '(offset, acc) :=
+            accumulate_padding offset (if pad then Some a else None) acc in
+          '(coff, bs) <- ser dt f 0%N None acc ;;
+          let '(offset'', bs') :=
+            accumulate_padding_bytes (offset + coff)%N (asz - ssz) bs in
+          struct_bytes_loop fs dts offset'' bs'
+      | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
+      end.
+  End SerStructLoop.
+
+  Section SerArrayLoop.
+    Variable ser : dtyp -> dvalue -> N -> option N -> list memory_byte ->
+                   EOU (N * list memory_byte).
+    Variable tail_align : option N.
+    Variable dt : dtyp.
+    Variable elt_pad : N.
+
+    Fixpoint array_bytes_loop (elts : list dvalue) (offset : N)
+      (acc : list memory_byte) {struct elts} : EOU (N * list memory_byte) :=
+      match elts with
+      | [] => ret (accumulate_padding offset tail_align acc)
+      | e::es =>
+          '(coff, bs) <- ser dt e 0%N None acc ;;
+          let '(offset'', bs') :=
+            accumulate_padding_bytes (offset + coff)%N elt_pad bs in
+          array_bytes_loop es offset'' bs'
+      end.
+  End SerArrayLoop.
+
+  Lemma ser_struct_unfold : forall packed dts p fields offset ta acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Struct packed dts)
+        (DVALUE_Struct p fields) offset ta acc =
+        struct_bytes_loop acc_dvalue_to_memory_bytes_h ta
+          (if packed then None else Some (max_preferred_dtyp_alignment dts))
+          fields dts offset acc.
+  Proof. reflexivity. Qed.
+
+  Lemma ser_array_unfold : forall vec sz t p elts offset ta acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Array vec sz t)
+        (DVALUE_Array p elts) offset ta acc =
+        array_bytes_loop acc_dvalue_to_memory_bytes_h ta t
+          (if vec then 0%N else (alloc_size_dtyp t - store_size_dtyp t)%N)
+          elts offset acc.
+  Proof. reflexivity. Qed.
+
+  Lemma ser_base_unfold : forall dtb dv offset ta acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Base dtb) (DVALUE_Base dv) offset ta acc =
+        let '(offset', bs) := acc_memory_bytes_of_dvalue_base dtb dv offset acc in
+        ret (accumulate_padding offset' ta bs).
+  Proof. reflexivity. Qed.
+
+  Lemma ser_struct_poison_unfold : forall packed dts offset ta acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Struct packed dts)
+        (DVALUE_Base DVALUE_Poison) offset ta acc =
+        let '(offset', bs) :=
+          accumulate_padding_bytes offset (store_size_dtyp (DTYPE_Struct packed dts)) acc in
+        ret (accumulate_padding offset' ta bs).
+  Proof. reflexivity. Qed.
+
+  Lemma ser_array_poison_unfold : forall vec sz t offset ta acc,
+      acc_dvalue_to_memory_bytes_h (DTYPE_Array vec sz t)
+        (DVALUE_Base DVALUE_Poison) offset ta acc =
+        let '(offset', bs) :=
+          accumulate_padding_bytes offset (store_size_dtyp (DTYPE_Array vec sz t)) acc in
+        ret (accumulate_padding offset' ta bs).
+  Proof. reflexivity. Qed.
+
+  (* Shape of the accumulator invariant: the returned offset says how many
+     bytes were appended to [acc]. *)
+  Definition acc_ok (offset : N) (acc : list memory_byte)
+                    (r : N * list memory_byte) : Prop :=
+    N.of_nat (length (snd r)) = (N.of_nat (length acc) + (fst r - offset))%N
+    /\ (offset <= fst r)%N.
+
+  Lemma tapad_ge : forall ta x, (x <= tapad ta x)%N.
+  Proof. intros [a|] x; cbn; unfold pad_to; lia. Qed.
+
+  Lemma store_le_alloc : forall t, (store_size_dtyp t <= alloc_size_dtyp t)%N.
+  Proof. intros t; unfold alloc_size_dtyp, pad_to_align, pad_to; lia. Qed.
+
+  (** The offset a struct's field loop reaches after one field: align (unpacked
+      only), then advance by the field's *alloc* size.  [fold_left sfe_step]
+      from 0 is [struct_fields_extent] on the nose. *)
+  Definition sfe_step (pad : option N) : N -> dtyp -> N :=
+    fun a t =>
+      (tapad (if pad then Some (preferred_alignment (dtyp_alignment t)) else None) a
+       + alloc_size_dtyp t)%N.
+
+  Lemma struct_bytes_loop_nil : forall ser ta pad offset acc,
+      struct_bytes_loop ser ta pad [] [] offset acc =
+        let '(offset, acc) := accumulate_padding offset pad acc in
+        ret (accumulate_padding offset ta acc).
+  Proof. reflexivity. Qed.
+
+  Lemma struct_bytes_loop_cons : forall ser ta pad f fs dt dts offset acc,
+      struct_bytes_loop ser ta pad (f::fs) (dt::dts) offset acc =
+        let '(offset, acc) :=
+          accumulate_padding offset
+            (if pad then Some (preferred_alignment (dtyp_alignment dt)) else None) acc in
+        '(coff, bs) <- ser dt f 0%N None acc ;;
+        let '(offset'', bs') :=
+          accumulate_padding_bytes (offset + coff)%N
+            (alloc_size_dtyp dt - store_size_dtyp dt)%N bs in
+        struct_bytes_loop ser ta pad fs dts offset'' bs'.
+  Proof. reflexivity. Qed.
+
+  Lemma array_bytes_loop_nil : forall ser ta dt ep offset acc,
+      array_bytes_loop ser ta dt ep [] offset acc =
+        ret (accumulate_padding offset ta acc).
+  Proof. reflexivity. Qed.
+
+  Lemma array_bytes_loop_cons : forall ser ta dt ep e es offset acc,
+      array_bytes_loop ser ta dt ep (e::es) offset acc =
+        '(coff, bs) <- ser dt e 0%N None acc ;;
+        let '(offset'', bs') := accumulate_padding_bytes (offset + coff)%N ep bs in
+        array_bytes_loop ser ta dt ep es offset'' bs'.
+  Proof. reflexivity. Qed.
+
+  (** The property proved by [acc_dvalue_to_memory_bytes_h_spec], named so that
+      the two loop lemmas can take the induction hypothesis as [Forall ser_spec]. *)
+  Definition ser_spec (dv : dvalue) : Prop :=
+    forall dt, dvalue_has_dtyp dv dt ->
+    forall ta acc offset' bs,
+      acc_dvalue_to_memory_bytes_h dt dv 0%N ta acc = raise_ret (offset', bs) ->
+      offset' = tapad ta (store_size_dtyp dt)
+      /\ N.of_nat (length bs) = (N.of_nat (length acc) + offset')%N.
+
+  Ltac cbn_ser H :=
+    cbn -[acc_dvalue_to_memory_bytes_h accumulate_padding accumulate_padding_bytes
+          struct_bytes_loop array_bytes_loop store_size_dtyp alloc_size_dtyp
+          pad_to_align dtyp_alignment preferred_alignment
+          max_preferred_dtyp_alignment] in H.
+
+  Lemma struct_bytes_loop_spec :
+    forall fs ts, Forall2 dvalue_has_dtyp fs ts ->
+      Forall ser_spec fs ->
+      forall pad ta offset acc offset' bs,
+        struct_bytes_loop acc_dvalue_to_memory_bytes_h ta pad fs ts offset acc
+          = raise_ret (offset', bs) ->
+        offset' = tapad ta (tapad pad (fold_left (sfe_step pad) ts offset))
+        /\ N.of_nat (length bs) = (N.of_nat (length acc) + (offset' - offset))%N
+        /\ (offset <= offset')%N.
+  Proof.
+    intros fs ts HF2; induction HF2 as [| f t fs ts Hft HF2 IHl];
+      intros HS pad ta offset acc offset' bs Heq.
+    - rewrite struct_bytes_loop_nil in Heq.
+      destruct (accumulate_padding_spec offset pad acc) as [P1 P2].
+      destruct (accumulate_padding offset pad acc) as [o1 a1]; cbn in P1, P2; subst o1.
+      destruct (accumulate_padding_spec (tapad pad offset) ta a1) as [Q1 Q2].
+      destruct (accumulate_padding (tapad pad offset) ta a1) as [o2 a2];
+        cbn in Q1, Q2; subst o2.
+      cbn_ser Heq; inversion Heq; subst; clear Heq.
+      pose proof (tapad_ge pad offset) as G1.
+      pose proof (tapad_ge ta (tapad pad offset)) as G2.
+      cbn [fold_left]; split; [reflexivity | split; lia].
+    - inversion HS as [| ? ? Hhd Htl]; subst; clear HS.
+      rewrite struct_bytes_loop_cons in Heq.
+      (* leading alignment of the field *)
+      destruct (accumulate_padding_spec offset
+                  (if pad then Some (preferred_alignment (dtyp_alignment t)) else None) acc)
+        as [P1 P2].
+      destruct (accumulate_padding offset
+                  (if pad then Some (preferred_alignment (dtyp_alignment t)) else None) acc)
+        as [o1' a1]; cbn in P1, P2; subst o1'.
+      pose proof (tapad_ge
+                    (if pad then Some (preferred_alignment (dtyp_alignment t)) else None)
+                    offset) as G1.
+      remember (tapad (if pad then Some (preferred_alignment (dtyp_alignment t)) else None)
+                  offset) as o1 eqn:Ho1.
+      (* the field itself, laid out from 0 *)
+      cbn_ser Heq.
+      destruct (acc_dvalue_to_memory_bytes_h t f 0%N None a1)
+        as [ | | | [coff cbs] ] eqn:EF; cbn_ser Heq; try discriminate.
+      destruct (Hhd _ Hft None a1 _ _ EF) as [Ec Elc]; cbn [tapad] in Ec; subst coff.
+      (* pad the field out to its alloc size *)
+      destruct (accumulate_padding_bytes_spec (o1 + store_size_dtyp t)%N
+                  (alloc_size_dtyp t - store_size_dtyp t)%N cbs) as [R1 R2].
+      destruct (accumulate_padding_bytes (o1 + store_size_dtyp t)%N
+                  (alloc_size_dtyp t - store_size_dtyp t)%N cbs) as [o2 a2];
+        cbn in R1, R2; subst o2.
+      pose proof (store_le_alloc t) as SA.
+      assert (EQ : (o1 + store_size_dtyp t + (alloc_size_dtyp t - store_size_dtyp t))%N
+                   = sfe_step pad offset t).
+      { unfold sfe_step; rewrite <- Ho1; lia. }
+      rewrite EQ in Heq.
+      destruct (IHl Htl pad ta _ a2 _ _ Heq) as [Eo [Elen Ele]].
+      cbn [fold_left]; split; [exact Eo | split ].
+      + rewrite Elen, R2, Elc, P2; lia.
+      + lia.
+  Qed.
+
+  Lemma array_bytes_loop_spec :
+    forall elts t, Forall (fun x => dvalue_has_dtyp x t) elts ->
+      Forall ser_spec elts ->
+      forall ta ep offset acc offset' bs,
+        array_bytes_loop acc_dvalue_to_memory_bytes_h ta t ep elts offset acc
+          = raise_ret (offset', bs) ->
+        offset' = tapad ta (offset + N.of_nat (length elts) * (store_size_dtyp t + ep))%N
+        /\ N.of_nat (length bs) = (N.of_nat (length acc) + (offset' - offset))%N
+        /\ (offset <= offset')%N.
+  Proof.
+    intros elts t HT; induction elts as [| e es IHl];
+      intros HS ta ep offset acc offset' bs Heq.
+    - rewrite array_bytes_loop_nil in Heq.
+      destruct (accumulate_padding_spec offset ta acc) as [Q1 Q2].
+      destruct (accumulate_padding offset ta acc) as [o2 a2]; cbn in Q1, Q2; subst o2.
+      cbn_ser Heq; inversion Heq; subst; clear Heq.
+      pose proof (tapad_ge ta offset) as G.
+      split; [f_equal; cbn [length]; lia | split; lia].
+    - inversion HT as [| ? ? Hhd HTtl]; subst; clear HT.
+      inversion HS as [| ? ? Shd Stl]; subst; clear HS.
+      rewrite array_bytes_loop_cons in Heq.
+      cbn_ser Heq.
+      destruct (acc_dvalue_to_memory_bytes_h t e 0%N None acc)
+        as [ | | | [coff cbs] ] eqn:EF; cbn_ser Heq; try discriminate.
+      destruct (Shd _ Hhd None acc _ _ EF) as [Ec Elc]; cbn [tapad] in Ec; subst coff.
+      destruct (accumulate_padding_bytes_spec (offset + store_size_dtyp t)%N ep cbs)
+        as [R1 R2].
+      destruct (accumulate_padding_bytes (offset + store_size_dtyp t)%N ep cbs)
+        as [o2 a2]; cbn in R1, R2; subst o2.
+      destruct (IHl HTtl Stl ta ep _ a2 _ _ Heq) as [Eo [Elen Ele]].
+      split; [| split].
+      + rewrite Eo; f_equal; cbn [length]; lia.
+      + rewrite Elen, R2, Elc; lia.
+      + lia.
+  Qed.
+
+  Lemma acc_dvalue_to_memory_bytes_h_spec :
+    forall dv dt, dvalue_has_dtyp dv dt ->
+    forall ta acc offset' bs,
+      acc_dvalue_to_memory_bytes_h dt dv 0%N ta acc = raise_ret (offset', bs) ->
+      offset' = tapad ta (store_size_dtyp dt)
+      /\ N.of_nat (length bs) = (N.of_nat (length acc) + offset')%N.
+  Proof.
+    intros dv; induction dv using dvalue_ind;
+      intros dt HT ta acc offset' bs Heq.
+    - (* DVALUE_Base: the value's own bytes (or the type's worth of poison
+         bytes at an aggregate type), then the caller's trailing pad. *)
+      assert (POIS : forall n,
+                 let '(o1, a1) := accumulate_padding_bytes 0%N n acc in
+                 let '(o2, a2) := accumulate_padding o1 ta a1 in
+                 o2 = tapad ta n
+                 /\ N.of_nat (length a2) = (N.of_nat (length acc) + o2)%N).
+      { intros n.
+        pose proof (accumulate_padding_bytes_spec 0%N n acc) as [E1 L1].
+        destruct (accumulate_padding_bytes 0%N n acc) as [o1 a1]; cbn in E1, L1.
+        pose proof (accumulate_padding_spec o1 ta a1) as [E2 L2].
+        destruct (accumulate_padding o1 ta a1) as [o2 a2]; cbn in E2, L2.
+        subst o1 o2; split; [reflexivity |].
+        rewrite L2, L1; destruct ta as [a|]; cbn; unfold pad_to; lia. }
+      destruct dt as [dtb | packed dts | vec sz t].
+      + rewrite ser_base_unfold in Heq.
+        pose proof (acc_memory_bytes_of_dvalue_base_spec dtb dv 0%N acc) as [E1 L1].
+        destruct (acc_memory_bytes_of_dvalue_base dtb dv 0%N acc) as [o1 a1];
+          cbn in E1, L1.
+        pose proof (accumulate_padding_spec o1 ta a1) as [E2 L2].
+        destruct (accumulate_padding o1 ta a1) as [o2 a2]; cbn in E2, L2, Heq.
+        inversion Heq; subst.
+        rewrite ?N.add_0_r in *.
+        split; [first [assumption | reflexivity] |].
+        rewrite L2, L1; destruct ta as [a|]; cbn; unfold pad_to; lia.
+      + (* a base value at an aggregate type must be poison
+           ([DVALUE_Poison_typ_agg] is the only applicable constructor) *)
+        inversion HT; subst.
+        rewrite ser_struct_poison_unfold in Heq.
+        specialize (POIS (store_size_dtyp (DTYPE_Struct packed dts))).
+        destruct (accumulate_padding_bytes 0%N
+                    (store_size_dtyp (DTYPE_Struct packed dts)) acc) as [o1 a1].
+        destruct (accumulate_padding o1 ta a1) as [o2 a2]; cbn in Heq.
+        inversion Heq; subst; exact POIS.
+      + inversion HT; subst.
+        rewrite ser_array_poison_unfold in Heq.
+        specialize (POIS (store_size_dtyp (DTYPE_Array vec sz t))).
+        destruct (accumulate_padding_bytes 0%N
+                    (store_size_dtyp (DTYPE_Array vec sz t)) acc) as [o1 a1].
+        destruct (accumulate_padding o1 ta a1) as [o2 a2]; cbn in Heq.
+        inversion Heq; subst; exact POIS.
+    - (* DVALUE_Struct *)
+      inversion HT as [| | pp ffs ddts HF2 |]; subst.
+      rewrite ser_struct_unfold in Heq.
+      destruct (struct_bytes_loop_spec HF2 IH _ _ _ _ Heq) as [Eo [Elen Ele]].
+      split.
+      + rewrite Eo; f_equal.
+        destruct p.
+        * rewrite store_size_dtyp_Packed_struct; reflexivity.
+        * rewrite store_size_dtyp_Struct; reflexivity.
+      + rewrite Elen; lia.
+    - (* DVALUE_Array *)
+      inversion HT as [| | | vv ees ssz eet HNV HFA HLen]; subst.
+      rewrite ser_array_unfold in Heq.
+      destruct (array_bytes_loop_spec HFA IH _ _ _ _ Heq) as [Eo [Elen Ele]].
+      split.
+      + rewrite Eo; f_equal.
+        rewrite HLen, Nnat.N2Nat.id.
+        destruct v.
+        * rewrite store_size_dtyp_vector; cbv beta iota; lia.
+        * rewrite store_size_dtyp_array; cbv beta iota.
+          replace (store_size_dtyp eet + (alloc_size_dtyp eet - store_size_dtyp eet))%N
+            with (alloc_size_dtyp eet)
+            by (pose proof (store_le_alloc eet); lia).
+          reflexivity.
+      + rewrite Elen; lia.
+  Qed.
+
   Lemma dvalue_to_memory_bytes_sizeof :
     forall dt dv tail_align bytes,
       dvalue_has_dtyp dv dt ->
@@ -428,7 +818,16 @@ Section MemoryByte.
         | Some a => pad_to a (store_size_dtyp dt)
         end.
   Proof.
-  Admitted.
+    intros dt dv ta bytes HT.
+    unfold dvalue_to_memory_bytes.
+    destruct (acc_dvalue_to_memory_bytes_h dt dv 0%N ta (@nil memory_byte))
+      as [ | | | [off bs] ] eqn:E;
+      cbn; try discriminate.
+    intros EQ; inversion EQ; subst; clear EQ.
+    destruct (acc_dvalue_to_memory_bytes_h_spec HT ta (@nil memory_byte) E) as [Eo Elen].
+    rewrite rev_append_rev, app_nil_r, length_rev, Elen; cbn.
+    subst off; destruct ta; reflexivity.
+  Qed.
 
 
   (* This function may essentially compute poison, but without a dvalue to embed it into yet.
