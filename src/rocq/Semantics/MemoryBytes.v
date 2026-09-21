@@ -256,11 +256,14 @@ Section MemoryByte.
             ret (accumulate_padding offset tail_align acc)
         | f::fs, dt::dts =>
             let a := preferred_alignment (dtyp_alignment dt) in
+            (* [alloc_size_dtyp] recomputes [store_size_dtyp] internally, so
+               bind both once per field *)
+            let ssz := store_size_dtyp dt in
+            let asz := alloc_size_dtyp dt in
             let '(offset, acc) :=
               accumulate_padding offset (if pad then Some a else None) acc in
             '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
-            let '(offset'', bs') :=
-              accumulate_padding_bytes offset' (alloc_size_dtyp dt - store_size_dtyp dt) bs in
+            let '(offset'', bs') := accumulate_padding_bytes offset' (asz - ssz) bs in
             loop fs dts offset'' bs'
         | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
         end
@@ -268,14 +271,17 @@ Section MemoryByte.
     (* Array elements sit at their alloc size; vector elements are contiguous
        at their store size. *)
     let dvalue_extract_array_bytes (vector : bool) dt :=
+      (* [dt] is fixed for the whole loop, so the per-element tail padding is
+         computed once here rather than at every element (mirrors the reader's
+         [array_elts_to_dvalue]) *)
+      let elt_pad :=
+        if vector then 0%N else (alloc_size_dtyp dt - store_size_dtyp dt)%N in
       fix loop (elts : list dvalue) offset (acc : list memory_byte) {struct elts}  :=
         match elts with
         | [] => ret (accumulate_padding offset tail_align acc)
         | e::es =>
             '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt e offset None acc ;;
-            let '(offset'', bs') :=
-              accumulate_padding_bytes offset'
-                (if vector then 0%N else (alloc_size_dtyp dt - store_size_dtyp dt)%N) bs in
+            let '(offset'', bs') := accumulate_padding_bytes offset' elt_pad bs in
             loop es offset'' bs'
         end
     in
@@ -759,11 +765,13 @@ Section MemoryByte.
             in
             let dbs' := drop padding dbs in
             let start := (offset + padding)%N in
-            let rest_bytes := drop (alloc_size_dtyp dt) dbs' in
-            f <- (if N.leb (start + store_size_dtyp dt) np
+            let ssz := store_size_dtyp dt in
+            let asz := alloc_size_dtyp dt in
+            let rest_bytes := drop asz dbs' in
+            f <- (if N.leb (start + ssz) np
                   then ret (DVALUE_Base DVALUE_Poison)
-                  else memory_bytes_to_dvalue (take (store_size_dtyp dt) dbs') dt) ;;
-            rest <- go (start + alloc_size_dtyp dt) dts rest_bytes ;;
+                  else memory_bytes_to_dvalue (take ssz dbs') dt) ;;
+            rest <- go (start + asz) dts rest_bytes ;;
             ret (f :: rest)
         end
     in
@@ -771,13 +779,14 @@ Section MemoryByte.
        size for vectors; in both cases only the first [store_size_dtyp t] bytes
        of each slot carry the value. *)
     let array_elts_to_dvalue (np : N) (stride : N) (t : dtyp) :=
+      let ssz := store_size_dtyp t in
       fix go (n : nat) (offset : N) (dbs : list memory_byte) : EOU (list dvalue) :=
         match n with
         | O => ret []
         | S n' =>
-            e <- (if N.leb (offset + store_size_dtyp t) np
+            e <- (if N.leb (offset + ssz) np
                   then ret (DVALUE_Base DVALUE_Poison)
-                  else memory_bytes_to_dvalue (take (store_size_dtyp t) dbs) t) ;;
+                  else memory_bytes_to_dvalue (take ssz dbs) t) ;;
             rest <- go n' (offset + stride)%N (drop stride dbs) ;;
             ret (e :: rest)
         end

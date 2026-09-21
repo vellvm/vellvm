@@ -1875,25 +1875,26 @@ Section SerUnfold.
           ret (accumulate_padding offset tail_align acc)
       | f::fs, dt::dts =>
           let a := preferred_alignment (dtyp_alignment dt) in
+          let ssz := store_size_dtyp dt in
+          let asz := alloc_size_dtyp dt in
           let '(offset, acc) :=
             accumulate_padding offset (if pad then Some a else None) acc in
           '(offset', bs) <- acc_dvalue_to_memory_bytes_h dt f offset None acc ;;
-          let '(offset'', bs') :=
-            accumulate_padding_bytes offset' (alloc_size_dtyp dt - store_size_dtyp dt) bs in
+          let '(offset'', bs') := accumulate_padding_bytes offset' (asz - ssz) bs in
           loop fs dts offset'' bs'
       | _, _ => raise_error "type-mismatch: structs / fields have different lengths"
       end.
 
   Definition accumulate_array_bytes (tail_align : option N) (vector : bool) (elt_t : dtyp)
     : list dvalue -> N -> list memory_byte -> EOU (N * list memory_byte) :=
+    let elt_pad :=
+      if vector then 0%N else (alloc_size_dtyp elt_t - store_size_dtyp elt_t)%N in
     fix loop elts (offset : N) (acc : list memory_byte) : EOU (N * list memory_byte) :=
       match elts with
       | [] => ret (accumulate_padding offset tail_align acc)
       | e::es =>
           '(offset', bs) <- acc_dvalue_to_memory_bytes_h elt_t e offset None acc ;;
-          let '(offset'', bs') :=
-            accumulate_padding_bytes offset'
-              (if vector then 0%N else (alloc_size_dtyp elt_t - store_size_dtyp elt_t)%N) bs in
+          let '(offset'', bs') := accumulate_padding_bytes offset' elt_pad bs in
           loop es offset'' bs'
       end.
 
