@@ -616,8 +616,30 @@ Section MemoryByte.
     | _ => false
     end.
   
+  (** [poison_split dbs = (k, rest)] splits [dbs] at its first non-poison
+      byte: [k] is the number of leading all-poison bytes and [rest] is what
+      follows, so [rest = []] exactly when every byte is poison.  Like
+      [forallb] it stops as soon as it sees a non-poison byte.
+
+      This replaces a boolean [all_poison_bytes] test in the deserializer.
+      The same scan then does two jobs: it selects the all-poison fast path,
+      and its index [k] says which fields / array elements lie entirely
+      before the first non-poison byte, so those can be answered with
+      [DVALUE_Poison] by arithmetic instead of being re-scanned. *)
+  Fixpoint poison_split (dbs : list memory_byte) : N * list memory_byte :=
+    match dbs with
+    | [] => (0%N, [])
+    | b :: rest =>
+        if is_all_poison_byte b
+        then let '(k, tl) := poison_split rest in ((1 + k)%N, tl)
+        else (0%N, b :: rest)
+    end.
+
   Definition all_poison_bytes (bytes : list memory_byte) : bool :=
-    List.forallb is_all_poison_byte bytes.
+    match snd (poison_split bytes) with
+    | [] => true
+    | _ :: _ => false
+    end.
   
   Definition memory_bytes_to_dvalue_base (dbs : list memory_byte) (dt : dtyp_base) : EOU dvalue_base :=
     match dt with
@@ -668,7 +690,7 @@ Section MemoryByte.
         if all_poison_bytes dbs then
           ret DVALUE_Poison
         else
-        (* otherwise at least one is non-poision *)
+        (* otherwise at least one is non-poison *)
         dv <- memory_bytes_to_byte_value sz dbs ;;
         ret (@DVALUE_B _ sz dv)
     end.
@@ -717,7 +739,10 @@ Section MemoryByte.
       Pinning down "<dv' agrees with dv>" is the open part of this model.
    *)
   Fixpoint memory_bytes_to_dvalue (dbs : list memory_byte) (dt : dtyp) : EOU dvalue :=
-    let list_memory_bytes_to_dvalue (pad : option N) :=
+    (* [np] is the index of the first non-poison byte of the *whole* aggregate.
+       A field or element lying entirely below it is poison, so it is answered
+       directly rather than reconstructed. *)
+    let list_memory_bytes_to_dvalue (np : N) (pad : option N) :=
       fix go (offset : N) dts dbs :=
         match dts with
         | [] =>
@@ -733,43 +758,54 @@ Section MemoryByte.
               else 0%N
             in
             let dbs' := drop padding dbs in
-            let init_bytes := take (store_size_dtyp dt) dbs' in
+            let start := (offset + padding)%N in
             let rest_bytes := drop (alloc_size_dtyp dt) dbs' in
-            f <- memory_bytes_to_dvalue init_bytes dt ;;
-            rest <- go (offset + padding + alloc_size_dtyp dt) dts rest_bytes ;;
+            f <- (if N.leb (start + store_size_dtyp dt) np
+                  then ret (DVALUE_Base DVALUE_Poison)
+                  else memory_bytes_to_dvalue (take (store_size_dtyp dt) dbs') dt) ;;
+            rest <- go (start + alloc_size_dtyp dt) dts rest_bytes ;;
             ret (f :: rest)
         end
     in
     (* Array/vector elements: stride is the alloc size for arrays and the store
        size for vectors; in both cases only the first [store_size_dtyp t] bytes
        of each slot carry the value. *)
-    let array_elts_to_dvalue (stride : N) (t : dtyp) :=
-      fix go (n : nat) (dbs : list memory_byte) : EOU (list dvalue) :=
+    let array_elts_to_dvalue (np : N) (stride : N) (t : dtyp) :=
+      fix go (n : nat) (offset : N) (dbs : list memory_byte) : EOU (list dvalue) :=
         match n with
         | O => ret []
         | S n' =>
-            e <- memory_bytes_to_dvalue (take (store_size_dtyp t) dbs) t ;;
-            rest <- go n' (drop stride dbs) ;;
+            e <- (if N.leb (offset + store_size_dtyp t) np
+                  then ret (DVALUE_Base DVALUE_Poison)
+                  else memory_bytes_to_dvalue (take (store_size_dtyp t) dbs) t) ;;
+            rest <- go n' (offset + stride)%N (drop stride dbs) ;;
             ret (e :: rest)
         end
     in
     match dt with
     | DTYPE_Base dt => DVALUE_Base <$> (memory_bytes_to_dvalue_base dbs dt)
 
-    | DTYPE_Array true sz t =>
-        (* vector: contiguous elements *)
-        elts <- array_elts_to_dvalue (store_size_dtyp t) t (N.to_nat sz) dbs ;;
-        ret (DVALUE_Array true elts)
+    | DTYPE_Array vector sz t =>
+        (* An all-poison aggregate canonicalises to [DVALUE_Poison] rather than
+           to an aggregate of poisons -- the same treatment [DTYPE_B] already
+           gets in [memory_bytes_to_dvalue_base]. *)
+        let '(np, rest) := poison_split dbs in
+        match rest with
+        | [] => ret (DVALUE_Base DVALUE_Poison)
+        | _ :: _ =>
+            let stride := if vector then store_size_dtyp t else alloc_size_dtyp t in
+            elts <- array_elts_to_dvalue np stride t (N.to_nat sz) 0%N dbs ;;
+            ret (DVALUE_Array vector elts)
+        end
 
-    | DTYPE_Array false sz t =>
-        elts <- array_elts_to_dvalue (alloc_size_dtyp t) t (N.to_nat sz) dbs ;;
-        ret (DVALUE_Array false elts)
-
-    | DTYPE_Struct false fields =>
-        (DVALUE_Struct false) <$> (list_memory_bytes_to_dvalue (Some (max_preferred_dtyp_alignment fields)) 0 fields dbs)
-                     
-    | DTYPE_Struct true fields =>
-        (DVALUE_Struct true) <$> (list_memory_bytes_to_dvalue None 0 fields dbs)
+    | DTYPE_Struct packed fields =>
+        let '(np, rest) := poison_split dbs in
+        match rest with
+        | [] => ret (DVALUE_Base DVALUE_Poison)
+        | _ :: _ =>
+            let pad := if packed then None else Some (max_preferred_dtyp_alignment fields) in
+            (DVALUE_Struct packed) <$> (list_memory_bytes_to_dvalue np pad 0%N fields dbs)
+        end
     end.
 
 End MemoryByte.

@@ -1335,11 +1335,29 @@ Proof.
   now apply I2F_all_poison_bits.
 Qed.
 
+(* Related byte lists split at the same place, and the two suffixes stay
+   related.  [all_poison_bytes] is now a projection of this. *)
+Lemma I2F_poison_split dbs dbs' :
+  Forall2 I2F_memory_byte dbs dbs' ->
+  fst (poison_split dbs) = fst (poison_split dbs')
+  /\ Forall2 I2F_memory_byte (snd (poison_split dbs)) (snd (poison_split dbs')).
+Proof.
+  intros F; induction F as [| b b' bs bs' HB F IH]; [split; cbn; auto |].
+  cbn [poison_split].
+  erewrite I2F_is_all_poison_byte by eauto.
+  destruct (is_all_poison_byte b') eqn:E.
+  - destruct IH as [E1 F1].
+    destruct (poison_split bs) as [k1 t1], (poison_split bs') as [k2 t2].
+    cbn in E1, F1 |- *; split; [now rewrite E1 | assumption].
+  - split; cbn; auto.
+Qed.
+
 Lemma I2F_all_poison_bytes dbs dbs' :
   Forall2 I2F_memory_byte dbs dbs' -> all_poison_bytes dbs = all_poison_bytes dbs'.
 Proof.
-  intros F; unfold all_poison_bytes; induction F; cbn; auto.
-  erewrite I2F_is_all_poison_byte by eauto; now rewrite IHF.
+  intros F; unfold all_poison_bytes.
+  destruct (I2F_poison_split F) as [_ FS].
+  destruct FS; reflexivity.
 Qed.
 
 (** ** Branch alignment
@@ -1557,136 +1575,6 @@ Proof.
     now constructor.
 Qed.
 
-(** Deserialization: related byte lists deserialize to related values;
-      aggregates recurse through the [Forall2] list combinators. *)
-Lemma I2F_memory_bytes_to_dvalue : forall t dbs dbs',
-    Forall2 I2F_memory_byte dbs dbs' ->
-    I2F_EOU I2F_dvalue
-      (@memory_bytes_to_dvalue PInf dbs t)
-      (@memory_bytes_to_dvalue PFin dbs' t).
-Proof.
-  intros t; induction t using dtyp_ind; intros dbs dbs' F.
-  - (* DTYPE_Base *)
-    cbn.
-    eapply I2F_EOU_bind;
-      [apply I2F_memory_bytes_to_dvalue_base; auto|].
-    intros; do 2 constructor; auto.
-  - (* DTYPE_Struct: [cbn] normalizes both sides' paddings to the same
-         terms (the alignment payload is only tested for [Some]-ness, so
-         it reduces away entirely); both flavours then run the same
-         lockstep loop induction *)
-    destruct p; cbn.
-    + match goal with
-      | |- context [?L 0%N fields dbs] => set (goL := L)
-      end.
-      match goal with
-      | |- context [?R 0%N fields dbs'] => set (goR := R)
-      end.
-      assert (GO : forall offset xs ys,
-                 Forall2 I2F_memory_byte xs ys ->
-                 I2F_EOU (Forall2 I2F_dvalue)
-                   (goL offset fields xs) (goR offset fields ys)).
-      { clear F.
-        match goal with
-        | IHu : forall u, In u fields -> _ |- _ => revert IHu
-        end.
-        induction fields as [| u fs IHf]; intros IH offset xs ys F.
-        - unfold goL, goR; cbn; repeat constructor.
-        - unfold goL, goR; cbn; fold goL; fold goR.
-          eapply I2F_EOU_bind;
-            [ apply IH; [now left | apply Forall2_take, Forall2_drop; auto] |].
-          intros f1 f2 Hf.
-          eapply I2F_EOU_bind;
-            [ apply IHf;
-              [ intros u0 IN; apply IH; now right
-              | apply Forall2_drop, Forall2_drop; auto ]
-            |].
-          intros r1 r2 Hr.
-          do 2 constructor; auto.
-      }
-      specialize (GO 0%N dbs dbs' F).
-      revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
-        intros m1 m2 GO; destruct GO; cbn; auto.
-    + match goal with
-      | |- context [?L 0%N fields dbs] => set (goL := L)
-      end.
-      match goal with
-      | |- context [?R 0%N fields dbs'] => set (goR := R)
-      end.
-      assert (GO : forall offset xs ys,
-                 Forall2 I2F_memory_byte xs ys ->
-                 I2F_EOU (Forall2 I2F_dvalue)
-                   (goL offset fields xs) (goR offset fields ys)).
-      { clear F.
-        match goal with
-        | IHu : forall u, In u fields -> _ |- _ => revert IHu
-        end.
-        induction fields as [| u fs IHf]; intros IH offset xs ys F.
-        - unfold goL, goR; cbn; repeat constructor.
-        - unfold goL, goR; cbn; fold goL; fold goR.
-          eapply I2F_EOU_bind;
-            [ apply IH; [now left | apply Forall2_take, Forall2_drop; auto] |].
-          intros f1 f2 Hf.
-          eapply I2F_EOU_bind;
-            [ apply IHf;
-              [ intros u0 IN; apply IH; now right
-              | apply Forall2_drop, Forall2_drop; auto ]
-            |].
-          intros r1 r2 Hr.
-          do 2 constructor; auto.
-      }
-      specialize (GO 0%N dbs dbs' F).
-      revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
-        intros m1 m2 GO; destruct GO; cbn; auto.
-  - (* DTYPE_Array / vector: the element loop walks [N.to_nat sz] slots,
-       reading [store_size_dtyp t] bytes from each and advancing by the
-       flavour's stride (alloc size for arrays, store size for vectors).
-       Same [goL]/[goR] treatment as the struct field loop above; the two
-       flavours differ only in that stride, so the scripts coincide. *)
-    cbn.
-    break_match_goal_safe.
-    + (* vector *)
-      match goal with
-      | |- context [?L (N.to_nat sz) dbs] => set (goL := L)
-      end;
-      match goal with
-      | |- context [?R (N.to_nat sz) dbs'] => set (goR := R)
-      end;
-      assert (GO : forall n xs ys,
-                 Forall2 I2F_memory_byte xs ys ->
-                 I2F_EOU (Forall2 I2F_dvalue) (goL n xs) (goR n ys));
-      [ intros n; induction n as [| n IHn]; intros xs ys F0;
-        [ unfold goL, goR; cbn; repeat constructor
-        | unfold goL, goR; cbn; fold goL; fold goR;
-          eapply I2F_EOU_bind; [ apply IHt; now apply Forall2_take |];
-          intros e1 e2 He;
-          eapply I2F_EOU_bind; [ apply IHn; now apply Forall2_drop |];
-          intros r1 r2 Hr; do 2 constructor; auto ]
-      | specialize (GO (N.to_nat sz) dbs dbs' F);
-        revert GO; generalize (goL (N.to_nat sz) dbs) (goR (N.to_nat sz) dbs');
-        intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto ].
-    + (* array *)
-      match goal with
-      | |- context [?L (N.to_nat sz) dbs] => set (goL := L)
-      end;
-      match goal with
-      | |- context [?R (N.to_nat sz) dbs'] => set (goR := R)
-      end;
-      assert (GO : forall n xs ys,
-                 Forall2 I2F_memory_byte xs ys ->
-                 I2F_EOU (Forall2 I2F_dvalue) (goL n xs) (goR n ys));
-      [ intros n; induction n as [| n IHn]; intros xs ys F0;
-        [ unfold goL, goR; cbn; repeat constructor
-        | unfold goL, goR; cbn; fold goL; fold goR;
-          eapply I2F_EOU_bind; [ apply IHt; now apply Forall2_take |];
-          intros e1 e2 He;
-          eapply I2F_EOU_bind; [ apply IHn; now apply Forall2_drop |];
-          intros r1 r2 Hr; do 2 constructor; auto ]
-      | specialize (GO (N.to_nat sz) dbs dbs' F);
-        revert GO; generalize (goL (N.to_nat sz) dbs) (goR (N.to_nat sz) dbs');
-        intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto ].
-Qed.
-
 (* The two models share their [Sizeof] instance, but its uses appear
      behind distinct [Params] projections; align them syntactically. *)
 Lemma I2F_store_size_dtyp : forall t,
@@ -1705,6 +1593,193 @@ Lemma I2F_max_alignment : forall ts,
     @max_preferred_dtyp_alignment (@SIZE PInf) ts
     = @max_preferred_dtyp_alignment (@SIZE PFin) ts.
 Proof. reflexivity. Qed.
+
+(** Deserialization: related byte lists deserialize to related values;
+      aggregates recurse through the [Forall2] list combinators. *)
+Lemma I2F_memory_bytes_to_dvalue : forall t dbs dbs',
+    Forall2 I2F_memory_byte dbs dbs' ->
+    I2F_EOU I2F_dvalue
+      (@memory_bytes_to_dvalue PInf dbs t)
+      (@memory_bytes_to_dvalue PFin dbs' t).
+Proof.
+  intros t; induction t using dtyp_ind; intros dbs dbs' F.
+  - (* DTYPE_Base *)
+    cbn.
+    eapply I2F_EOU_bind;
+      [apply I2F_memory_bytes_to_dvalue_base; auto|].
+    intros; do 2 constructor; auto.
+  - (* DTYPE_Struct.  Both sides split at the same index
+       ([I2F_poison_split]), so they agree on the all-poison fast path; after
+       that the field loop runs in lockstep.
+       [destruct p] comes first because it makes the [if p then None else
+       Some ...] padding selector reduce, discarding the
+       [max_preferred_dtyp_alignment fields] payload.  Without that, [goL]
+       below mentions [fields] and the induction on [fields] stops
+       [fold goL] from matching.  The two flavours then have identical
+       scripts. *)
+    destruct p; cbn.
+    + (* packed *)
+      destruct (I2F_poison_split F) as [EN FS].
+      destruct (poison_split dbs) as [np1 r1].
+      destruct (poison_split dbs') as [np2 r2].
+      cbn in EN, FS; subst np2.
+      destruct FS as [| x y xs ys Hxy FS]; cbn.
+      * (* every byte poison: both canonicalise to [DVALUE_Poison] *)
+        repeat constructor.
+      * match goal with
+        | |- context [?L 0%N fields dbs] => set (goL := L)
+        end.
+        match goal with
+        | |- context [?R 0%N fields dbs'] => set (goR := R)
+        end.
+        assert (GO : forall offset us vs,
+                   Forall2 I2F_memory_byte us vs ->
+                   I2F_EOU (Forall2 I2F_dvalue)
+                     (goL offset fields us) (goR offset fields vs)).
+        { clear F.
+          match goal with
+          | IHu : forall u, In u fields -> _ |- _ => revert IHu
+          end.
+          induction fields as [| u fs IHf]; intros IH offset us vs FV.
+          - unfold goL, goR; cbn; repeat constructor.
+          - unfold goL, goR; cbn; fold goL; fold goR.
+            eapply I2F_EOU_bind with (RA := I2F_dvalue).
+            { (* the skip test is the same term on both sides once [cbn] has
+                 reduced the [Sizeof] projections, so one [destruct] serves *)
+              match goal with
+              | |- I2F_EOU _ (if ?c then _ else _) _ => destruct c
+              end.
+              - (* field lies entirely below the first non-poison byte *)
+                repeat constructor.
+              - apply IH; [now left | apply Forall2_take, Forall2_drop; auto]. }
+            intros f1 f2 Hf.
+            eapply I2F_EOU_bind with (RA := Forall2 I2F_dvalue);
+              [ apply IHf;
+                [ intros u0 IN; apply IH; now right
+                | apply Forall2_drop, Forall2_drop; auto ]
+              |].
+            intros s1 s2 Hs.
+            do 2 constructor; auto.
+        }
+        specialize (GO 0%N dbs dbs' F).
+        revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
+          intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto.
+    + (* unpacked *)
+      destruct (I2F_poison_split F) as [EN FS].
+      destruct (poison_split dbs) as [np1 r1].
+      destruct (poison_split dbs') as [np2 r2].
+      cbn in EN, FS; subst np2.
+      destruct FS as [| x y xs ys Hxy FS]; cbn.
+      * (* every byte poison: both canonicalise to [DVALUE_Poison] *)
+        repeat constructor.
+      * match goal with
+        | |- context [?L 0%N fields dbs] => set (goL := L)
+        end.
+        match goal with
+        | |- context [?R 0%N fields dbs'] => set (goR := R)
+        end.
+        assert (GO : forall offset us vs,
+                   Forall2 I2F_memory_byte us vs ->
+                   I2F_EOU (Forall2 I2F_dvalue)
+                     (goL offset fields us) (goR offset fields vs)).
+        { clear F.
+          match goal with
+          | IHu : forall u, In u fields -> _ |- _ => revert IHu
+          end.
+          induction fields as [| u fs IHf]; intros IH offset us vs FV.
+          - unfold goL, goR; cbn; repeat constructor.
+          - unfold goL, goR; cbn; fold goL; fold goR.
+            eapply I2F_EOU_bind with (RA := I2F_dvalue).
+            { (* the skip test is the same term on both sides once [cbn] has
+                 reduced the [Sizeof] projections, so one [destruct] serves *)
+              match goal with
+              | |- I2F_EOU _ (if ?c then _ else _) _ => destruct c
+              end.
+              - (* field lies entirely below the first non-poison byte *)
+                repeat constructor.
+              - apply IH; [now left | apply Forall2_take, Forall2_drop; auto]. }
+            intros f1 f2 Hf.
+            eapply I2F_EOU_bind with (RA := Forall2 I2F_dvalue);
+              [ apply IHf;
+                [ intros u0 IN; apply IH; now right
+                | apply Forall2_drop, Forall2_drop; auto ]
+              |].
+            intros s1 s2 Hs.
+            do 2 constructor; auto.
+        }
+        specialize (GO 0%N dbs dbs' F).
+        revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
+          intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto.
+  - (* DTYPE_Array / vector.  Same shape as the struct case; [destruct v]
+       first so that the [stride] selector reduces. *)
+    destruct v; cbn.
+    + (* vector: contiguous elements *)
+      destruct (I2F_poison_split F) as [EN FS].
+      destruct (poison_split dbs) as [np1 r1].
+      destruct (poison_split dbs') as [np2 r2].
+      cbn in EN, FS; subst np2.
+      destruct FS as [| x y xs ys Hxy FS]; cbn.
+      * repeat constructor.
+      * match goal with
+        | |- context [?L (N.to_nat sz) 0%N dbs] => set (goL := L)
+        end.
+        match goal with
+        | |- context [?R (N.to_nat sz) 0%N dbs'] => set (goR := R)
+        end.
+        assert (GO : forall n offset us vs,
+                   Forall2 I2F_memory_byte us vs ->
+                   I2F_EOU (Forall2 I2F_dvalue) (goL n offset us) (goR n offset vs)).
+        { intros n; induction n as [| n IHn]; intros offset us vs FV.
+          - unfold goL, goR; cbn; repeat constructor.
+          - unfold goL, goR; cbn; fold goL; fold goR.
+            eapply I2F_EOU_bind with (RA := I2F_dvalue).
+            { match goal with
+              | |- I2F_EOU _ (if ?c then _ else _) _ => destruct c
+              end.
+              - (* element lies entirely below the first non-poison byte *)
+                repeat constructor.
+              - apply IHt; now apply Forall2_take. }
+            intros e1 e2 He.
+            eapply I2F_EOU_bind with (RA := Forall2 I2F_dvalue);
+              [ apply IHn; now apply Forall2_drop |].
+            intros w1 w2 Hw; do 2 constructor; auto. }
+        specialize (GO (N.to_nat sz) 0%N dbs dbs' F).
+        revert GO; generalize (goL (N.to_nat sz) 0%N dbs) (goR (N.to_nat sz) 0%N dbs');
+          intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto.
+    + (* array: elements at their alloc size *)
+      destruct (I2F_poison_split F) as [EN FS].
+      destruct (poison_split dbs) as [np1 r1].
+      destruct (poison_split dbs') as [np2 r2].
+      cbn in EN, FS; subst np2.
+      destruct FS as [| x y xs ys Hxy FS]; cbn.
+      * repeat constructor.
+      * match goal with
+        | |- context [?L (N.to_nat sz) 0%N dbs] => set (goL := L)
+        end.
+        match goal with
+        | |- context [?R (N.to_nat sz) 0%N dbs'] => set (goR := R)
+        end.
+        assert (GO : forall n offset us vs,
+                   Forall2 I2F_memory_byte us vs ->
+                   I2F_EOU (Forall2 I2F_dvalue) (goL n offset us) (goR n offset vs)).
+        { intros n; induction n as [| n IHn]; intros offset us vs FV.
+          - unfold goL, goR; cbn; repeat constructor.
+          - unfold goL, goR; cbn; fold goL; fold goR.
+            eapply I2F_EOU_bind with (RA := I2F_dvalue).
+            { match goal with
+              | |- I2F_EOU _ (if ?c then _ else _) _ => destruct c
+              end.
+              - (* element lies entirely below the first non-poison byte *)
+                repeat constructor.
+              - apply IHt; now apply Forall2_take. }
+            intros e1 e2 He.
+            eapply I2F_EOU_bind with (RA := Forall2 I2F_dvalue);
+              [ apply IHn; now apply Forall2_drop |].
+            intros w1 w2 Hw; do 2 constructor; auto. }
+        specialize (GO (N.to_nat sz) 0%N dbs dbs' F).
+        revert GO; generalize (goL (N.to_nat sz) 0%N dbs) (goR (N.to_nat sz) 0%N dbs');
+          intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto.
+Qed.
 
 Lemma length_take {A B} (l : list A) (l' : list B) n :
   length l = length l' -> length (take n l) = length (take n l').
