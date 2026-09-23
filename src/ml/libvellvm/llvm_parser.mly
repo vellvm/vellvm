@@ -216,6 +216,11 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_ALIGNSTACK
 %token KW_ALLOCALIGN
 %token KW_ALLOCPTR
+%token KW_CAPTURES
+%token KW_ADDRESS
+%token KW_ADDRESS_IS_NULL
+%token KW_PROVENANCE
+%token KW_READ_PROVENANCE
 
 (* Function Attributes *)
 (* %token KW_ALIGNSTACK *)
@@ -1221,6 +1226,21 @@ param_attr:
   | KW_DEADONUNWIND                      { PARAMATTR_Dead_on_unwind            }
   | KW_RANGE LPAREN t=typ a=INTEGER COMMA b=INTEGER RPAREN { PARAMATTR_Range(t, a, b) }
   | KW_INITIALIZES LPAREN l=separated_list(csep, int_pair) RPAREN { PARAMATTR_Initializes(l) }
+  | KW_CAPTURES LPAREN l=capture_group RPAREN { PARAMATTR_Captures(l) }
+
+capture_group:
+  | KW_NONE { ([], []) }
+  | l=separated_list(csep, capture_component) r=capture_group_ret { (l, r) }
+
+capture_component:
+  | KW_ADDRESS { str "address" }
+  | KW_ADDRESS_IS_NULL {str "address_is_null" }
+  | KW_PROVENANCE { str "provenance" }
+  | KW_READ_PROVENANCE { str "read_provenance" }
+
+capture_group_ret:
+  | (* empty *) { [] }
+  | KW_RET COLON l=separated_list(csep, capture_component) { l }
 
 int_pair:
   | LPAREN i1=INTEGER COMMA i2=INTEGER RPAREN { (i1, i2) }

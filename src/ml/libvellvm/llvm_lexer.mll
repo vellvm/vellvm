@@ -214,6 +214,11 @@
   ("alignstack"                   , KW_ALIGNSTACK);
   ("allocalign"                   , KW_ALLOCALIGN);
   ("allocptr"                     , KW_ALLOCPTR);
+  ("captures"                     , KW_CAPTURES);
+  ("address"                      , KW_ADDRESS);
+  ("address_is_null"              , KW_ADDRESS_IS_NULL);
+  ("provenance"                   , KW_PROVENANCE);
+  ("read_provenance"              , KW_READ_PROVENANCE);
 
 (* Function Attributes *)
   ("allockind"                    , KW_ALLOCKIND);

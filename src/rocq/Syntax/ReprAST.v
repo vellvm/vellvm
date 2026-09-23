@@ -569,6 +569,7 @@ Section ReprInstances.
     | PARAMATTR_Dead_on_unwind => "PARAMATTR_Dead_on_unwind"
     | PARAMATTR_Range t a b => "(PARAMATTR_Range " ++ repr t ++ " " ++ repr a ++ " " ++ repr b ++ ")"
     | PARAMATTR_Initializes l => "(PARAMATTR_Initializes " ++ repr l ++ ")"
+    | PARAMATTR_Captures p => "(PARAMATTR_Captures " ++ repr p ++ ")"
     end.
 
   #[global]

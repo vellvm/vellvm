@@ -200,6 +200,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Dead_on_unwind      
 | PARAMATTR_Range (t : typ) (a b : int_syntax)
 | PARAMATTR_Initializes (l : list (int_syntax * int_syntax))
+| PARAMATTR_Captures (p : (list string) * (list string))
 .
 
 Variant frame_pointer_val : Set :=

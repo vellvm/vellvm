@@ -303,6 +303,14 @@ Section ShowInstances.
   Definition dshow_pair_list {A} `{Show A} (l:list (A*A)) : DString :=
     dconcat (sd ", ") (List.map (fun x => sd (show x)) l).
 
+  Definition dshow_capture (p : ((list string) * (list string))) : DString :=
+    match p with
+    | ([], []) => sd "none"
+    | (l, []) => (dconcat (sd ", ") (List.map sd l))
+    | (l, r) => (dconcat (sd ", ") (List.map sd l)) @@ (sd " ret:") @@
+                 (dconcat (sd ", ") (List.map sd r))
+    end.
+  
   Definition show_param_attr (p : param_attr) : DString :=
     match p with
     | PARAMATTR_Zeroext => sd "zeroext"
@@ -341,6 +349,7 @@ Section ShowInstances.
                                           @@ sd (show a) @@ sd ", " 
                                           @@ sd (show b) @@ sd ")"
     | PARAMATTR_Initializes l => sd "initializes(" @@ (dshow_pair_list l) @@ sd ")"
+    | PARAMATTR_Captures l => sd "captures(" @@ (dshow_capture l) @@ sd ")"                                   
     end.
 
   #[global] Instance dshowParamAttr : DShow param_attr
