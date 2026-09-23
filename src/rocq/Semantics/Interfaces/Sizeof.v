@@ -157,6 +157,35 @@ Class SizeofTheory {S : Sizeof} : Prop :=
     store_size_dtyp_i8 :
     store_size_dtyp (DTYPE_Base (DTYPE_I 8)) = 1%N;
 
+    (** A base type occupies whole bytes, as many as its bit width needs.
+
+        Nothing above ties a base type's store size to its width, but the
+        deserializer's bit arithmetic is keyed to exactly that: [DTYPE_I sz]
+        splits on [sz mod 8] to decide whether the last byte is mixed, and
+        [memory_byte_of_dvalue_bv] pads it accordingly.  Without these laws
+        the writer and reader cannot be shown to invert each other
+        ([read_base_block] in MemoryBytes.v). *)
+    store_size_dtyp_int :
+    forall sz, store_size_dtyp (DTYPE_Base (DTYPE_I sz)) = ((Npos sz + 7) / 8)%N;
+
+    store_size_dtyp_bytes :
+    forall sz, store_size_dtyp (DTYPE_Base (DTYPE_B sz)) = ((Npos sz + 7) / 8)%N;
+
+    store_size_dtyp_float :
+    store_size_dtyp (DTYPE_Base (DTYPE_FP FP_float)) = 4%N;
+
+    store_size_dtyp_double :
+    store_size_dtyp (DTYPE_Base (DTYPE_FP FP_double)) = 8%N;
+
+    (** Pointers occupy at least one byte.  Needed so that a poison pointer
+        serializes to a non-empty run: an empty byte list would read back as
+        a concrete zero rather than poison. *)
+    store_size_dtyp_ptr_pos :
+    (0 < store_size_dtyp (DTYPE_Base DTYPE_Pointer))%N;
+
+    store_size_dtyp_iptr_pos :
+    (0 < store_size_dtyp (DTYPE_Base DTYPE_Iptr))%N;
+
     (** A non-packed struct is self-aligned: its store size already includes
         the tail padding, so it coincides with its alloc size.  This is what
         makes laying out consecutive structs by store size correct, and what

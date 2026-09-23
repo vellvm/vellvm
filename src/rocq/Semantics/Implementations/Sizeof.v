@@ -198,6 +198,18 @@ Proof.
   now apply H.
 Qed.
 
+(* [round_up_to_eight n / 8] is ceiling division by 8, which is how the
+   interface states a base type's byte count. *)
+Lemma round_up_to_eight_div : forall n,
+    (0 < n)%N -> (round_up_to_eight n / 8 = (n + 7) / 8)%N.
+Proof.
+  intros n H; unfold round_up_to_eight.
+  destruct (N.eqb_spec 0 n); [lia |].
+  rewrite N.div_mul by lia.
+  replace (n + 7)%N with ((n - 1) + 1 * 8)%N by lia.
+  rewrite N.div_add by lia; reflexivity.
+Qed.
+
 Instance SizeofTheoryV : @SizeofTheory SizeofV.
 Proof.
   (* the size laws hold by computation: [struct_fields_extent] and
@@ -205,6 +217,12 @@ Proof.
      [Store_size_dtyp] *)
   constructor; try reflexivity.
   - lia.
+  - (* [DTYPE_I sz] occupies ceil(sz/8) bytes *)
+    intros sz; cbn [store_size_dtyp SizeofV Store_size_dtyp Sizeof_dtyp_base].
+    apply round_up_to_eight_div; lia.
+  - (* likewise [DTYPE_B sz] *)
+    intros sz; cbn [store_size_dtyp SizeofV Store_size_dtyp Sizeof_dtyp_base].
+    apply round_up_to_eight_div; lia.
   - (* a non-packed struct is self-aligned: its store size already ends in
        [pad_to (max_preferred_dtyp_alignment dts) _] *)
     intros dts.

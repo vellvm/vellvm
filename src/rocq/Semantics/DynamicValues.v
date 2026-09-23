@@ -188,6 +188,65 @@ Section DValue.
     | _ => raise_error "dvalue_to_dvalue_base: got non-base value"
     end.
 
+  Definition is_poison_bit (b : memory_bit) : bool :=
+    match b with
+    | Bit_psn => true
+    | _ => false
+    end.
+
+  (** ** Canonical [dvalue_bv]s
+
+      [memory_bytes_to_byte_value] picks a representation for the bits it
+      reads back: a slice of a pointer if it can, otherwise an integer,
+      otherwise a raw bit list -- and [memory_bytes_to_dvalue_base] answers
+      [DVALUE_Poison] before either if every bit is poison.  A [dvalue_bv] is
+      *canonical* when it is the one that reader would produce, which is what
+      makes serializing and deserializing it the identity.  This formalises
+      the invariant sketched in the comment on [dvalue_bv] above:
+      "[BYTE_Mixed] must _not_ have all pointer bits (otherwise
+      [BYTE_Pointer] is canonical)". *)
+
+  (* [bits] are the consecutive bits [j], [j+1], ... of the one pointer [p] *)
+  Fixpoint all_pointer_bits_from (p : ptr) (j : N) (bits : list memory_bit) : bool :=
+    match bits with
+    | [] => true
+    | Bit_ptr q i :: rest =>
+        (if eq_dec_ptr p q then true else false)
+        && N.eqb i j && all_pointer_bits_from p (1 + j) rest
+    | _ => false
+    end.
+
+  (* ... and they start on a byte boundary, since the reader recognises a
+     pointer slice byte by byte *)
+  Definition is_pointer_bits (bits : list memory_bit) : bool :=
+    match bits with
+    | Bit_ptr p j :: _ => N.eqb (j mod 8) 0 && all_pointer_bits_from p j bits
+    | _ => false
+    end.
+
+  Definition dvalue_bv_canonical {sz : positive} (bv : dvalue_bv sz) : bool :=
+    match bv with
+    | BYTE_I _ => true
+    (* [memory_byte_of_dvalue_bv] starts chunk [i] at byte [(sz * i) / 8] and
+       the reader inverts that with [(k * 8) / sz]; the two agree exactly when
+       [sz] is a whole number of bytes.  (The writer has an open TODO for the
+       other case.) *)
+    | BYTE_Pointer _ _ => N.eqb ((Npos sz) mod 8) 0
+    | BYTE_Mixed bits =>
+        N.eqb (N.of_nat (List.length bits)) (Npos sz)
+                                              (* the invariant [dvalue_bv]'s
+                                                 comment already states *)
+        && negb (is_pointer_bits bits)        (* else [BYTE_Pointer] is canonical *)
+        && existsb is_poison_bit bits         (* else [BYTE_I] is canonical *)
+        && negb (forallb is_poison_bit bits)  (* else [DVALUE_Poison] is canonical *)
+    end.
+
+  Definition dvalue_base_canonical (v : dvalue_base) : bool :=
+    match v with
+    | DVALUE_B _ bv => dvalue_bv_canonical bv
+    | _ => true
+    end.
+
   Definition dvalue_base_has_dtyp_base (v:dvalue_base) (dt:dtyp_base) : bool :=
     match v, dt with
     | DVALUE_Pointer a, DTYPE_Pointer => true
@@ -1244,25 +1303,14 @@ Section DValue.
     | BYTE_Int_sz : forall sz' (x: @bit_int sz), sz = sz' -> dvalue_bv_has_sz sz' (BYTE_I x)
     | BYTE_Mixed_sz bits : forall sz', length bits = (Pos.to_nat sz') -> sz = sz' -> dvalue_bv_has_sz sz' (BYTE_Mixed sz bits).
 
-  (*
-  Variant dvalue_base_has_dtyp_base : dvalue_base -> dtyp_base -> Prop :=
-  | DVALUE_Pointer_typ   : forall a, dvalue_base_has_dtyp_base (DVALUE_Pointer a) DTYPE_Pointer
-  | DVALUE_I_typ      : forall sz x, dvalue_base_has_dtyp_base (@DVALUE_I sz x) (DTYPE_I sz)
-  | DVALUE_Iptr_typ   : forall x, dvalue_base_has_dtyp_base (@DVALUE_Iptr x) DTYPE_Iptr
-  | DVALUE_Double_typ : forall x, dvalue_base_has_dtyp_base (DVALUE_Double x) (DTYPE_FP FP_double)
-  | DVALUE_Float_typ  : forall x, dvalue_base_has_dtyp_base (DVALUE_Float x) (DTYPE_FP FP_float)
-  | DVALUE_None_typ   : dvalue_base_has_dtyp_base DVALUE_None DTYPE_Void
-  | DVALUE_Poison_typ : forall τ, NO_VOID_base τ -> dvalue_base_has_dtyp_base DVALUE_Poison τ
-  | DVALUE_B_typ      : forall sz bv, dvalue_bv_has_sz sz bv ->
-                                   dvalue_base_has_dtyp_base (@DVALUE_B sz bv) (DTYPE_B sz)
-  .*)
   
-  (* Poison not included because of concretize *)
   Unset Elimination Schemes.
   Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
   | DVALUE_Base_typ :
     forall dv t,
-      dvalue_base_has_dtyp_base dv t = true -> dvalue_has_dtyp (DVALUE_Base dv) (DTYPE_Base t)
+      dvalue_base_has_dtyp_base dv t = true ->
+      dvalue_base_canonical dv = true ->
+      dvalue_has_dtyp (DVALUE_Base dv) (DTYPE_Base t)
 
   | DVALUE_Poison_typ_agg :
     forall t,
@@ -1270,6 +1318,7 @@ Section DValue.
                                                        
   | DVALUE_Struct_typ :
     forall p fields dts,
+      List.forallb dvalue_is_poison fields = false ->
       List.Forall2 dvalue_has_dtyp fields dts ->
       dvalue_has_dtyp (DVALUE_Struct p fields) (DTYPE_Struct p dts)
 
@@ -1277,6 +1326,7 @@ Section DValue.
   | DVALUE_Array_typ :
     forall v xs sz dt,
       NO_VOID dt ->
+      List.forallb dvalue_is_poison xs = false ->      
       Forall (fun x => dvalue_has_dtyp x dt) xs ->
       length xs = (N.to_nat sz) ->
       dvalue_has_dtyp (DVALUE_Array v xs) (DTYPE_Array v sz dt) 

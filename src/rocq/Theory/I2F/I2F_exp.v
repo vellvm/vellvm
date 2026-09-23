@@ -1025,42 +1025,33 @@ Proof.
     destruct n; constructor; auto.
 Qed.    
 
-Lemma I2F_concat_bytes_Z_mixed extra_bits acc dbs dbs' 
-    (H : Forall2 I2F_memory_byte dbs dbs') : 
-    I2F_EOUP Logic.eq (concat_bytes_Z_mixed extra_bits acc dbs) (concat_bytes_Z_mixed extra_bits acc dbs').
+(* [concat_bytes_Z_mixed] now recurses with a positional shift rather than an
+   accumulator, so the induction follows the list directly: the last byte must
+   be a [BYTE_Mixed] (anything else is an error on both sides), and every
+   earlier byte contributes through two binds. *)
+Lemma I2F_concat_bytes_Z_mixed extra_bits : forall dbs dbs',
+    Forall2 I2F_memory_byte dbs dbs' ->
+    I2F_EOUP Logic.eq (concat_bytes_Z_mixed extra_bits dbs)
+                      (concat_bytes_Z_mixed extra_bits dbs').
 Proof.
-  revert acc.
-  induction H; intros.
-  - cbn. constructor; auto.
-  - inversion H; subst.
-    + cbn. inversion H0; subst; auto. 
-    + cbn. inversion H0; subst; auto. 
-      unfold I2F_Addr in H1.
-      destruct p. destruct p'.
-      destruct H1. subst. unfold I2F_Iptr in H1.
-      subst.
-      apply IHForall2.
-    + cbn. inversion H0; subst; auto.
-      * apply (Forall2_take extra_bits) in H1.
-        eapply I2F_EOUP_bind with (RA:=Logic.eq).
-        eapply I2F_EOUP_bind with (RA:=Forall2 Logic.eq).
-        eapply I2F_EOUP_map_monad2 with (RA:=I2F_memory_bit); auto.
-        apply I2F_memory_bit_to_bit.
-        intros. constructor.
-        apply Forall2_eq in H2. subst.
-        reflexivity.
-        intros. subst.
-        constructor. reflexivity.
-      * eapply I2F_EOUP_bind with (RA:=Logic.eq).
-        eapply I2F_EOUP_bind with (RA:=Forall2 Logic.eq).
-        eapply I2F_EOUP_map_monad2 with (RA:=I2F_memory_bit); auto.
-        apply I2F_memory_bit_to_bit.
-        intros. constructor.
-        apply Forall2_eq in H4. subst.
-        reflexivity.
-        intros. subst.
-        eapply IHForall2.
-Qed.        
+  induction dbs as [| x l IH]; intros dbs' H;
+    inversion H as [| ? y ? l' Hxy Hl]; subst.
+  - cbn; constructor; reflexivity.
+  - destruct l as [| d r].
+    + (* the last byte: only [BYTE_Mixed] carries a value *)
+      inversion Hl; subst.
+      destruct Hxy; cbn [concat_bytes_Z_mixed]; try (constructor; fail).
+      apply I2F_memory_bits_to_Z, Forall2_take; assumption.
+    + (* an earlier byte *)
+      inversion Hl as [| ? e ? r' Hde Hr]; subst.
+      rewrite 2 concat_bytes_Z_mixed_cons2.
+      eapply I2F_EOUP_bind with (RA := Logic.eq);
+        [apply I2F_memory_byte_to_Z; assumption |].
+      intros z1 z2 <-.
+      eapply I2F_EOUP_bind with (RA := Logic.eq); [apply IH; assumption |].
+      intros r1 r2 <-.
+      constructor; reflexivity.
+Qed.
 
 Lemma I2F_memory_bytes_to_int (bit_sz : positive) dbs dbs' :
     Forall2 I2F_memory_byte dbs dbs' ->
@@ -1401,20 +1392,16 @@ Section NoCut.
   Proof. destruct mb; try exact I; apply no_cut_memory_bits_to_Z. Qed.
 
   (* One unfolding step; [cbn] would reduce two levels deep. *)
-  Lemma concat_bytes_Z_mixed_cons2 extra acc b d rest :
-    concat_bytes_Z_mixed extra acc (b :: d :: rest) =
-      z <- memory_byte_to_Z b ;; concat_bytes_Z_mixed extra (acc + z)%Z (d :: rest).
-  Proof. destruct b; reflexivity. Qed.
-
-  Lemma no_cut_concat_bytes_Z_mixed extra : forall dbs acc,
-      no_cut (concat_bytes_Z_mixed extra acc dbs).
+  Lemma no_cut_concat_bytes_Z_mixed extra : forall dbs,
+      no_cut (concat_bytes_Z_mixed extra dbs).
   Proof.
-    induction dbs as [| b rest IH]; intros acc; [exact I |].
+    induction dbs as [| b rest IH]; [exact I |].
     destruct rest as [| d rest'].
     - destruct b; try exact I.
-      cbn; apply no_cut_bind_EOUP; [apply no_cut_memory_bits_to_Z | intros; exact I].
+      cbn; apply no_cut_memory_bits_to_Z.
     - rewrite concat_bytes_Z_mixed_cons2.
-      apply no_cut_bind_EOUP; [apply no_cut_memory_byte_to_Z | intros; apply IH].
+      apply no_cut_bind_EOUP; [apply no_cut_memory_byte_to_Z | intros].
+      apply no_cut_bind_EOUP; [apply IH | intros; exact I].
   Qed.
 
   Lemma no_cut_memory_bytes_to_int sz dbs : no_cut (memory_bytes_to_int sz dbs).
@@ -1478,6 +1465,80 @@ Proof.
   apply I2F_get_bits_of_memory_byte_list; auto.
 Qed.
 
+(** The reader's pointer-slice recognition transports across refinement:
+    related bytes answer [pointer_byte_at] identically, so the two sides find
+    the same slice (at the same byte index) or neither does. *)
+Lemma I2F_pointer_byte_at p p' idx mb mb'
+  (HP : I2F_Addr p p')
+  (HB : I2F_memory_byte mb mb') :
+  @pointer_byte_at PInf p idx mb = @pointer_byte_at PFin p' idx mb'.
+Proof.
+  unfold pointer_byte_at.
+  pose proof (I2F_EOUP_valid_pointer_byte p p' idx HP HB) as H.
+  apply I2F_EOUP_no_cut_inv in H;
+    [| apply (@no_cut_valid_pointer_byte PInf)
+     | apply (@no_cut_valid_pointer_byte PFin) ].
+  destruct H as [(b1 & b2 & -> & -> & <-) | [(-> & ->) | (s1 & s2 & -> & ->)]];
+    reflexivity.
+Qed.
+
+Lemma I2F_pointer_slice_from p p' dbs dbs'
+  (HP : I2F_Addr p p')
+  (F : Forall2 I2F_memory_byte dbs dbs') :
+  forall idx, @pointer_slice_from PInf p idx dbs = @pointer_slice_from PFin p' idx dbs'.
+Proof.
+  induction F as [| x y xs ys Hxy F IH]; intros idx; cbn; [reflexivity |].
+  now rewrite (I2F_pointer_byte_at _ _ idx HP Hxy), IH.
+Qed.
+
+Lemma I2F_memory_bytes_to_pointer_slice dbs dbs'
+  (F : Forall2 I2F_memory_byte dbs dbs') :
+  match @memory_bytes_to_pointer_slice PInf dbs,
+        @memory_bytes_to_pointer_slice PFin dbs' with
+  | None, None => True
+  | Some (p, k), Some (p', k') => I2F_Addr p p' /\ k = k'
+  | _, _ => False
+  end.
+Proof.
+  unfold memory_bytes_to_pointer_slice.
+  destruct F as [| x y xs ys Hxy F]; [exact I |].
+  destruct Hxy as [i | p p' n HA | bits bits' HBits]; cbv beta iota; [exact I | |].
+  - (* packed [BYTE_Pointer] head *)
+    assert (FC : Forall2 I2F_memory_byte
+                   (@BYTE_Pointer PInf 8 p n :: xs) (@BYTE_Pointer PFin 8 p' n :: ys)).
+    { constructor; [constructor; assumption | assumption]. }
+    pose proof (I2F_pointer_slice_from _ _ HA FC n) as EQ.
+    (* [rewrite EQ] does not fire: the two sides differ only in the hidden
+       [Params] argument, convertible but not syntactically equal.  Taking the
+       terms out of the goal sidesteps that. *)
+    match goal with
+    | |- context [if ?b1 then Some (p, n) else None] =>
+        match goal with
+        | |- context [if ?b2 then Some (p', n) else None] =>
+            replace b1 with b2 by (symmetry; exact EQ);
+            destruct b2; cbv beta iota; [split; auto | exact I]
+        end
+    end.
+  - (* expanded [BYTE_Mixed] head: only a leading [Bit_ptr] starts a slice *)
+    destruct HBits as [| b b' bs bs' Hb HBs]; cbv beta iota; [exact I |].
+    destruct Hb as [q q' j HA | | ]; cbv beta iota; [| exact I | exact I].
+    assert (FC : Forall2 I2F_memory_byte
+                   (@BYTE_Mixed PInf 8 (@Bit_ptr PInf q j :: bs) :: xs)
+                   (@BYTE_Mixed PFin 8 (@Bit_ptr PFin q' j :: bs') :: ys)).
+    { constructor; [| assumption].
+      constructor.
+      constructor; [constructor; assumption | assumption]. }
+    pose proof (I2F_pointer_slice_from _ _ HA FC (j / 8)%N) as EQ.
+    match goal with
+    | |- context [if ?b1 then Some (q, (j / 8)%N) else None] =>
+        match goal with
+        | |- context [if ?b2 then Some (q', (j / 8)%N) else None] =>
+            replace b1 with b2 by (symmetry; exact EQ);
+            destruct b2; cbv beta iota; [split; auto | exact I]
+        end
+    end.
+Qed.
+
 Lemma I2F_memory_bytes_to_byte_value sz dbs dbs' :
   Forall2 I2F_memory_byte dbs dbs' ->
   I2F_EOU I2F_dvalue_bv
@@ -1485,32 +1546,21 @@ Lemma I2F_memory_bytes_to_byte_value sz dbs dbs' :
     (@memory_bytes_to_byte_value PFin sz dbs').
 Proof.
   intros F.
-  assert (PTR : I2F_EOU I2F_dvalue_bv
-     (match @memory_bytes_to_pointer PInf dbs with
-      | raise_ret (NoPois p) => ret (@BYTE_Pointer PInf sz p 0)
-      | _ => ret (@BYTE_Mixed PInf sz
-                    (rev_append (get_bits_of_memory_byte_list (N.pos sz) dbs []) []))
-      end)
-     (match @memory_bytes_to_pointer PFin dbs' with
-      | raise_ret (NoPois p) => ret (@BYTE_Pointer PFin sz p 0)
-      | _ => ret (@BYTE_Mixed PFin sz
-                    (rev_append (get_bits_of_memory_byte_list (N.pos sz) dbs' []) []))
-      end)).
-  { pose proof (I2F_EOUP_memory_bytes_to_pointer F) as HP.
-    apply I2F_EOUP_no_cut_inv in HP;
-      [| apply (@no_cut_memory_bytes_to_pointer PInf)
-       | apply (@no_cut_memory_bytes_to_pointer PFin) ].
-    destruct HP as [(p1 & p2 & -> & -> & HA) | [(-> & ->) | (s1 & s2 & -> & ->)]]; cbn.
-    - constructor; now constructor.
-    - constructor; now apply I2F_mixed_fallback.
-    - constructor; now apply I2F_mixed_fallback. }
   unfold memory_bytes_to_byte_value.
-  pose proof (I2F_memory_bytes_to_int sz F) as HI.
-  apply I2F_EOUP_no_cut_inv in HI;
-    [| apply (@no_cut_memory_bytes_to_int PInf)
-     | apply (@no_cut_memory_bytes_to_int PFin) ].
-  destruct HI as [(x1 & x2 & -> & -> & <-) | [(-> & ->) | (s1 & s2 & -> & ->)]]; cbn; auto.
-  constructor; constructor.
+  pose proof (I2F_memory_bytes_to_pointer_slice F) as HS.
+  destruct (@memory_bytes_to_pointer_slice PInf dbs) as [[p1 k1] |] eqn:E1;
+    destruct (@memory_bytes_to_pointer_slice PFin dbs') as [[p2 k2] |] eqn:E2;
+    try contradiction.
+  - destruct HS as [HA ->]; constructor; now constructor.
+  - (* neither side is a pointer slice: fall through to the integer attempt *)
+    pose proof (I2F_memory_bytes_to_int sz F) as HI.
+    apply I2F_EOUP_no_cut_inv in HI;
+      [| apply (@no_cut_memory_bytes_to_int PInf)
+       | apply (@no_cut_memory_bytes_to_int PFin) ].
+    destruct HI as [(x1 & x2 & -> & -> & <-) | [(-> & ->) | (s1 & s2 & -> & ->)]]; cbn.
+    + constructor; constructor.
+    + constructor; now apply I2F_mixed_fallback.
+    + constructor; now apply I2F_mixed_fallback.
 Qed.
 
 (** Deserialization at base types: every arm funnels through the shared
@@ -1586,6 +1636,36 @@ Proof. reflexivity. Qed.
 
 (** Deserialization: related byte lists deserialize to related values;
       aggregates recurse through the [Forall2] list combinators. *)
+(** [dvalue_is_poison] is a shallow test, so related values answer it
+    identically; lifting that through [forallb] is what lets the reader's
+    [canonicalize_agg] step commute with refinement. *)
+Lemma I2F_dvalue_is_poison : forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    @dvalue_is_poison PInf v1 = @dvalue_is_poison PFin v2.
+Proof.
+  intros * H; destruct H; [destruct H |..]; auto.
+Qed.
+
+Lemma I2F_forallb_is_poison : forall l1 l2,
+    Forall2 I2F_dvalue l1 l2 ->
+    forallb (@dvalue_is_poison PInf) l1 = forallb (@dvalue_is_poison PFin) l2.
+Proof.
+  induction 1 as [| x y xs ys Hxy H IH]; cbn; auto.
+  now rewrite (I2F_dvalue_is_poison Hxy), IH.
+Qed.
+
+Lemma I2F_canonicalize_agg :
+  forall (mk1 : list (@dvalue PInf) -> @dvalue PInf)
+         (mk2 : list (@dvalue PFin) -> @dvalue PFin) l1 l2,
+    Forall2 I2F_dvalue l1 l2 ->
+    I2F_dvalue (mk1 l1) (mk2 l2) ->
+    I2F_dvalue (@canonicalize_agg PInf mk1 l1) (@canonicalize_agg PFin mk2 l2).
+Proof.
+  intros mk1 mk2 l1 l2 HF HM; unfold canonicalize_agg.
+  rewrite (I2F_forallb_is_poison HF).
+  destruct (forallb (@dvalue_is_poison PFin) l2); auto.
+Qed.
+
 Lemma I2F_memory_bytes_to_dvalue : forall t dbs dbs',
     Forall2 I2F_memory_byte dbs dbs' ->
     I2F_EOU I2F_dvalue
@@ -1596,7 +1676,7 @@ Proof.
   - (* DTYPE_Base *)
     cbn.
     eapply I2F_EOU_bind;
-      [apply I2F_memory_bytes_to_dvalue_base; auto|].
+      [apply I2F_memory_bytes_to_dvalue_base, Forall2_take; auto|].
     intros; do 2 constructor; auto.
   - (* DTYPE_Struct.  Both sides split at the same index
        ([I2F_poison_split]), so they agree on the all-poison fast path; after
@@ -1653,7 +1733,9 @@ Proof.
         }
         specialize (GO 0%N dbs dbs' F).
         revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
-          intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto.
+          intros m1 m2 GO; destruct GO; cbn;
+          first [ constructor; apply I2F_canonicalize_agg; auto
+                | repeat constructor ].
     + (* unpacked *)
       destruct (I2F_poison_split F) as [EN FS].
       destruct (poison_split dbs) as [np1 r1].
@@ -1699,7 +1781,9 @@ Proof.
         }
         specialize (GO 0%N dbs dbs' F).
         revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
-          intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto.
+          intros m1 m2 GO; destruct GO; cbn;
+          first [ constructor; apply I2F_canonicalize_agg; auto
+                | repeat constructor ].
   - (* DTYPE_Array / vector.  Same shape as the struct case; [destruct v]
        first so that the [stride] selector reduces. *)
     destruct v; cbn.
@@ -1735,7 +1819,9 @@ Proof.
             intros w1 w2 Hw; do 2 constructor; auto. }
         specialize (GO (N.to_nat sz) 0%N dbs dbs' F).
         revert GO; generalize (goL (N.to_nat sz) 0%N dbs) (goR (N.to_nat sz) 0%N dbs');
-          intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto.
+          intros m1 m2 GO; destruct GO; cbn;
+          first [ constructor; apply I2F_canonicalize_agg; auto
+                | repeat constructor ].
     + (* array: elements at their alloc size *)
       destruct (I2F_poison_split F) as [EN FS].
       destruct (poison_split dbs) as [np1 r1].
@@ -1768,7 +1854,9 @@ Proof.
             intros w1 w2 Hw; do 2 constructor; auto. }
         specialize (GO (N.to_nat sz) 0%N dbs dbs' F).
         revert GO; generalize (goL (N.to_nat sz) 0%N dbs) (goR (N.to_nat sz) 0%N dbs');
-          intros m1 m2 GO; destruct GO; cbn; repeat constructor; auto.
+          intros m1 m2 GO; destruct GO; cbn;
+          first [ constructor; apply I2F_canonicalize_agg; auto
+                | repeat constructor ].
 Qed.
 
 Lemma length_take {A B} (l : list A) (l' : list B) n :
@@ -1813,20 +1901,18 @@ Proof.
     constructor.
   - unfold memory_byte_of_dvalue_bv.
     constructor. assumption.
-  - unfold memory_byte_of_dvalue_bv.
+  - (* [BYTE_Mixed]: byte [idx] is now uniformly [take 8 (drop (8 * idx) _)],
+       so there is no [idx = 0] special case to split on *)
+    unfold memory_byte_of_dvalue_bv.
     constructor.
     apply Forall2_app.
     apply Forall2_take.
-    destruct ((idx =? 0)%N); auto.
     apply Forall2_drop; auto.
-    apply Forall2_length in H0.    
-    destruct ((idx =? 0)%N).
-    + rewrite (length_take bits bits'); auto.
-      destruct (negb (N.of_nat (Datatypes.length (take 8 bits')) =? 8)%N); auto.
-    + rewrite (length_take (drop _ bits) (drop (8 * N.pred idx) bits')); auto.
-      destruct (negb (N.of_nat (Datatypes.length (take 8 (drop (8 * N.pred idx) bits'))) =? 8)%N).
-      apply Forall2_repeat; auto. constructor.
-      apply length_drop. auto.
+    apply Forall2_length in H0.
+    rewrite (length_take (drop _ bits) (drop (8 * idx) bits')); auto.
+    destruct (negb (N.of_nat (Datatypes.length (take 8 (drop (8 * idx) bits'))) =? 8)%N).
+    apply Forall2_repeat; auto. constructor.
+    apply length_drop. auto.
 Qed.
 
 

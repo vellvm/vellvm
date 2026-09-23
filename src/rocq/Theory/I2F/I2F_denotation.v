@@ -246,12 +246,7 @@ Qed.
 Hint Constructors I2F_dvalue : core.
 Hint Unfold TT : core.
 
-Lemma I2F_dvalue_is_poison : forall v1 v2,
-    I2F_dvalue v1 v2 ->
-    @dvalue_is_poison PInf v1 = @dvalue_is_poison PFin v2.
-Proof.
-  intros * H; destruct H; [destruct H |..]; auto.
-Qed.
+(* [I2F_dvalue_is_poison] now lives in I2F_exp.v, which needs it earlier. *)
 
 (** [select_switch] computes in the parameter-free [EOU block_id]: on
     related selectors and switch tables the two sides are literally

@@ -70,6 +70,144 @@ Fixpoint concat_bytes_Z (bytes : list Z) : Z
          byte + (Z.shiftl (concat_bytes_Z bytes) 8)
      end.
 
+(** ** Bit-level facts for the integer round trip
+
+    [concat_bytes_Z_extract] is the arithmetic core: concatenating the bytes
+    of a value reassembles it modulo the number of bytes taken.
+    [extract_byte_vint_spec] says the writer's byte extraction really is
+    "shift right and take the low 8 bits" -- which at exactly 8 bits holds
+    for a different reason, since [repr 256] is then [0] and Rocq's
+    [_ mod 0] is the identity. *)
+Lemma concat_bytes_Z_extract : forall k v j,
+    concat_bytes_Z (List.map (fun i => ((v / 2 ^ (8 * Z.of_N i)) mod 256)%Z) (Nseq j k))
+    = ((v / 2 ^ (8 * Z.of_N j)) mod 2 ^ (8 * Z.of_nat k))%Z.
+Proof.
+  induction k as [| k IH]; intros v j; cbn [Nseq List.map concat_bytes_Z].
+  - cbn; rewrite Z.mod_1_r; reflexivity.
+  - rewrite IH.
+    rewrite Z.shiftl_mul_pow2 by lia.
+    rewrite N2Z.inj_succ.
+    replace (8 * Z.succ (Z.of_N j))%Z with (8 * Z.of_N j + 8)%Z by lia.
+    rewrite Z.pow_add_r by lia.
+    rewrite <- Z.div_div by (try lia; apply Z.pow_pos_nonneg; lia).
+    replace (Z.of_nat (S k)) with (Z.of_nat k + 1)%Z by lia.
+    replace (8 * (Z.of_nat k + 1))%Z with (8 * Z.of_nat k + 8)%Z by lia.
+    rewrite Z.pow_add_r by lia.
+    replace (2 ^ 8)%Z with 256%Z by reflexivity.
+    rewrite (Z.mul_comm (2 ^ (8 * Z.of_nat k))%Z 256%Z).
+    rewrite (Z.rem_mul_r _ 256 (2 ^ (8 * Z.of_nat k)))
+      by (try lia; apply Z.pow_pos_nonneg; lia).
+    lia.
+Qed.
+
+Lemma two_power_pos_eq : forall p, two_power_pos p = (2 ^ Z.pos p)%Z.
+Proof. intros p; rewrite two_power_pos_equiv; reflexivity. Qed.
+
+Lemma extract_byte_vint_spec : forall sz (x : @bit_int sz) idx,
+    (8 * (Z.of_N idx + 1) <= Z.pos sz)%Z ->
+    extract_byte_vint x idx = ((unsigned x / 2 ^ (8 * Z.of_N idx)) mod 256)%Z.
+Proof.
+  intros sz x idx H.
+  pose proof (unsigned_range x) as [Hlo Hhi].
+  assert (Hm : (@modulus sz = 2 ^ Z.pos sz)%Z)
+    by (rewrite modulus_def; apply two_power_pos_eq).
+  assert (Hpow : (Z.pos sz < 2 ^ Z.pos sz)%Z) by (apply Z.pow_gt_lin_r; lia).
+  unfold extract_byte_vint.
+  cbn [modu shru unsigned repr VInt_Bounded].
+  unfold Integers.modu, Integers.shru.
+  rewrite !unsigned_repr_eq.
+  rewrite (Z.mod_small (Z.of_N idx * 8)) by lia.
+  rewrite Z.shiftr_div_pow2 by lia.
+  replace (Z.of_N idx * 8)%Z with (8 * Z.of_N idx)%Z by lia.
+  rewrite (Z.mod_small (Integers.unsigned x / 2 ^ (8 * Z.of_N idx))).
+  2:{ assert (Hp : (0 < 2 ^ (8 * Z.of_N idx))%Z) by (apply Z.pow_pos_nonneg; lia).
+      assert (Hge1 : (1 <= 2 ^ (8 * Z.of_N idx))%Z)
+        by (replace 1%Z with (2 ^ 0)%Z by reflexivity;
+            apply Z.pow_le_mono_r; lia).
+      split.
+      - apply Z.div_pos; lia.
+      - apply Z.le_lt_trans with (Integers.unsigned x); [| lia].
+        apply Z.div_le_upper_bound; [lia | nia]. }
+  destruct (Z.eq_dec (Z.pos sz) 8) as [E8 | E8].
+  - (* exactly one byte wide: [repr 256] is 0 and [_ mod 0] is the identity *)
+    assert (idx = 0%N) by lia; subst.
+    rewrite E8 in Hm; cbn in Hm.
+    rewrite Hm, Z.mod_same by lia.
+    rewrite Zmod_0_r; reflexivity.
+  - (* wider: [repr 256] is 256 and the outer [mod] is the identity *)
+    assert (H256 : (256 < 2 ^ Z.pos sz)%Z).
+    { apply Z.lt_le_trans with (2 ^ 9)%Z; [cbn; lia |].
+      apply Z.pow_le_mono_r; lia. }
+    rewrite Hm, (Z.mod_small 256) by lia.
+    rewrite Z.mod_small; [reflexivity |].
+    split; [apply Z.mod_pos_bound; lia |].
+    eapply Z.lt_trans; [apply Z.mod_pos_bound; lia | lia].
+Qed.
+
+(** Bit-level analogues of [extract_byte_vint_spec] / [concat_bytes_Z_extract],
+    for the last byte of an integer whose width is not a multiple of 8: the
+    writer stores [sz mod 8] real bits there and pads the rest with poison. *)
+Lemma extract_bit_N_spec : forall v i, (0 <= v)%Z ->
+    Z.of_N (extract_bit_N (Z.to_N v) i) = ((v / 2 ^ Z.of_N i) mod 2)%Z.
+Proof.
+  intros v i Hv; unfold extract_bit_N.
+  rewrite N.shiftr_div_pow2, N2Z.inj_mod, N2Z.inj_div, N2Z.inj_pow, Z2N.id by lia.
+  reflexivity.
+Qed.
+
+Lemma concat_bits_Z_extract : forall n v j,
+    concat_bits_Z (List.map (fun i => ((v / 2 ^ Z.of_N i) mod 2)%Z) (Nseq j n))
+    = ((v / 2 ^ Z.of_N j) mod 2 ^ Z.of_nat n)%Z.
+Proof.
+  induction n as [| n IH]; intros v j; cbn [Nseq List.map concat_bits_Z].
+  - cbn; rewrite Z.mod_1_r; reflexivity.
+  - rewrite IH.
+    rewrite Z.shiftl_mul_pow2 by lia.
+    rewrite N2Z.inj_succ.
+    replace (Z.succ (Z.of_N j)) with (Z.of_N j + 1)%Z by lia.
+    rewrite Z.pow_add_r by lia.
+    rewrite <- Z.div_div by (try lia; apply Z.pow_pos_nonneg; lia).
+    replace (Z.of_nat (S n)) with (Z.of_nat n + 1)%Z by lia.
+    rewrite Z.pow_add_r by lia.
+    replace (2 ^ 1)%Z with 2%Z by reflexivity.
+    rewrite (Z.mul_comm (2 ^ Z.of_nat n)%Z 2%Z).
+    rewrite (Z.rem_mul_r _ 2 (2 ^ Z.of_nat n)) by (try lia; apply Z.pow_pos_nonneg; lia).
+    lia.
+Qed.
+
+(** For [DTYPE_Iptr] and the floats the writer uses [extract_byte_Z], the
+    plain-[Z] sibling of [extract_byte_vint], and the reader recombines with
+    [concat_bytes_Z_vint].  These two lemmas say each is what it looks like. *)
+Lemma extract_byte_Z_spec : forall v idx,
+    extract_byte_Z v idx = ((v / 2 ^ (8 * Z.of_N idx)) mod 256)%Z.
+Proof.
+  intros v idx; unfold extract_byte_Z.
+  rewrite Z.shiftr_div_pow2 by (pose proof (N2Z.is_nonneg idx); lia).
+  replace (Z.of_N idx * 8)%Z with (8 * Z.of_N idx)%Z by lia.
+  reflexivity.
+Qed.
+
+(* the vint-level fold agrees with the Z-level one, modulo the width *)
+Lemma concat_bytes_vint_Z : forall (w : positive) (zs : list Z),
+    (8 < @Integers.modulus w)%Z ->
+    @concat_bytes_vint _ (VInt_Bounded w) (List.map (@Integers.repr w) zs)
+    = Integers.repr (concat_bytes_Z zs).
+Proof.
+  intros w zs H; induction zs as [| z zs IH]; [reflexivity |].
+  cbn [List.map concat_bytes_vint concat_bytes_Z].
+  rewrite IH.
+  cbn [add shl repr unsigned VInt_Bounded].
+  unfold Integers.add, Integers.shl.
+  rewrite (Integers.unsigned_repr_eq 8), (Z.mod_small 8) by lia.
+  apply Integers.eqm_samerepr.
+  apply Integers.eqm_add; [apply Integers.eqm_sym, Integers.eqm_unsigned_repr |].
+  eapply Integers.eqm_trans;
+    [apply Integers.eqm_sym, Integers.eqm_unsigned_repr |].
+  rewrite !Z.shiftl_mul_pow2 by lia.
+  apply Integers.eqm_mult; [| apply Integers.eqm_refl].
+  apply Integers.eqm_sym, Integers.eqm_unsigned_repr.
+Qed.
+
 Section MemoryByte.
   Context {Pa : Params}.
 
@@ -174,8 +312,9 @@ Section MemoryByte.
         else
           BYTE_I (repr (extract_byte_vint x idx))
     | BYTE_Mixed bits =>
-        let suffix := if N.eqb idx 0 then bits else drop (8 * (N.pred idx)) bits in
-        let mbits := take 8 suffix in
+        (* byte [idx] is bits [8*idx .. 8*idx+7]; the old [8 * N.pred idx] made
+           bytes 0 and 1 identical *)
+        let mbits := take 8 (drop (8 * idx) bits) in
         let pad := if negb (N.of_nat (List.length mbits) =? 8) then
                      repeat Bit_psn (8 - (List.length mbits)) else
                      []
@@ -399,27 +538,6 @@ Section MemoryByte.
       development ([write_dvalue] and the bitcast case of [convert]) pass
       [None], so the [Some] case is currently unexercised.
       (Previously named [pad_to], which collides with [Sizeof.pad_to].)
-
-      *** Status: the definition below does NOT yet satisfy the layout law.
-      Measured against [store_size_dtyp] (all values well-typed, [tail_align = None]):
-
-        type                  store_size_dtyp   emitted
-        { i64, i64 }               16          16   ok
-        packed { i32, i64 }        12          12   ok
-        { i32, i64 }               16          12   missing leading padding
-        { i64, i32 }               16          12   missing trailing padding
-        { { i64, i32 }, i8 }       24          13   both, nested
-        [ 2 x { i64, i32 } ]       32          24   2x the element's trailing
-
-      Two independent causes, both in [accumulate_struct_bytes]:
-      (a) the field padding is passed as [acc_dvalue_to_memory_bytes_h]'s
-          [tail_align], so it lands *after* the field rather than before it, and
-          it is a byte count where [accumulate_padding] expects an alignment;
-      (b) the struct's own trailing padding is never emitted -- the [[], []]
-          case pads to the caller's [tail_align] instead of to
-          [max_preferred_dtyp_alignment dts].
-      A third, separate gap: [DVALUE_Base DVALUE_Poison] at an aggregate type is
-      well-typed but raises "type-mismatch non-struct/array value" here.
    *)
   Definition dvalue_to_memory_bytes (dt:dtyp) (dv : dvalue) (tail_align : option N)
     : EOU (list memory_byte) :=
@@ -782,7 +900,7 @@ Section MemoryByte.
         destruct (accumulate_padding o1 ta a1) as [o2 a2]; cbn in Heq.
         inversion Heq; subst; exact POIS.
     - (* DVALUE_Struct *)
-      inversion HT as [| | pp ffs ddts HF2 |]; subst.
+      inversion HT as [| | pp ffs ddts HNP HF2 |]; subst.
       rewrite ser_struct_unfold in Heq.
       destruct (struct_bytes_loop_spec HF2 IH _ _ _ _ Heq) as [Eo [Elen Ele]].
       split.
@@ -792,7 +910,7 @@ Section MemoryByte.
         * rewrite store_size_dtyp_Struct; reflexivity.
       + rewrite Elen; lia.
     - (* DVALUE_Array *)
-      inversion HT as [| | | vv ees ssz eet HNV HFA HLen]; subst.
+      inversion HT as [| | | vv ees ssz eet HNV HNP HFA HLen]; subst.
       rewrite ser_array_unfold in Heq.
       destruct (array_bytes_loop_spec HFA IH _ _ _ _ Heq) as [Eo [Elen Ele]].
       split.
@@ -949,24 +1067,36 @@ Section MemoryByte.
     end.
 
   (* A version of concat_bytes that trims extra bits from the last byte. *)
-  Fixpoint concat_bytes_Z_mixed (extra:N) (acc:Z) (dbs : list memory_byte) : EOUP Z :=
+  (* Like [concat_bytes_Z], but the last byte is mixed and only its low
+     [extra] bits belong to the value; the rest is padding.  Each byte has to
+     be weighted by its position, exactly as [concat_bytes_Z] does -- an
+     unweighted running sum reads [i12 4000] back as 175. *)
+  Fixpoint concat_bytes_Z_mixed (extra:N) (dbs : list memory_byte) : EOUP Z :=
     match dbs with
-    | [] => ret acc
-      (* Special case: the last byte it must be mixed and we ignore the poison part. *)
-    | (BYTE_Mixed bits)::[] =>
-        x <- memory_bits_to_Z (take extra bits) ;;
-        ret (acc + x)%Z
+    | [] => ret 0%Z
+    | (BYTE_Mixed bits)::[] => memory_bits_to_Z (take extra bits)
     | _::[] => raise_error "concat_bytes_Z_mixed - broken invariants for memory bytes"
     | b::rest =>
         z <- memory_byte_to_Z b ;;
-        concat_bytes_Z_mixed extra (acc + z) rest
+        r <- concat_bytes_Z_mixed extra rest ;;
+        ret (z + Z.shiftl r 8)%Z
     end.
   
+  (* one-step unfolding for the recursive case; [cbn] would splice the
+     recursive call in too, leaving no [concat_bytes_Z_mixed] for an
+     induction hypothesis to apply to *)
+  Lemma concat_bytes_Z_mixed_cons2 : forall extra b d rest,
+      concat_bytes_Z_mixed extra (b :: d :: rest) =
+        z <- memory_byte_to_Z b ;;
+        r <- concat_bytes_Z_mixed extra (d :: rest) ;;
+        ret (z + Z.shiftl r 8)%Z.
+  Proof. intros extra b d rest; destruct b; reflexivity. Qed.
+
   Definition memory_bytes_to_int (bit_sz : positive) (dbs : list memory_byte) : EOUP Z :=
     let extra_bits := N.modulo (Npos bit_sz) 8 in
     if negb (N.eqb extra_bits 0) then
       (* we need to deal with padding *)
-      concat_bytes_Z_mixed extra_bits 0 dbs 
+      concat_bytes_Z_mixed extra_bits dbs 
     else
       v <- map_monad (m := EOUP) (memory_byte_to_Z) dbs ;;
       ret (concat_bytes_Z v).
@@ -994,23 +1124,68 @@ Section MemoryByte.
         
     end.
   
-  Definition memory_bytes_to_byte_value (bit_sz : positive) (dbs : list memory_byte) : EOU (@dvalue_bv _ bit_sz) :=
-    match memory_bytes_to_int bit_sz dbs with
-    (* First try to serialize as an integer *)
-    | raise_ret (NoPois x) => ret (BYTE_I (repr x))
-    | _ => match memory_bytes_to_pointer dbs with
-          (* Next try to serialize as a pointer *)            
-          | raise_ret (NoPois p) => ret (BYTE_Pointer bit_sz p 0)
-          | _ => (* otherwise retain as just a list of mixed bits *)
-              ret (BYTE_Mixed bit_sz (rev_append (get_bits_of_memory_byte_list (Npos bit_sz) dbs []) []))
-          end
-    end.
-
-  Definition is_poison_bit (b : memory_bit) : bool :=
-    match b with
-    | Bit_psn => true
+  (* Is [mb] byte number [idx] of pointer [p]?  This is just [valid_pointer_byte]
+     read as a plain predicate: it answers [NoPois] on every byte shape, so the
+     other outcomes can only be [Pois], which is "no". *)
+  Definition pointer_byte_at (p : ptr) (idx : N) (mb : memory_byte) : bool :=
+    match valid_pointer_byte p idx mb with
+    | raise_ret (NoPois b) => b
     | _ => false
     end.
+
+  Fixpoint pointer_slice_from (p : ptr) (idx : N) (dbs : list memory_byte) : bool :=
+    match dbs with
+    | [] => true
+    | b :: rest => pointer_byte_at p idx b && pointer_slice_from p (1+idx) rest
+    end.
+
+  (** Recognise a contiguous run of bytes of a *single* pointer, starting at
+      whatever index the run happens to begin at:
+
+        [BYTE_Pointer 8 p k; BYTE_Pointer 8 p (k+1); ...]
+
+      This is deliberately weaker than [memory_bytes_to_pointer], which
+      reconstructs a *whole* pointer (it requires the run to start at index 0
+      and to span the full pointer width) because that is what a
+      [DTYPE_Pointer] read needs.  A [DTYPE_B] read has the opposite job: it
+      must preserve the byte-level representation, provenance and byte index
+      included, so that storing [p] and reading it back as, say,
+      [<8 x DTYPE_B 8>] yields bytes [0..7] of [p] rather than eight
+      provenance-free integers.  A sub-word slice is representable: bytes
+      [k..k+n-1] read at [DTYPE_B (8*n)] give [BYTE_Pointer (8*n) p k]. *)
+  Definition memory_bytes_to_pointer_slice (dbs : list memory_byte) : option (ptr * N) :=
+    match dbs with
+    | (BYTE_Pointer p k) :: _ =>
+        if pointer_slice_from p k dbs then Some (p, k) else None
+    | (BYTE_Mixed ((Bit_ptr p j) :: _)) :: _ =>
+        let k := (j / 8)%N in
+        if pointer_slice_from p k dbs then Some (p, k) else None
+    | _ => None
+    end.
+
+  Definition memory_bytes_to_byte_value (bit_sz : positive) (dbs : list memory_byte) : EOU (@dvalue_bv _ bit_sz) :=
+    match memory_bytes_to_pointer_slice dbs with
+    (* First try to retain a slice of a pointer, provenance and index intact.
+       This must come before the integer attempt: [memory_byte_to_Z] answers
+       pointer bytes with a concrete address rather than poison, so an
+       integer-first order would strip provenance from every pointer byte. *)
+    | Some (p, k) =>
+        (* [k] is a *byte* index, but [BYTE_Pointer]'s index counts chunks of
+           [bit_sz] bits -- [memory_byte_of_dvalue_bv] writes chunk [i] of a
+           [BYTE_Pointer _ i] starting at byte [(bit_sz * i) / 8].  Invert
+           that here, so reading bytes 4..7 of [p] at [DTYPE_B 32] gives
+           [BYTE_Pointer 32 p 1] rather than [BYTE_Pointer 32 p 4]. *)
+        ret (BYTE_Pointer bit_sz p ((k * 8) / Npos bit_sz))
+    | None =>
+        match memory_bytes_to_int bit_sz dbs with
+        (* then as a plain integer *)
+        | raise_ret (NoPois x) => ret (BYTE_I (repr x))
+        | _ => (* otherwise retain as just a list of mixed bits *)
+            ret (BYTE_Mixed bit_sz (rev_append (get_bits_of_memory_byte_list (Npos bit_sz) dbs []) []))
+        end
+    end.
+
+  (* [is_poison_bit] is defined in DynamicValues.v, next to [dvalue_bv_canonical]. *)
   
   Definition all_poison_bits (bits : list memory_bit) : bool :=
     List.forallb is_poison_bit bits.
@@ -1143,6 +1318,24 @@ Section MemoryByte.
       come back under a different [dvalue_bv] constructor than it went in.
       Pinning down "<dv' agrees with dv>" is the open part of this model.
    *)
+  (* Canonicalising constructor for aggregates: an aggregate all of whose
+     immediate children are poison *is* poison, per [dvalue_has_dtyp].
+
+     The [poison_split] fast path in [memory_bytes_to_dvalue] catches the
+     common case -- every byte poison -- without rebuilding the value, but it
+     is not sufficient on its own.  A single non-poison byte lying in padding,
+     or in the tail of an array slot, leaves [rest] non-empty while every
+     field still reads back as poison; e.g. reading [{i8, i32}] from
+     [[psn; X; psn; psn; psn; psn; psn; psn]] would otherwise yield
+     [DVALUE_Struct false [Poison; Poison]].  Children are canonical by
+     induction, so the shallow [dvalue_is_poison] test is enough here.
+
+     Note this also sends an empty aggregate to poison, which is what the
+     [forallb ... = false] premises of [DVALUE_Struct_typ] / [DVALUE_Array_typ]
+     require. *)
+  Definition canonicalize_agg (mk : list dvalue -> dvalue) (vs : list dvalue) : dvalue :=
+    if forallb dvalue_is_poison vs then DVALUE_Base DVALUE_Poison else mk vs.
+
   Fixpoint memory_bytes_to_dvalue (dbs : list memory_byte) (dt : dtyp) : EOU dvalue :=
     (* [np] is the index of the first non-poison byte of the *whole* aggregate.
        A field or element lying entirely below it is poison, so it is answered
@@ -1191,7 +1384,16 @@ Section MemoryByte.
         end
     in
     match dt with
-    | DTYPE_Base dt => DVALUE_Base <$> (memory_bytes_to_dvalue_base dbs dt)
+    | DTYPE_Base dt =>
+        (* Trim to the type's store size, mirroring the [take ssz _] the
+           aggregate loops below already hand their children.  Each arm of
+           [memory_bytes_to_dvalue_base] consumes its whole input, so without
+           this a base read is the only part of the reader that cannot
+           tolerate a longer buffer: a value written with a [tail_align] would
+           have its trailing padding folded into the value and read back as
+           [DVALUE_Poison].  On an exactly-sized buffer this is the identity. *)
+        DVALUE_Base <$> (memory_bytes_to_dvalue_base
+                           (take (store_size_dtyp (DTYPE_Base dt)) dbs) dt)
 
     | DTYPE_Array vector sz t =>
         (* An all-poison aggregate canonicalises to [DVALUE_Poison] rather than
@@ -1203,7 +1405,7 @@ Section MemoryByte.
         | _ :: _ =>
             let stride := if vector then store_size_dtyp t else alloc_size_dtyp t in
             elts <- array_elts_to_dvalue np stride t (N.to_nat sz) 0%N dbs ;;
-            ret (DVALUE_Array vector elts)
+            ret (canonicalize_agg (DVALUE_Array vector) elts)
         end
 
     | DTYPE_Struct packed fields =>
@@ -1212,9 +1414,2030 @@ Section MemoryByte.
         | [] => ret (DVALUE_Base DVALUE_Poison)
         | _ :: _ =>
             let pad := if packed then None else Some (max_preferred_dtyp_alignment fields) in
-            (DVALUE_Struct packed) <$> (list_memory_bytes_to_dvalue np pad 0%N fields dbs)
+            (canonicalize_agg (DVALUE_Struct packed))
+              <$> (list_memory_bytes_to_dvalue np pad 0%N fields dbs)
         end
     end.
+
+  (** ** Round trip: deserializing a serialization
+
+      Two side conditions, both necessary (each has a checked counterexample):
+
+      - [tail_align] must be [None].  With [Some a] the writer appends poison
+        out to [pad_to a (store_size_dtyp dt)], but the reader is never told
+        [a].  Aggregates ignore trailing bytes (each loop consumes only what
+        its type needs) but base types do not: an [i32] written with [Some 8]
+        reads back as [DVALUE_Poison], because the integer read consumes the
+        four padding bytes too.
+
+      - [dt] must be [serializable].  [memory_bytes_to_dvalue_base] is partial:
+        it raises an error on [DTYPE_Void] and on the floating-point and opaque
+        types it does not implement.  Since poison inhabits *every* type
+        ([DVALUE_Poison_typ_agg]), each of those types has well-typed values -
+        e.g. poison at [DTYPE_FP FP_half], or [DVALUE_None] at [DTYPE_Void] -
+        that the reader cannot produce. *)
+
+  (* [DTYPE_Iptr] is deliberately excluded: it is not an LLVM IR type, and it
+     does not round-trip under the infinite-pointer instance, where [to_Z] is
+     unbounded but the type still occupies only [ptr_size] bytes -- so any
+     value of at least [2 ^ (8 * ptr_size)] is truncated by the writer. *)
+  Definition serializable_base (dt : dtyp_base) : Prop :=
+    match dt with
+    | DTYPE_I _ | DTYPE_Pointer | DTYPE_B _ => True
+    | DTYPE_FP FP_float | DTYPE_FP FP_double => True
+    | _ => False
+    end.
+
+  Fixpoint serializable (dt : dtyp) : Prop :=
+    match dt with
+    | DTYPE_Base dt => serializable_base dt
+    | DTYPE_Struct _ dts => FORALL serializable dts
+    | DTYPE_Array _ _ t => serializable t
+    end.
+
+  Lemma serializable_NO_VOID : forall dt, serializable dt -> NO_VOID dt.
+  Proof.
+    induction dt as [db | pk dts IH | vv sz t IHt];
+      cbn [serializable NO_VOID].
+    - destruct db; cbn; auto; destruct f; cbn; auto.
+    - unfold FORALL; revert IH; induction dts as [| t ts IHts]; cbn; auto.
+      intros IH [Ht Hts]; split.
+      + apply (IH t (or_introl eq_refl)), Ht.
+      + apply IHts; [intros u INu; apply IH; now right | exact Hts].
+    - auto.
+  Qed.
+
+  (** How [poison_split] -- the reader's all-poison fast path -- reacts to
+      extra bytes after the value.  Either the value already has a non-poison
+      byte, in which case the split index is unchanged and the extra bytes
+      just ride along on the tail; or it does not, in which case the scan runs
+      on into the extra bytes.  Together these say the fast path is taken on
+      [w ++ extra] exactly when it is taken on both parts. *)
+  (** The byte generator [acc_memory_bytes_of_dvalue_base] uses, lifted out of
+      its [let] so that proofs can name it.  [acc_base_unfold] says the lift is
+      exact. *)
+  Definition base_byte_gen (dv : dvalue_base) : N -> memory_byte :=
+    match dv with
+    | DVALUE_I sz x => memory_byte_of_dvalue_bv (BYTE_I x)
+    | DVALUE_Iptr x => fun idx => BYTE_I (repr (extract_byte_Z (to_Z x) idx))
+    | DVALUE_Pointer ptr => BYTE_Pointer 8 ptr
+    | DVALUE_Float f => fun idx => BYTE_I (repr (extract_byte_Z (unsigned (Float32.to_bits f)) idx))
+    | DVALUE_Double d => fun idx => BYTE_I (repr (extract_byte_Z (unsigned (Float.to_bits d)) idx))
+    | DVALUE_Poison => fun idx => poison_memory_byte
+    | DVALUE_None => fun idx => poison_memory_byte
+    | DVALUE_B sz bits => memory_byte_of_dvalue_bv bits
+    end.
+
+  Lemma acc_base_unfold : forall dtb dv offset acc,
+      acc_memory_bytes_of_dvalue_base dtb dv offset acc
+      = ((store_size_dtyp (DTYPE_Base dtb) + offset)%N,
+         N.rev_loop_acc (base_byte_gen dv) (store_size_dtyp (DTYPE_Base dtb)) 0 acc).
+  Proof. intros dtb dv offset acc; destruct dv; reflexivity. Qed.
+
+  (** The forward-order block the writer lays down for a base value is
+      [List.map (base_byte_gen dv) (Nseq 0 (N.to_nat (store_size_dtyp _)))];
+      it is spelled out rather than named so that it matches the goal the
+      writer's unfolding produces. *)
+  Lemma base_block_length : forall dtb dv,
+      N.of_nat (length (List.map (base_byte_gen dv)
+                          (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base dtb))))))
+      = store_size_dtyp (DTYPE_Base dtb).
+  Proof.
+    intros dtb dv; rewrite length_map, Nseq_length; apply Nnat.N2Nat.id.
+  Qed.
+
+  (** ** All-poison blocks
+
+      The writer emits padding, and a poison value at an aggregate type, as a
+      run of [poison_memory_byte]; the reader answers any such run with
+      [DVALUE_Poison].  These lemmas turn both sides into [List.repeat]. *)
+
+  Lemma accumulate_poison_bytes_app : forall n acc,
+      accumulate_poison_bytes n acc
+      = List.repeat poison_memory_byte (N.to_nat n) ++ acc.
+  Proof.
+    intros n acc; unfold accumulate_poison_bytes, accumulate_memory_bytes.
+    apply rev_loop_acc_const.
+  Qed.
+
+  Lemma is_all_poison_memory_byte : is_all_poison_byte poison_memory_byte = true.
+  Proof. reflexivity. Qed.
+
+  Lemma poison_split_repeat : forall k,
+      poison_split (List.repeat poison_memory_byte k) = (N.of_nat k, []).
+  Proof.
+    induction k; [reflexivity |].
+    cbn [List.repeat poison_split].
+    rewrite is_all_poison_memory_byte, IHk; cbv beta iota.
+    replace (N.of_nat (S k)) with (1 + N.of_nat k)%N by lia; reflexivity.
+  Qed.
+
+  (* an all-poison buffer reads as [DVALUE_Poison] at any aggregate type *)
+  Lemma read_repeat_poison_agg : forall dt L,
+      match dt with DTYPE_Base _ => False | _ => True end ->
+      memory_bytes_to_dvalue (List.repeat poison_memory_byte L) dt
+      = ret (DVALUE_Base DVALUE_Poison).
+  Proof.
+    intros dt L H; destruct dt as [db | pk dts | vv sz t]; [contradiction | |];
+      cbn [memory_bytes_to_dvalue]; rewrite poison_split_repeat;
+      cbv beta iota; reflexivity.
+  Qed.
+
+  (** ** The poison and pointer blocks
+
+      Poison is uniform across every serializable base type: the writer emits
+      a run of [poison_memory_byte] and each arm of the reader absorbs it.
+      A pointer is laid down as the run [BYTE_Pointer 8 p 0 .. 8 p (k-1)],
+      which is exactly what [valid_pointer_bytes] walks. *)
+
+  Lemma serializable_base_pos : forall dtb,
+      serializable_base dtb -> (0 < store_size_dtyp (DTYPE_Base dtb))%N.
+  Proof.
+    intros dtb H; destruct dtb as [sz | | | | fp | | | | | | sz];
+      cbn in H; try contradiction.
+    - rewrite store_size_dtyp_int; apply N.div_str_pos; lia.
+    - exact store_size_dtyp_ptr_pos.
+    - destruct fp; cbn in H; try contradiction.
+      + rewrite store_size_dtyp_float; lia.
+      + rewrite store_size_dtyp_double; lia.
+    - rewrite store_size_dtyp_bytes; apply N.div_str_pos; lia.
+  Qed.
+
+  Lemma map_monad_EOUP_pois_head : forall {A B} (f : A -> EOUP B) x rest,
+      f x = raise_ret Pois -> map_monad f (x :: rest) = raise_ret Pois.
+  Proof. intros A B f x rest H; cbn; rewrite H; reflexivity. Qed.
+
+  Lemma memory_byte_to_Z_poison : memory_byte_to_Z poison_memory_byte = raise_ret Pois.
+  Proof. reflexivity. Qed.
+
+  Lemma memory_bits_to_Z_poison_cons : forall rest,
+      memory_bits_to_Z (Bit_psn :: rest) = raise_ret Pois.
+  Proof.
+    intros rest; unfold memory_bits_to_Z.
+    rewrite (map_monad_EOUP_pois_head memory_bit_to_bit Bit_psn rest eq_refl).
+    reflexivity.
+  Qed.
+
+  Lemma map_monad_byte_to_Z_poison : forall k, (0 < k)%nat ->
+      map_monad memory_byte_to_Z (List.repeat poison_memory_byte k) = raise_ret Pois.
+  Proof.
+    intros [| k'] H; [lia |]; cbn [List.repeat].
+    apply map_monad_EOUP_pois_head, memory_byte_to_Z_poison.
+  Qed.
+
+  Lemma take_repeat_cons : forall {A} (x : A) n k,
+      (0 < n)%N -> (0 < k)%nat -> exists r, take n (List.repeat x k) = x :: r.
+  Proof.
+    intros A x n [| k'] Hn Hk; [lia |].
+    cbn [List.repeat take].
+    destruct (N.eqb_spec 0 n); [lia |].
+    eexists; reflexivity.
+  Qed.
+
+  Lemma concat_bytes_Z_mixed_poison : forall extra k,
+      (0 < extra)%N -> (0 < k)%nat ->
+      concat_bytes_Z_mixed extra (List.repeat poison_memory_byte k)
+      = raise_ret Pois.
+  Proof.
+    intros extra [| [| k'']] Hx Hk; [lia | |].
+    - (* exactly one byte: the last-byte-mixed path *)
+      cbn [List.repeat]; unfold poison_memory_byte; cbn [concat_bytes_Z_mixed].
+      destruct (@take_repeat_cons _ Bit_psn extra 8 Hx ltac:(lia)) as [r Hr].
+      rewrite Hr, memory_bits_to_Z_poison_cons; reflexivity.
+    - (* two or more: the first byte already poisons the fold *)
+      cbn [List.repeat concat_bytes_Z_mixed].
+      rewrite memory_byte_to_Z_poison; reflexivity.
+  Qed.
+
+  Lemma memory_bytes_to_int_poison : forall sz k,
+      (0 < k)%nat ->
+      memory_bytes_to_int sz (List.repeat poison_memory_byte k) = raise_ret Pois.
+  Proof.
+    intros sz k H; unfold memory_bytes_to_int.
+    destruct (N.eqb_spec (N.modulo (Npos sz) 8) 0) as [E | E]; cbn [negb].
+    - rewrite map_monad_byte_to_Z_poison by exact H; reflexivity.
+    - (* [lia] does not know [N.modulo]; abstract it first *)
+      assert (Hx : (0 < N.pos sz mod 8)%N)
+        by (revert E; generalize (N.pos sz mod 8)%N; intros m Hm; lia).
+      apply concat_bytes_Z_mixed_poison; [exact Hx | exact H].
+  Qed.
+
+  Lemma memory_bytes_to_pointer_poison : forall k, (0 < k)%nat ->
+      memory_bytes_to_pointer (List.repeat poison_memory_byte k) = raise_ret Pois.
+  Proof.
+    intros [| k'] H; [lia |].
+    cbn [List.repeat]; unfold poison_memory_byte, memory_bytes_to_pointer;
+      cbn [List.repeat]; reflexivity.
+  Qed.
+
+  Lemma all_poison_bytes_repeat : forall k,
+      all_poison_bytes (List.repeat poison_memory_byte k) = true.
+  Proof.
+    intros k; unfold all_poison_bytes; rewrite poison_split_repeat; reflexivity.
+  Qed.
+
+  Lemma read_base_block_poison : forall dtb,
+      serializable_base dtb ->
+      memory_bytes_to_dvalue_base
+        (List.repeat poison_memory_byte
+           (N.to_nat (store_size_dtyp (DTYPE_Base dtb)))) dtb
+      = ret DVALUE_Poison.
+  Proof.
+    intros dtb H.
+    assert (Hk : (0 < N.to_nat (store_size_dtyp (DTYPE_Base dtb)))%nat)
+      by (pose proof (serializable_base_pos dtb H); lia).
+    destruct dtb as [sz | | | | fp | | | | | | sz];
+      cbn in H; try contradiction; cbn [memory_bytes_to_dvalue_base].
+    - rewrite memory_bytes_to_int_poison by exact Hk; reflexivity.
+    - rewrite memory_bytes_to_pointer_poison by exact Hk; reflexivity.
+    - destruct fp; cbn in H; try contradiction;
+        rewrite map_monad_byte_to_Z_poison by exact Hk; reflexivity.
+    - rewrite all_poison_bytes_repeat; reflexivity.
+  Qed.
+
+  (** The writer lays a pointer down as the run
+      [BYTE_Pointer 8 p 0, BYTE_Pointer 8 p 1, ...], which is exactly the
+      shape [valid_pointer_bytes] walks; its terminator compares the index
+      reached against [store_size_dtyp (DTYPE_Base DTYPE_Pointer)], which is
+      how many bytes the writer emitted. *)
+  Lemma valid_pointer_bytes_run : forall p n i,
+      valid_pointer_bytes p i (List.map (BYTE_Pointer 8 p) (Nseq i n))
+      = ret (N.eqb (i + N.of_nat n) (store_size_dtyp (DTYPE_Base DTYPE_Pointer))).
+  Proof.
+    intros p; induction n as [| n IH]; intros i;
+      cbn [Nseq List.map valid_pointer_bytes].
+    - replace (i + N.of_nat 0)%N with i by lia; reflexivity.
+    - unfold valid_pointer_byte.
+      destruct (eq_dec_ptr p p) as [_ | NE]; [| now contradiction NE].
+      rewrite N.eqb_refl; cbv beta iota.
+      replace (N.succ i) with (1 + i)%N by lia.
+      rewrite IH.
+      replace (1 + i + N.of_nat n)%N with (i + N.of_nat (S n))%N by lia.
+      reflexivity.
+  Qed.
+
+  Lemma memory_bytes_to_pointer_run : forall p n,
+      (0 < n)%nat ->
+      N.of_nat n = store_size_dtyp (DTYPE_Base DTYPE_Pointer) ->
+      memory_bytes_to_pointer (List.map (BYTE_Pointer 8 p) (Nseq 0 n))
+      = raise_ret (NoPois p).
+  Proof.
+    intros p [| n'] Hn Hsz; [lia |].
+    unfold memory_bytes_to_pointer.
+    cbn [Nseq List.map]; cbv beta iota.
+    change (BYTE_Pointer 8 p 0 :: List.map (BYTE_Pointer 8 p) (Nseq (N.succ 0) n'))
+      with (List.map (BYTE_Pointer 8 p) (Nseq 0 (S n'))).
+    rewrite valid_pointer_bytes_run.
+    replace (0 + N.of_nat (S n'))%N
+      with (store_size_dtyp (DTYPE_Base DTYPE_Pointer)) by lia.
+    rewrite N.eqb_refl; reflexivity.
+  Qed.
+
+  Lemma read_base_block_pointer : forall p,
+      memory_bytes_to_dvalue_base
+        (List.map (base_byte_gen (DVALUE_Pointer p))
+                  (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base DTYPE_Pointer)))))
+        DTYPE_Pointer
+      = ret (DVALUE_Pointer p).
+  Proof.
+    intros p; pose proof store_size_dtyp_ptr_pos as Hp.
+    cbn [memory_bytes_to_dvalue_base base_byte_gen].
+    rewrite memory_bytes_to_pointer_run by lia.
+    reflexivity.
+  Qed.
+
+  (** ** Integers of a whole number of bytes
+
+      When the width is a multiple of 8 the writer emits plain [BYTE_I]s and
+      the reader's [memory_bytes_to_int] takes its non-mixed branch, so the
+      round trip is [concat_bytes_Z_extract] plus [extract_byte_vint_spec]
+      and some plumbing. *)
+
+  Lemma map_monad_byte_to_Z_BYTE_I : forall (f : N -> @bit_int 8) l,
+      map_monad memory_byte_to_Z (List.map (fun i => @BYTE_I Pa 8 (f i)) l)
+      = raise_ret (NoPois (List.map (fun i => Integers.unsigned (f i)) l)).
+  Proof.
+    intros f; induction l as [| a l IH]; [reflexivity |].
+    cbn [List.map]; cbn [map_monad].
+    rewrite IH; reflexivity.
+  Qed.
+
+  (* a multiple-of-8 width occupies exactly [sz/8] bytes *)
+  Lemma store_size_int_mult8 : forall sz,
+      (Npos sz mod 8 = 0)%N ->
+      (8 * store_size_dtyp (DTYPE_Base (DTYPE_I sz)) = Npos sz)%N.
+  Proof.
+    intros sz H; rewrite store_size_dtyp_int.
+    assert (Hq : (Npos sz = 8 * (Npos sz / 8))%N)
+      by (apply N.div_exact; [lia | exact H]).
+    remember (Npos sz / 8)%N as q.
+    rewrite Hq.
+    replace (8 * q + 7)%N with (7 + q * 8)%N by lia.
+    rewrite N.div_add by lia.
+    replace (7 / 8)%N with 0%N by reflexivity.
+    lia.
+  Qed.
+  Lemma read_int_block_mult8 : forall sz (x : @bit_int sz),
+      (Npos sz mod 8 = 0)%N ->
+      memory_bytes_to_dvalue_base
+        (List.map (memory_byte_of_dvalue_bv (BYTE_I x))
+                  (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_I sz))))))
+        (DTYPE_I sz)
+      = ret (DVALUE_I sz x).
+  Proof.
+    intros sz x H8.
+    pose proof (store_size_int_mult8 sz H8) as Hk.
+    pose proof (Integers.unsigned_range x) as [Hlo Hhi].
+    assert (Hm : (@Integers.modulus sz = 2 ^ Z.pos sz)%Z)
+      by (rewrite Integers.modulus_def; apply two_power_pos_eq).
+    (* the generator takes the non-mixed branch *)
+    assert (Hgen : forall idx, memory_byte_of_dvalue_bv (BYTE_I x) idx
+                               = BYTE_I (repr (extract_byte_vint x idx))).
+    { intros idx; cbn [memory_byte_of_dvalue_bv].
+      rewrite H8; reflexivity. }
+    cbn [memory_bytes_to_dvalue_base].
+    unfold memory_bytes_to_int; rewrite H8; cbn [N.eqb negb].
+    erewrite map_ext by exact Hgen.
+    rewrite map_monad_byte_to_Z_BYTE_I.
+    cbn -[store_size_dtyp Nseq concat_bytes_Z Integers.unsigned
+          Z.pow Z.div Z.modulo List.map extract_byte_vint Integers.repr].
+    do 2 f_equal.
+    erewrite map_ext_in with
+      (g := fun i => ((Integers.unsigned x / 2 ^ (8 * Z.of_N i)) mod 256)%Z).
+    2:{ intros i Hi; apply In_Nseq in Hi.
+        cbn [repr unsigned VInt_Bounded].
+        rewrite Integers.unsigned_repr_eq.
+        rewrite extract_byte_vint_spec by lia.
+        replace (@Integers.modulus 8) with 256%Z by reflexivity.
+        rewrite Z.mod_mod by lia; reflexivity. }
+    rewrite concat_bytes_Z_extract.
+    replace (8 * Z.of_N 0)%Z with 0%Z by lia.
+    rewrite Z.pow_0_r, Z.div_1_r.
+    replace (8 * Z.of_nat (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_I sz)))))%Z
+      with (Z.pos sz) by lia.
+    rewrite <- Hm, Z.mod_small by lia.
+    apply Integers.repr_unsigned.
+  Qed.
+
+  (** ** Integers whose width is not a whole number of bytes
+
+      The writer puts [sz mod 8] real bits in the last byte and pads the rest
+      with poison; the reader takes [concat_bytes_Z_mixed], which weights each
+      full byte by its position and truncates the last one. *)
+
+  Lemma map_monad_cons_EOUP : forall {A B} (f : A -> EOUP B) x xs,
+      map_monad f (x :: xs) = (y <- f x ;; ys <- map_monad f xs ;; ret (y :: ys)).
+  Proof. reflexivity. Qed.
+
+  (* the last byte's real bits, read back *)
+  Lemma memory_bits_to_Z_of_bits : forall zs,
+      memory_bits_to_Z (List.map Z_to_memory_bit zs)
+      = raise_ret (NoPois (concat_bits_Z (List.map (fun z => (z mod 2)%Z) zs))).
+  Proof.
+    assert (M : forall zs, map_monad memory_bit_to_bit (List.map Z_to_memory_bit zs)
+                = raise_ret (NoPois (List.map (fun z => (z mod 2)%Z) zs))).
+    { induction zs as [| z zs IH]; [reflexivity |].
+      cbn [List.map].
+      rewrite map_monad_cons_EOUP, IH.
+      unfold Z_to_memory_bit, memory_bit_to_bit.
+      cbn [unsigned repr VInt_Bounded].
+      rewrite Integers.unsigned_repr_eq.
+      replace (@Integers.modulus 1) with 2%Z by reflexivity.
+      reflexivity. }
+    intros zs; unfold memory_bits_to_Z; rewrite M; reflexivity.
+  Qed.
+
+  (* [concat_bytes_Z_mixed_cons2] needs two visible elements; here the tail is
+     [map _ ys ++ [lastb]], which is a cons for either shape of [ys] *)
+  Lemma concat_bytes_Z_mixed_cons_app : forall extra b ys lastb,
+      concat_bytes_Z_mixed extra
+        (b :: (List.map (fun z => @BYTE_I Pa 8 z) ys ++ [lastb]))
+      = (z <- memory_byte_to_Z b ;;
+         r <- concat_bytes_Z_mixed extra
+                (List.map (fun z => @BYTE_I Pa 8 z) ys ++ [lastb]) ;;
+         ret (z + Z.shiftl r 8)%Z).
+  Proof. intros extra b [| y ys] lastb; destruct b; reflexivity. Qed.
+
+  (* a run of plain bytes followed by the mixed last one *)
+  Lemma concat_bytes_Z_mixed_app_ret : forall extra ys bits v,
+      memory_bits_to_Z (take extra bits) = raise_ret (NoPois v) ->
+      concat_bytes_Z_mixed extra
+        (List.map (fun y => @BYTE_I Pa 8 y) ys ++ [@BYTE_Mixed Pa 8 bits])
+      = raise_ret (NoPois (concat_bytes_Z (List.map Integers.unsigned ys)
+                           + v * 2 ^ (8 * Z.of_nat (length ys)))%Z).
+  Proof.
+    intros extra ys bits v Hv; induction ys as [| y ys IH].
+    - cbn [List.map app length].
+      cbn [concat_bytes_Z_mixed]; rewrite Hv.
+      cbn [concat_bytes_Z]; repeat f_equal; lia.
+    - cbn [List.map app].
+      rewrite concat_bytes_Z_mixed_cons_app, IH.
+      cbn [memory_byte_to_Z concat_bytes_Z List.map Datatypes.length].
+      cbn -[concat_bytes_Z List.map Z.pow Z.of_nat Integers.unsigned
+            Datatypes.length Z.shiftl Z.mul Z.add].
+      rewrite !Z.shiftl_mul_pow2 by lia.
+      replace (8 * Z.of_nat (S (Datatypes.length ys)))%Z
+         with (8 * Z.of_nat (Datatypes.length ys) + 8)%Z by lia.
+      rewrite Z.pow_add_r by lia.
+      do 2 f_equal; ring.
+  Qed.
+  Lemma store_size_int_mixed : forall sz,
+      (Npos sz mod 8 <> 0)%N ->
+      (1 <= store_size_dtyp (DTYPE_Base (DTYPE_I sz))
+       /\ 8 * (store_size_dtyp (DTYPE_Base (DTYPE_I sz)) - 1) + Npos sz mod 8
+          = Npos sz)%N.
+  Proof.
+    intros sz H; rewrite store_size_dtyp_int.
+    pose proof (N.div_mod (Npos sz) 8 ltac:(lia)) as D.
+    pose proof (N.mod_upper_bound (Npos sz) 8 ltac:(lia)) as U.
+    remember (Npos sz / 8)%N as q; remember (Npos sz mod 8)%N as e.
+    replace (Npos sz + 7)%N with (7 + e + q * 8)%N by lia.
+    rewrite N.div_add by lia.
+    assert (Hd : ((7 + e) / 8 = 1)%N).
+    { replace (7 + e)%N with (1 * 8 + (e - 1))%N by lia.
+      rewrite N.div_add_l by lia.
+      rewrite (N.div_small (e - 1) 8) by lia; lia. }
+    rewrite Hd; lia.
+  Qed.
+
+  (* which branch the writer's generator takes *)
+  Lemma gen_plain : forall sz (x : @bit_int sz) idx,
+      (idx + 1 <> store_size_dtyp (DTYPE_Base (DTYPE_I sz)))%N ->
+      memory_byte_of_dvalue_bv (BYTE_I x) idx
+      = BYTE_I (repr (extract_byte_vint x idx)).
+  Proof.
+    intros sz x idx H; cbn [memory_byte_of_dvalue_bv].
+    destruct (N.eqb_spec (idx + 1) (store_size_dtyp (DTYPE_Base (DTYPE_I sz))));
+      [lia |].
+    rewrite Bool.andb_false_r; reflexivity.
+  Qed.
+
+  Lemma gen_mixed : forall sz (x : @bit_int sz) idx,
+      (Npos sz mod 8 <> 0)%N ->
+      (idx + 1 = store_size_dtyp (DTYPE_Base (DTYPE_I sz)))%N ->
+      memory_byte_of_dvalue_bv (BYTE_I x) idx
+      = BYTE_Mixed 8
+          (List.map Z_to_memory_bit
+             (List.map (fun i => Z.of_N (extract_bit_N (Z.to_N (unsigned x)) i))
+                (Nseq (8 * idx) (N.to_nat (Npos sz mod 8))))
+           ++ List.repeat Bit_psn (N.to_nat (8 - Npos sz mod 8))).
+  Proof.
+    intros sz x idx H8 H; cbn [memory_byte_of_dvalue_bv].
+    destruct (N.eqb_spec (Npos sz mod 8) 0); [lia |].
+    destruct (N.eqb_spec (idx + 1) (store_size_dtyp (DTYPE_Base (DTYPE_I sz))));
+      [| lia].
+    cbn [negb andb]; rewrite map_map; reflexivity.
+  Qed.
+
+  Lemma read_int_block_mixed : forall sz (x : @bit_int sz),
+      (Npos sz mod 8 <> 0)%N ->
+      memory_bytes_to_dvalue_base
+        (List.map (memory_byte_of_dvalue_bv (BYTE_I x))
+                  (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_I sz))))))
+        (DTYPE_I sz)
+      = ret (DVALUE_I sz x).
+  Proof.
+    intros sz x H8.
+    destruct (store_size_int_mixed sz H8) as [Hk1 Hk2].
+    pose proof (Integers.unsigned_range x) as [Hlo Hhi].
+    pose proof (N.mod_upper_bound (Npos sz) 8 ltac:(lia)) as Hub.
+    assert (Hm : (@Integers.modulus sz = 2 ^ Z.pos sz)%Z)
+      by (rewrite Integers.modulus_def; apply two_power_pos_eq).
+    destruct (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_I sz)))) as [| m] eqn:EK;
+      [lia |].
+    assert (HK : (store_size_dtyp (DTYPE_Base (DTYPE_I sz)) = N.of_nat (S m))%N)
+      by (rewrite <- EK; symmetry; apply Nnat.N2Nat.id).
+    assert (HK1 : (store_size_dtyp (DTYPE_Base (DTYPE_I sz)) - 1 = N.of_nat m)%N)
+      by (rewrite HK, Nnat.Nat2N.inj_succ; lia).
+    rewrite HK1 in Hk2.
+    assert (Hmm : (8 * N.of_nat m + Npos sz mod 8 = Npos sz)%N) by exact Hk2.
+    assert (He1 : (1 <= Npos sz mod 8)%N)
+      by (revert H8; generalize (Npos sz mod 8)%N; intros e He; lia).
+    rewrite Nseq_snoc, List.map_app.
+    (* the leading bytes are plain [BYTE_I]s *)
+    erewrite map_ext_in with
+      (g := fun i => @BYTE_I Pa 8 (repr (extract_byte_vint x i))).
+    2:{ intros i Hi; apply In_Nseq in Hi; apply gen_plain; lia. }
+    rewrite <- (map_map (fun i => repr (extract_byte_vint x i))
+                        (fun z => @BYTE_I Pa 8 z)).
+    (* the last byte is mixed *)
+    cbn [List.map].
+    erewrite gen_mixed by lia.
+    change (unsigned x) with (Integers.unsigned x).
+    (* read the last byte's real bits *)
+    assert (HV : memory_bits_to_Z
+                   (take (Npos sz mod 8)
+                      (List.map Z_to_memory_bit
+                         (List.map (fun i => Z.of_N
+                            (extract_bit_N (Z.to_N (Integers.unsigned x)) i))
+                            (Nseq (8 * (0 + N.of_nat m)) (N.to_nat (Npos sz mod 8))))
+                       ++ List.repeat Bit_psn (N.to_nat (8 - Npos sz mod 8))))
+                 = raise_ret (NoPois
+                     ((Integers.unsigned x / 2 ^ (8 * Z.of_nat m))
+                      mod 2 ^ Z.of_N (Npos sz mod 8))%Z)).
+    { rewrite take_app_exact
+        by (rewrite length_map, length_map, Nseq_length; lia).
+      rewrite memory_bits_to_Z_of_bits, map_map.
+      erewrite map_ext with
+        (g := fun i => ((Integers.unsigned x / 2 ^ Z.of_N i) mod 2)%Z).
+      2:{ intros i; rewrite extract_bit_N_spec by lia.
+          rewrite Z.mod_mod by lia; reflexivity. }
+      rewrite concat_bits_Z_extract.
+      replace (Z.of_N (8 * (0 + N.of_nat m))%N) with (8 * Z.of_nat m)%Z by lia.
+      replace (Z.of_nat (N.to_nat (Npos sz mod 8)))
+         with (Z.of_N (Npos sz mod 8)) by lia.
+      reflexivity. }
+    cbn [memory_bytes_to_dvalue_base].
+    unfold memory_bytes_to_int.
+    destruct (N.eqb_spec (Npos sz mod 8) 0); [lia |]; cbn [negb].
+    rewrite (concat_bytes_Z_mixed_app_ret _ _ _ HV).
+    cbn -[concat_bytes_Z List.map Z.pow Z.of_nat Integers.unsigned
+          Datatypes.length Z.mul Z.add Nseq extract_byte_vint Integers.repr].
+    do 2 f_equal.
+    (* the leading bytes reassemble the low part *)
+    rewrite map_map.
+    erewrite map_ext_in with
+      (g := fun i => ((Integers.unsigned x / 2 ^ (8 * Z.of_N i)) mod 256)%Z).
+    2:{ intros i Hi; apply In_Nseq in Hi.
+        cbn [repr unsigned VInt_Bounded].
+        rewrite Integers.unsigned_repr_eq.
+        rewrite extract_byte_vint_spec by lia.
+        replace (@Integers.modulus 8) with 256%Z by reflexivity.
+        rewrite Z.mod_mod by lia; reflexivity. }
+    rewrite concat_bytes_Z_extract, length_map, Nseq_length.
+    replace (8 * Z.of_N 0)%Z with 0%Z by lia.
+    rewrite Z.pow_0_r, Z.div_1_r.
+    (* combine low part and the top bits *)
+    rewrite (Z.mul_comm ((Integers.unsigned x / 2 ^ (8 * Z.of_nat m))
+                          mod 2 ^ Z.of_N (N.pos sz mod 8))%Z
+                        (2 ^ (8 * Z.of_nat m))%Z).
+    rewrite <- (Z.rem_mul_r (Integers.unsigned x) (2 ^ (8 * Z.of_nat m))
+                            (2 ^ Z.of_N (Npos sz mod 8)))
+      by (try (apply Z.pow_nonzero; lia); apply Z.pow_pos_nonneg; lia).
+    rewrite <- Z.pow_add_r by lia.
+    replace (8 * Z.of_nat m + Z.of_N (Npos sz mod 8))%Z with (Z.pos sz) by lia.
+    rewrite <- Hm, Z.mod_small by lia.
+    apply Integers.repr_unsigned.
+  Qed.
+
+  (** ** Floating point
+
+      Both float types are fixed width and the writer captures every byte, so
+      the round trip is [concat_bytes_Z_extract] plus [concat_bytes_vint_Z] to
+      cross from the reader's [vint]-level fold, then [of_to_bits]. *)
+
+  Lemma read_base_block_double : forall d,
+      memory_bytes_to_dvalue_base
+        (List.map (base_byte_gen (DVALUE_Double d))
+           (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_FP FP_double))))))
+        (DTYPE_FP FP_double)
+      = ret (DVALUE_Double d).
+  Proof.
+    intros d.
+    pose proof (Integers.unsigned_range (Float.to_bits d)) as [Hlo Hhi].
+    assert (Hm : (@Integers.modulus 64 = 2 ^ 64)%Z) by reflexivity.
+    cbn [base_byte_gen].
+    rewrite store_size_dtyp_double.
+    cbn [memory_bytes_to_dvalue_base].
+    match goal with
+    | |- context [map_monad memory_byte_to_Z ?L] =>
+        replace (map_monad memory_byte_to_Z L)
+          with (raise_ret (NoPois (List.map
+                  (fun i => @Integers.unsigned 8
+                     (repr (extract_byte_Z (unsigned (Float.to_bits d)) i)))
+                  (Nseq 0 (N.to_nat 8)))))
+          by (symmetry; apply map_monad_byte_to_Z_BYTE_I)
+    end.
+    cbn -[concat_bytes_Z_vint List.map Nseq Integers.unsigned Z.pow Z.of_nat
+          Integers.repr extract_byte_Z].
+    do 2 f_equal.
+    unfold concat_bytes_Z_vint.
+    cbn [repr VInt_Bounded].
+    rewrite concat_bytes_vint_Z by (rewrite Hm; lia).
+    erewrite map_ext with
+      (g := fun i => ((Integers.unsigned (Float.to_bits d) / 2 ^ (8 * Z.of_N i))
+                      mod 256)%Z).
+    2:{ intros i; cbn [repr unsigned VInt_Bounded].
+        rewrite Integers.unsigned_repr_eq.
+        replace (@Integers.modulus 8) with 256%Z by reflexivity.
+        rewrite extract_byte_Z_spec, Z.mod_mod by lia; reflexivity. }
+    rewrite concat_bytes_Z_extract.
+    replace (8 * Z.of_N 0)%Z with 0%Z by lia.
+    rewrite Z.pow_0_r, Z.div_1_r.
+    match goal with
+    | |- context [(2 ^ ?E)%Z] => replace (2 ^ E)%Z with (2 ^ 64)%Z by (f_equal; lia)
+    end.
+    rewrite <- Hm, Z.mod_small by lia.
+    rewrite Integers.repr_unsigned.
+    apply Float.of_to_bits.
+  Qed.
+  Lemma read_base_block_float : forall d,
+      memory_bytes_to_dvalue_base
+        (List.map (base_byte_gen (DVALUE_Float d))
+           (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_FP FP_float))))))
+        (DTYPE_FP FP_float)
+      = ret (DVALUE_Float d).
+  Proof.
+    intros d.
+    pose proof (Integers.unsigned_range (Float32.to_bits d)) as [Hlo Hhi].
+    assert (Hm : (@Integers.modulus 32 = 2 ^ 32)%Z) by reflexivity.
+    cbn [base_byte_gen].
+    rewrite store_size_dtyp_float.
+    cbn [memory_bytes_to_dvalue_base].
+    match goal with
+    | |- context [map_monad memory_byte_to_Z ?L] =>
+        replace (map_monad memory_byte_to_Z L)
+          with (raise_ret (NoPois (List.map
+                  (fun i => @Integers.unsigned 8
+                     (repr (extract_byte_Z (unsigned (Float32.to_bits d)) i)))
+                  (Nseq 0 (N.to_nat 4)))))
+          by (symmetry; apply map_monad_byte_to_Z_BYTE_I)
+    end.
+    cbn -[concat_bytes_Z_vint List.map Nseq Integers.unsigned Z.pow Z.of_nat
+          Integers.repr extract_byte_Z].
+    do 2 f_equal.
+    unfold concat_bytes_Z_vint.
+    cbn [repr VInt_Bounded].
+    rewrite concat_bytes_vint_Z by (rewrite Hm; lia).
+    erewrite map_ext with
+      (g := fun i => ((Integers.unsigned (Float32.to_bits d) / 2 ^ (8 * Z.of_N i))
+                      mod 256)%Z).
+    2:{ intros i; cbn [repr unsigned VInt_Bounded].
+        rewrite Integers.unsigned_repr_eq.
+        replace (@Integers.modulus 8) with 256%Z by reflexivity.
+        rewrite extract_byte_Z_spec, Z.mod_mod by lia; reflexivity. }
+    rewrite concat_bytes_Z_extract.
+    replace (8 * Z.of_N 0)%Z with 0%Z by lia.
+    rewrite Z.pow_0_r, Z.div_1_r.
+    match goal with
+    | |- context [(2 ^ ?E)%Z] => replace (2 ^ E)%Z with (2 ^ 32)%Z by (f_equal; lia)
+    end.
+    rewrite <- Hm, Z.mod_small by lia.
+    rewrite Integers.repr_unsigned.
+    apply Float32.of_to_bits.
+  Qed.
+
+  (** ** Byte-vector values
+
+      [DTYPE_B] reads through [memory_bytes_to_byte_value], which prefers a
+      pointer slice, then an integer, then a raw bit list -- so each
+      constructor of a canonical [dvalue_bv] has to be shown to come back down
+      the branch it came from. *)
+
+  Lemma store_size_B_I : forall sz,
+      store_size_dtyp (DTYPE_Base (DTYPE_B sz))
+      = store_size_dtyp (DTYPE_Base (DTYPE_I sz)).
+  Proof. intros sz; rewrite store_size_dtyp_bytes, store_size_dtyp_int; reflexivity. Qed.
+
+  Lemma memory_bytes_to_int_of_read : forall sz (x : @bit_int sz) dbs,
+      memory_bytes_to_dvalue_base dbs (DTYPE_I sz) = ret (DVALUE_I sz x) ->
+      exists v, memory_bytes_to_int sz dbs = raise_ret (NoPois v) /\ repr v = x.
+  Proof.
+    intros sz x dbs H; cbn [memory_bytes_to_dvalue_base] in H.
+    unfold absorb_pois in H.
+    destruct (memory_bytes_to_int sz dbs) as [ | | | [ | v] ] eqn:E;
+      cbn in H; try discriminate.
+    exists v; split; [reflexivity |]. inversion H; reflexivity.
+  Qed.
+
+  Lemma pointer_slice_from_run : forall p n i,
+      pointer_slice_from p i (List.map (fun j => @BYTE_Pointer Pa 8 p j) (Nseq i n))
+      = true.
+  Proof.
+    intros p; induction n as [| n IH]; intros i; cbn [Nseq List.map pointer_slice_from];
+      [reflexivity |].
+    unfold pointer_byte_at, valid_pointer_byte.
+    destruct (eq_dec_ptr p p) as [_ | NE]; [| now contradiction NE].
+    rewrite N.eqb_refl; cbn [andb].
+    replace (N.succ i) with (1 + i)%N by lia.
+    apply IH.
+  Qed.
+
+  Lemma BYTE_I_byte0 : forall sz (x : @bit_int sz),
+      memory_byte_of_dvalue_bv (BYTE_I x) 0
+      = BYTE_I (repr (extract_byte_vint x 0))
+      \/ exists b bs, memory_byte_of_dvalue_bv (BYTE_I x) 0
+                      = @BYTE_Mixed Pa 8 (Bit_bit b :: bs).
+  Proof.
+    intros sz x; cbn [memory_byte_of_dvalue_bv].
+    destruct (N.eqb_spec (Npos sz mod 8) 0) as [E | E]; cbn [negb andb]; [now left |].
+    destruct (N.eqb_spec (0 + 1) (store_size_dtyp (DTYPE_Base (DTYPE_I sz))));
+      [| now left].
+    right.
+    destruct (N.to_nat (Npos sz mod 8)) as [| n] eqn:En; [exfalso; lia |].
+    cbn [Nseq List.map app]; unfold Z_to_memory_bit; eauto.
+  Qed.
+
+  Lemma all_poison_BYTE_I_block : forall sz (x : @bit_int sz) K,
+      (0 < K)%nat ->
+      all_poison_bytes
+        (List.map (memory_byte_of_dvalue_bv (BYTE_I x)) (Nseq 0 K)) = false.
+  Proof.
+    intros sz x [| K] H; [lia |].
+    cbn [Nseq List.map]; unfold all_poison_bytes; cbn [poison_split].
+    destruct (BYTE_I_byte0 x) as [E | (b & bs & E)]; rewrite E;
+      cbn [is_all_poison_byte all_poison_bits forallb is_poison_bit]; reflexivity.
+  Qed.
+
+  Lemma pointer_slice_BYTE_I_block : forall sz (x : @bit_int sz) K,
+      (0 < K)%nat ->
+      memory_bytes_to_pointer_slice
+        (List.map (memory_byte_of_dvalue_bv (BYTE_I x)) (Nseq 0 K)) = None.
+  Proof.
+    intros sz x [| K] H; [lia |].
+    cbn [Nseq List.map]; unfold memory_bytes_to_pointer_slice.
+    destruct (BYTE_I_byte0 x) as [E | (b & bs & E)]; rewrite E; reflexivity.
+  Qed.
+
+  Lemma read_base_block_BYTE_I : forall sz (x : @bit_int sz),
+      memory_bytes_to_dvalue_base
+        (List.map (memory_byte_of_dvalue_bv (BYTE_I x))
+                  (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_B sz))))))
+        (DTYPE_B sz)
+      = ret (@DVALUE_B Pa sz (BYTE_I x)).
+  Proof.
+    intros sz x.
+    rewrite store_size_B_I.
+    assert (HK : (0 < N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_I sz))))%nat).
+    { pose proof (serializable_base_pos (DTYPE_I sz) I); lia. }
+    assert (HR : memory_bytes_to_dvalue_base
+                   (List.map (memory_byte_of_dvalue_bv (BYTE_I x))
+                      (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_I sz))))))
+                   (DTYPE_I sz) = ret (DVALUE_I sz x)).
+    { destruct (N.eqb_spec (Npos sz mod 8) 0) as [E8 | E8];
+        [apply read_int_block_mult8 | apply read_int_block_mixed]; exact E8. }
+    destruct (memory_bytes_to_int_of_read _ HR) as [v [Ev Hv]].
+    cbn [memory_bytes_to_dvalue_base].
+    rewrite all_poison_BYTE_I_block by exact HK.
+    unfold memory_bytes_to_byte_value.
+    rewrite pointer_slice_BYTE_I_block by exact HK.
+    rewrite Ev; cbv beta iota.
+    rewrite Hv; cbn; reflexivity.
+  Qed.
+
+  Lemma map_Nseq_shift : forall {A} (f : N -> A) n a s,
+      List.map (fun i => f (s + i)%N) (Nseq a n) = List.map f (Nseq (s + a)%N n).
+  Proof.
+    intros A f; induction n as [| n IH]; intros a s; cbn [Nseq List.map];
+      [reflexivity |].
+    f_equal.
+    rewrite (IH (N.succ a) s).
+    do 2 f_equal; lia.
+  Qed.
+
+
+  Lemma all_poison_pointer_run : forall p i n,
+      all_poison_bytes
+        (List.map (fun j => @BYTE_Pointer Pa 8 p j) (Nseq i (S n))) = false.
+  Proof.
+    intros p i n; cbn [Nseq List.map].
+    unfold all_poison_bytes; cbn [poison_split is_all_poison_byte]; reflexivity.
+  Qed.
+
+  Lemma memory_bytes_to_pointer_slice_run : forall p i n,
+      memory_bytes_to_pointer_slice
+        (List.map (fun j => @BYTE_Pointer Pa 8 p j) (Nseq i (S n))) = Some (p, i).
+  Proof.
+    intros p i n.
+    pose proof (pointer_slice_from_run p (S n) i) as HR.
+    cbn [Nseq List.map] in *.
+    unfold memory_bytes_to_pointer_slice.
+    rewrite HR; reflexivity.
+  Qed.
+
+  Lemma read_base_block_BYTE_Pointer : forall sz p k,
+      (Npos sz mod 8 = 0)%N ->
+      memory_bytes_to_dvalue_base
+        (List.map (memory_byte_of_dvalue_bv (@BYTE_Pointer Pa sz p k))
+                  (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_B sz))))))
+        (DTYPE_B sz)
+      = ret (@DVALUE_B Pa sz (BYTE_Pointer sz p k)).
+  Proof.
+    intros sz p k H8.
+    pose proof (serializable_base_pos (DTYPE_B sz) I) as HKpos.
+    remember (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_B sz)))) as K eqn:EK.
+    destruct K as [| K']; [lia |].
+    erewrite map_ext with
+      (g := fun idx => @BYTE_Pointer Pa 8 p ((Npos sz * k / 8) + idx)%N)
+      by (intros idx; reflexivity).
+    rewrite (map_Nseq_shift (fun j => @BYTE_Pointer Pa 8 p j) (S K') 0
+                            (Npos sz * k / 8)%N).
+    rewrite N.add_0_r.
+    remember (Npos sz / 8)%N as q eqn:Eq.
+    assert (Hq : (Npos sz = 8 * q)%N)
+      by (subst q; apply N.div_exact; [lia | exact H8]).
+    assert (Hqnz : (q <> 0)%N) by lia.
+    assert (Harith : ((Npos sz * k / 8) * 8 / Npos sz = k)%N).
+    { rewrite Hq.
+      replace (8 * q * k)%N with (q * k * 8)%N by lia.
+      rewrite N.div_mul by lia.
+      replace (q * k * 8)%N with (k * (8 * q))%N by lia.
+      rewrite N.div_mul by lia.
+      reflexivity. }
+    cbn [memory_bytes_to_dvalue_base].
+    rewrite all_poison_pointer_run.
+    unfold memory_bytes_to_byte_value.
+    rewrite memory_bytes_to_pointer_slice_run.
+    cbv beta iota.
+    rewrite Harith; cbn; reflexivity.
+  Qed.
+
+  (** The reader's [get_bits_of_memory_byte_list] inverts the writer's
+      per-byte [take 8 (drop (8*idx) _)] splitting: it recovers exactly the
+      original bit list. *)
+
+  Definition mixed_byte (bits : list memory_bit) (idx : N) : memory_byte :=
+    let m := take 8 (drop (8 * idx) bits) in
+    @BYTE_Mixed Pa 8
+      (m ++ (if negb (N.of_nat (List.length m) =? 8)%N then
+               repeat Bit_psn (8 - List.length m) else [])).
+
+  Lemma writer_mixed_byte : forall sz bits idx,
+      memory_byte_of_dvalue_bv (@BYTE_Mixed Pa sz bits) idx = mixed_byte bits idx.
+  Proof. reflexivity. Qed.
+
+  Lemma mixed_byte_shift : forall bits j,
+      mixed_byte bits (1 + j) = mixed_byte (drop 8 bits) j.
+  Proof.
+    intros bits j; unfold mixed_byte.
+    replace (8 * (1 + j))%N with (8 + 8 * j)%N by lia.
+    rewrite <- (drop_drop (8 * j)%N 8 bits); reflexivity.
+  Qed.
+
+  Lemma memory_byte_to_memory_bits_mixed : forall bits idx,
+      memory_byte_to_memory_bits (mixed_byte bits idx)
+      = (let m := take 8 (drop (8 * idx) bits) in
+         m ++ (if negb (N.of_nat (List.length m) =? 8)%N then
+                 repeat Bit_psn (8 - List.length m) else [])).
+  Proof. reflexivity. Qed.
+
+  Lemma get_bits_writer : forall n bits acc,
+      (N.of_nat (List.length bits) <= 8 * N.of_nat n)%N ->
+      get_bits_of_memory_byte_list (N.of_nat (List.length bits))
+        (List.map (mixed_byte bits) (Nseq 0 n)) acc
+      = rev_append bits acc.
+  Proof.
+    induction n as [| n IH]; intros bits acc Hlen.
+    - cbn [Nseq List.map get_bits_of_memory_byte_list].
+      destruct bits; [reflexivity | cbn in Hlen; lia].
+    - cbn [Nseq List.map get_bits_of_memory_byte_list].
+      rewrite !memory_byte_to_memory_bits_mixed; cbv beta zeta.
+      rewrite N.mul_0_r, drop_nil.
+      destruct (N.ltb_spec (N.of_nat (List.length bits)) 8) as [Hlt | Hge].
+      + (* the only byte: take just the real bits *)
+        rewrite (@take_all _ bits 8) by lia.
+        replace (if negb (N.of_nat (List.length bits) =? 8)%N then
+                   repeat Bit_psn (8 - List.length bits) else [])
+          with (repeat (@Bit_psn Pa) (8 - List.length bits))
+          by (destruct (N.eqb_spec (N.of_nat (List.length bits)) 8); [lia | reflexivity]).
+        rewrite take_app_exact by reflexivity; reflexivity.
+      + (* a full byte: recurse on the rest *)
+        assert (H8 : N.of_nat (List.length (take 8 bits)) = 8%N)
+          by (apply take_length_exact; lia).
+        rewrite H8; cbn [negb N.eqb]; rewrite app_nil_r.
+        replace (N.succ 0)%N with (1 + 0)%N by lia.
+        rewrite <- (map_Nseq_shift (mixed_byte bits) n 0 1).
+        erewrite map_ext by (intros j; apply mixed_byte_shift).
+        replace (N.of_nat (List.length bits) - 8)%N
+          with (N.of_nat (List.length (drop 8 bits)))
+          by (rewrite length_drop_N; lia).
+        rewrite IH by (rewrite length_drop_N; lia).
+        rewrite <- (@take_drop_app _ 8 bits) at 3.
+        rewrite rev_append_rev, rev_append_rev, rev_append_rev, rev_app_distr.
+        rewrite <- app_assoc; reflexivity.
+  Qed.
+  (** Bridges from a property of the bit list to the corresponding property of
+      the bytes the writer lays down. *)
+
+  Lemma all_poison_bytes_forallb : forall l,
+      all_poison_bytes l = forallb is_all_poison_byte l.
+  Proof.
+    induction l as [| b l IH]; [reflexivity |].
+    unfold all_poison_bytes in *; cbn [poison_split forallb].
+    destruct (is_all_poison_byte b); cbn [andb].
+    - destruct (poison_split l) as [k tl]; cbn in *; exact IH.
+    - reflexivity.
+  Qed.
+
+  (* if every byte of the block is all-poison then so is every bit *)
+  Lemma mixed_all_poison : forall n bits,
+      (N.of_nat (List.length bits) <= 8 * N.of_nat n)%N ->
+      forallb is_all_poison_byte (List.map (mixed_byte bits) (Nseq 0 n)) = true ->
+      forallb is_poison_bit bits = true.
+  Proof.
+    induction n as [| n IH]; intros bits Hlen H.
+    - destruct bits; [reflexivity | cbn in Hlen; lia].
+    - cbn [Nseq List.map forallb] in H.
+      apply andb_true_iff in H as [H0 Hrest].
+      unfold mixed_byte, is_all_poison_byte, all_poison_bits in H0.
+      rewrite N.mul_0_r, drop_nil in H0.
+      rewrite forallb_app in H0; apply andb_true_iff in H0 as [Htake _].
+      replace (N.succ 0)%N with (1 + 0)%N in Hrest by lia.
+      rewrite <- (map_Nseq_shift (mixed_byte bits) n 0 1) in Hrest.
+      erewrite map_ext in Hrest by (intros j; apply mixed_byte_shift).
+      specialize (IH (drop 8 bits) ltac:(rewrite length_drop_N; lia) Hrest).
+      rewrite <- (@take_drop_app _ 8 bits), forallb_app, Htake, IH; reflexivity.
+  Qed.
+
+  Lemma map_monad_bit_pois : forall l,
+      existsb is_poison_bit l = true ->
+      map_monad memory_bit_to_bit l = raise_ret (@Pois (list Z)).
+  Proof.
+    induction l as [| b l IH]; [discriminate |].
+    cbn [existsb]; intros H.
+    rewrite map_monad_cons_EOUP.
+    destruct b; cbn [is_poison_bit] in H; cbn [memory_bit_to_bit].
+    - rewrite IH by exact H; reflexivity.
+    - reflexivity.
+    - rewrite IH by exact H; reflexivity.
+  Qed.
+
+  Lemma memory_bits_to_Z_pois : forall l,
+      existsb is_poison_bit l = true -> memory_bits_to_Z l = raise_ret (@Pois Z).
+  Proof.
+    intros l H; unfold memory_bits_to_Z.
+    rewrite map_monad_bit_pois by exact H; reflexivity.
+  Qed.
+
+  Lemma memory_byte_to_Z_mixed_pois : forall bits idx,
+      existsb is_poison_bit (take 8 (drop (8 * idx) bits)) = true ->
+      memory_byte_to_Z (mixed_byte bits idx) = raise_ret (@Pois Z).
+  Proof.
+    intros bits idx H.
+    unfold mixed_byte; cbn [memory_byte_to_Z].
+    apply memory_bits_to_Z_pois.
+    rewrite existsb_app, H; reflexivity.
+  Qed.
+
+  Lemma map_monad_bit_ret : forall l,
+      exists r, map_monad memory_bit_to_bit l = raise_ret r.
+  Proof.
+    induction l as [| b l [r IH]]; [eexists; reflexivity |].
+    rewrite map_monad_cons_EOUP, IH.
+    destruct b; cbn [memory_bit_to_bit]; destruct r; eexists; reflexivity.
+  Qed.
+
+  Lemma memory_byte_to_Z_mixed_ret : forall bits idx,
+      exists r, memory_byte_to_Z (mixed_byte bits idx) = raise_ret r.
+  Proof.
+    intros bits idx; unfold mixed_byte; cbn [memory_byte_to_Z].
+    unfold memory_bits_to_Z.
+    destruct (map_monad_bit_ret
+                (take 8 (drop (8 * idx) bits) ++
+                 (if negb (N.of_nat (List.length (take 8 (drop (8 * idx) bits))) =? 8)%N
+                  then repeat Bit_psn (8 - List.length (take 8 (drop (8 * idx) bits)))
+                  else []))) as [r Er].
+    rewrite Er; destruct r; eexists; reflexivity.
+  Qed.
+
+  (* the whole-byte read poisons as soon as any bit does *)
+  Lemma map_monad_byte_mixed_pois : forall n bits,
+      (N.of_nat (List.length bits) <= 8 * N.of_nat n)%N ->
+      existsb is_poison_bit bits = true ->
+      map_monad memory_byte_to_Z (List.map (mixed_byte bits) (Nseq 0 n))
+      = raise_ret (@Pois (list Z)).
+  Proof.
+    induction n as [| n IH]; intros bits Hlen H.
+    - destruct bits; [discriminate | cbn in Hlen; lia].
+    - cbn [Nseq List.map].
+      rewrite map_monad_cons_EOUP.
+      rewrite <- (@take_drop_app _ 8 bits), existsb_app in H.
+      apply orb_true_iff in H as [Hhd | Htl].
+      + rewrite memory_byte_to_Z_mixed_pois; [reflexivity |].
+        rewrite N.mul_0_r, drop_nil; exact Hhd.
+      + replace (N.succ 0)%N with (1 + 0)%N by lia.
+        rewrite <- (map_Nseq_shift (mixed_byte bits) n 0 1).
+        erewrite map_ext by (intros j; apply mixed_byte_shift).
+        rewrite IH by (first [rewrite length_drop_N; lia | exact Htl]).
+        destruct (memory_byte_to_Z_mixed_ret bits 0) as [r Er].
+        rewrite Er; destruct r; reflexivity.
+  Qed.
+
+  Lemma cbmix_cons : forall extra b f a n,
+      concat_bytes_Z_mixed extra (b :: List.map f (Nseq a (S n)))
+      = (z <- memory_byte_to_Z b ;;
+         r <- concat_bytes_Z_mixed extra (List.map f (Nseq a (S n))) ;;
+         ret (z + Z.shiftl r 8)%Z).
+  Proof.
+    intros extra b f a n; cbn [Nseq List.map]; apply concat_bytes_Z_mixed_cons2.
+  Qed.
+
+  Lemma concat_bytes_Z_mixed_mixed_pois : forall n extra bits,
+      (0 < extra <= 8)%N ->
+      (N.of_nat (List.length bits) = 8 * N.of_nat n + extra)%N ->
+      existsb is_poison_bit bits = true ->
+      concat_bytes_Z_mixed extra (List.map (mixed_byte bits) (Nseq 0 (S n)))
+      = raise_ret (@Pois Z).
+  Proof.
+    induction n as [| n IH]; intros extra bits Hx Hlen H.
+    - (* a single, partial byte *)
+      cbn [Nseq List.map concat_bytes_Z_mixed].
+      unfold mixed_byte.
+      rewrite N.mul_0_r, drop_nil, (@take_all _ bits 8) by lia.
+      rewrite take_app_exact by lia.
+      apply memory_bits_to_Z_pois; exact H.
+    - (* at least one full byte first *)
+      rewrite <- (@take_drop_app _ 8 bits), existsb_app in H.
+      apply orb_true_iff in H as [Hhd | Htl].
+      + change (List.map (mixed_byte bits) (Nseq 0 (S (S n))))
+          with (mixed_byte bits 0
+                :: List.map (mixed_byte bits) (Nseq (N.succ 0) (S n))).
+        rewrite cbmix_cons.
+        rewrite memory_byte_to_Z_mixed_pois; [reflexivity |].
+        rewrite N.mul_0_r, drop_nil; exact Hhd.
+      + assert (Hshift : List.map (mixed_byte bits) (Nseq (N.succ 0) (S n))
+                         = List.map (mixed_byte (drop 8 bits)) (Nseq 0 (S n))).
+        { replace (N.succ 0)%N with (1 + 0)%N by lia.
+          rewrite <- (map_Nseq_shift (mixed_byte bits) (S n) 0 1).
+          apply map_ext; intros j; apply mixed_byte_shift. }
+        change (List.map (mixed_byte bits) (Nseq 0 (S (S n))))
+          with (mixed_byte bits 0
+                :: List.map (mixed_byte bits) (Nseq (N.succ 0) (S n))).
+        rewrite Hshift, cbmix_cons.
+        rewrite IH by (first [lia | rewrite length_drop_N; lia | exact Htl]).
+        destruct (memory_byte_to_Z_mixed_ret bits 0) as [r Er].
+        rewrite Er; destruct r; reflexivity.
+  Qed.
+
+  (** Relating the bit-level pointer-run test [all_pointer_bits_from] that
+      [dvalue_bv_canonical] uses to the byte-level [pointer_slice_from] the
+      reader runs. *)
+
+  Lemma all_pointer_bits_from_app : forall l1 p j l2,
+      all_pointer_bits_from p j (l1 ++ l2)
+      = all_pointer_bits_from p j l1
+        && all_pointer_bits_from p (j + N.of_nat (List.length l1))%N l2.
+  Proof.
+    induction l1 as [| b l1 IH]; intros p j l2; cbn [app all_pointer_bits_from
+                                                     Datatypes.length].
+    - rewrite N.add_0_r; reflexivity.
+    - destruct b; cbn [andb]; [| reflexivity | reflexivity].
+      destruct (eq_dec_ptr p p0); cbn [andb]; [| reflexivity].
+      destruct (N.eqb_spec idx j); cbn [andb]; [| reflexivity].
+      rewrite IH.
+      replace (1 + j + N.of_nat (List.length l1))%N
+        with (j + N.of_nat (S (List.length l1)))%N by lia.
+      reflexivity.
+  Qed.
+
+  Lemma all_pointer_bits_from_repeat_psn : forall m p j,
+      all_pointer_bits_from p j (repeat (@Bit_psn Pa) m) = true -> m = 0%nat.
+  Proof. intros [| m] p j H; [reflexivity | cbn in H; discriminate]. Qed.
+
+  Lemma valid_pointer_bits_implies : forall l p base offset,
+      valid_pointer_bits p base offset l = raise_ret (NoPois true) ->
+      all_pointer_bits_from p (base + offset)%N l = true.
+  Proof.
+    induction l as [| b l IH]; intros p base offset H; [reflexivity |].
+    cbn [valid_pointer_bits] in H; cbn [all_pointer_bits_from].
+    destruct b; [| discriminate | discriminate].
+    destruct (eq_dec_ptr p p0) as [Ep | ]; [| discriminate].
+    destruct (N.eqb_spec idx (base + offset)) as [Eidx | ]; [| discriminate].
+    cbn [andb].
+    replace (1 + (base + offset))%N with (base + (1 + offset))%N by lia.
+    apply IH; exact H.
+  Qed.
+  Lemma pointer_slice_implies_bits : forall n bits p k,
+      (N.of_nat (List.length bits) <= 8 * N.of_nat n)%N ->
+      pointer_slice_from p k (List.map (mixed_byte bits) (Nseq 0 n)) = true ->
+      all_pointer_bits_from p (8 * k)%N bits = true.
+  Proof.
+    induction n as [| n IH]; intros bits p k Hlen H.
+    - destruct bits; [reflexivity | cbn in Hlen; lia].
+    - cbn [Nseq List.map pointer_slice_from] in H.
+      apply andb_true_iff in H as [Hhd Htl].
+      (* the head byte is eight consecutive pointer bits, so no padding *)
+      unfold pointer_byte_at, valid_pointer_byte, mixed_byte in Hhd.
+      rewrite N.mul_0_r, drop_nil in Hhd.
+      destruct (valid_pointer_bits p (k * 8) 0
+                  (take 8 bits ++ _)) as [ | | | [ | b] ] eqn:Ev in Hhd;
+        try discriminate.
+      subst b.
+      apply valid_pointer_bits_implies in Ev.
+      rewrite N.add_0_r, all_pointer_bits_from_app in Ev.
+      apply andb_true_iff in Ev as [Etake Epad].
+      assert (Hfull : N.of_nat (List.length (take 8 bits)) = 8%N).
+      { destruct (N.eqb_spec (N.of_nat (List.length (take 8 bits))) 8) as [E | E];
+          [exact E |].
+        cbn [negb] in Epad.
+        apply all_pointer_bits_from_repeat_psn in Epad.
+        pose proof (take_length_le bits 8); lia. }
+      (* recurse on the remaining bits *)
+      replace (N.succ 0)%N with (1 + 0)%N in Htl by lia.
+      rewrite <- (map_Nseq_shift (mixed_byte bits) n 0 1) in Htl.
+      erewrite map_ext in Htl by (intros j; apply mixed_byte_shift).
+      specialize (IH (drop 8 bits) p (1 + k)%N
+                    ltac:(rewrite length_drop_N; lia) Htl).
+      rewrite <- (@take_drop_app _ 8 bits), all_pointer_bits_from_app.
+      replace (8 * k)%N with (k * 8)%N by lia.
+      rewrite Etake, Hfull; cbn [andb].
+      replace (k * 8 + 8)%N with (8 * (1 + k))%N by lia.
+      rewrite IH; reflexivity.
+  Qed.
+
+  Lemma mixed_block_head : forall bits n,
+      List.map (mixed_byte bits) (Nseq 0 (S n))
+      = mixed_byte bits 0 :: List.map (mixed_byte bits) (Nseq (N.succ 0) n).
+  Proof. reflexivity. Qed.
+
+  Lemma mixed_byte_0 : forall bits,
+      mixed_byte bits 0
+      = @BYTE_Mixed Pa 8 (take 8 bits ++
+          (if negb (N.of_nat (List.length (take 8 bits)) =? 8)%N
+           then repeat Bit_psn (8 - List.length (take 8 bits)) else [])).
+  Proof. intros bits; unfold mixed_byte; rewrite N.mul_0_r, drop_nil; reflexivity. Qed.
+
+
+  Lemma pointer_slice_head : forall bits n,
+      match bits with
+      | Bit_ptr q j :: _ =>
+          memory_bytes_to_pointer_slice (List.map (mixed_byte bits) (Nseq 0 (S n)))
+          = (if pointer_slice_from q (j / 8)%N
+                  (List.map (mixed_byte bits) (Nseq 0 (S n)))
+             then Some (q, (j / 8)%N) else None)
+      | _ =>
+          memory_bytes_to_pointer_slice (List.map (mixed_byte bits) (Nseq 0 (S n)))
+          = None
+      end.
+  Proof. intros [| [q j | | ] bits'] n; reflexivity. Qed.
+  Lemma pointer_slice_mixed_none : forall n bits,
+      (N.of_nat (List.length bits) <= 8 * N.of_nat (S n))%N ->
+      negb (is_pointer_bits bits) = true ->
+      memory_bytes_to_pointer_slice (List.map (mixed_byte bits) (Nseq 0 (S n)))
+      = None.
+  Proof.
+    intros n bits Hlen H.
+    pose proof (pointer_slice_head bits n) as HP.
+    destruct bits as [| [q j | | ] bits']; try exact HP.
+    rewrite HP.
+    destruct (pointer_slice_from q (j / 8)%N
+                (List.map (mixed_byte (Bit_ptr q j :: bits')) (Nseq 0 (S n))))
+      eqn:E; [| reflexivity].
+    exfalso.
+    assert (Hall : all_pointer_bits_from q (8 * (j / 8))%N (Bit_ptr q j :: bits')
+                   = true)
+      by (apply (pointer_slice_implies_bits (S n)); [exact Hlen | exact E]).
+    assert (Ej : j = (8 * (j / 8))%N).
+    { cbn [all_pointer_bits_from] in Hall.
+      destruct (eq_dec_ptr q q) as [_ | NE]; [| now contradiction NE].
+      cbn [andb] in Hall.
+      destruct (N.eqb_spec j (8 * (j / 8))%N) as [Ej | ]; [exact Ej | discriminate]. }
+    assert (Hmod : (j mod 8 = 0)%N).
+    { rewrite Ej at 1; rewrite N.mul_comm, N.mod_mul; lia. }
+    unfold is_pointer_bits in H.
+    rewrite Hmod, N.eqb_refl in H; cbn [andb] in H.
+    rewrite <- Ej in Hall.
+    rewrite Hall in H; discriminate.
+  Qed.
+
+  Lemma read_base_block_BYTE_Mixed : forall sz bits,
+      (N.of_nat (List.length bits) = Npos sz)%N ->
+      negb (is_pointer_bits bits) = true ->
+      existsb is_poison_bit bits = true ->
+      negb (forallb is_poison_bit bits) = true ->
+      memory_bytes_to_dvalue_base
+        (List.map (memory_byte_of_dvalue_bv (@BYTE_Mixed Pa sz bits))
+                  (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_B sz))))))
+        (DTYPE_B sz)
+      = ret (@DVALUE_B Pa sz (BYTE_Mixed sz bits)).
+  Proof.
+    intros sz bits Hlen Hptr Hex Hnall.
+    erewrite map_ext with (g := mixed_byte bits)
+      by (intros idx; apply writer_mixed_byte).
+    pose proof (serializable_base_pos (DTYPE_B sz) I) as HKpos.
+    assert (Hb : (Npos sz <= 8 * store_size_dtyp (DTYPE_Base (DTYPE_B sz)))%N).
+    { rewrite store_size_dtyp_bytes.
+      pose proof (N.div_mod (Npos sz + 7) 8 ltac:(lia)) as D.
+      pose proof (N.mod_upper_bound (Npos sz + 7) 8 ltac:(lia)) as U.
+      lia. }
+    remember (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_B sz)))) as K eqn:EK.
+    assert (HKb : (N.of_nat (List.length bits) <= 8 * N.of_nat K)%N) by lia.
+    destruct K as [| n]; [lia |].
+    cbn [memory_bytes_to_dvalue_base].
+    (* not all poison *)
+    assert (Hap : all_poison_bytes (List.map (mixed_byte bits) (Nseq 0 (S n)))
+                  = false).
+    { destruct (all_poison_bytes (List.map (mixed_byte bits) (Nseq 0 (S n))))
+        eqn:Eap; [| reflexivity].
+      rewrite all_poison_bytes_forallb in Eap.
+      apply mixed_all_poison in Eap; [| exact HKb].
+      rewrite Eap in Hnall; discriminate. }
+    rewrite Hap.
+    unfold memory_bytes_to_byte_value.
+    (* not a pointer slice *)
+    rewrite pointer_slice_mixed_none by (first [exact HKb | exact Hptr]).
+    (* the integer read poisons *)
+    assert (Hint : memory_bytes_to_int sz (List.map (mixed_byte bits) (Nseq 0 (S n)))
+                   = raise_ret (@Pois Z)).
+    { unfold memory_bytes_to_int.
+      destruct (N.eqb_spec (Npos sz mod 8) 0) as [E8 | E8]; cbn [negb].
+      - rewrite map_monad_byte_mixed_pois by (first [exact HKb | exact Hex]);
+          reflexivity.
+      - rewrite store_size_B_I in EK.
+        destruct (store_size_int_mixed sz E8) as [_ Hk2].
+        assert (HK : (store_size_dtyp (DTYPE_Base (DTYPE_I sz))
+                      = N.of_nat (S n))%N)
+          by (rewrite EK; symmetry; apply Nnat.N2Nat.id).
+        assert (Hx : (0 < Npos sz mod 8 <= 8)%N).
+        { pose proof (N.mod_upper_bound (Npos sz) 8 ltac:(lia)) as U.
+          revert E8 U; generalize (Npos sz mod 8)%N; intros m HA HB; lia. }
+        apply concat_bytes_Z_mixed_mixed_pois; [exact Hx | lia | exact Hex]. }
+    rewrite Hint; cbv beta iota.
+    (* the bits come back unchanged *)
+    rewrite <- Hlen, get_bits_writer by exact HKb.
+    rewrite rev_append_rev, app_nil_r, rev_append_rev, app_nil_r, rev_involutive.
+    reflexivity.
+  Qed.
+
+
+  (** The one remaining bit-level obligation of the round trip: the reader
+      inverts the writer at each supported base type.  Per [dtyp_base] this
+      needs a [concat_bytes_Z]-after-[extract_byte_vint] lemma for [DTYPE_I]
+      (and the float types), that [valid_pointer_bytes] accepts what the
+      writer laid down for [DTYPE_Pointer], and that [dvalue_bv_canonical]
+      forces [memory_bytes_to_byte_value] down the branch the value came
+      from for [DTYPE_B].  Poison is uniform: the writer emits poison bytes
+      and every arm absorbs them. *)
+  Lemma read_base_block : forall dtb dv,
+      serializable_base dtb ->
+      dvalue_base_has_dtyp_base dv dtb = true ->
+      dvalue_base_canonical dv = true ->
+      memory_bytes_to_dvalue_base
+        (List.map (base_byte_gen dv)
+                  (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base dtb))))) dtb
+      = ret dv.
+  Proof.
+    intros dtb dv HS HB HC;
+      destruct dv as [p | vsz x | ip | d | fl | | | bsz bv].
+    - (* [DVALUE_Pointer]: only well-typed at [DTYPE_Pointer] *)
+      destruct dtb; cbn in HB; try discriminate.
+      apply read_base_block_pointer.
+    - (* [DVALUE_I]: only well-typed at [DTYPE_I] of the same width *)
+      destruct dtb as [tsz | | | | fp | | | | | | tsz];
+        cbn in HB; try discriminate.
+      apply Pos.eqb_eq in HB; subst tsz.
+      cbn [base_byte_gen].
+      destruct (N.eqb_spec (Npos vsz mod 8) 0) as [E8 | E8].
+      + (* a whole number of bytes *)
+        apply read_int_block_mult8; exact E8.
+      + (* the last byte holds [sz mod 8] real bits plus poison padding *)
+        apply read_int_block_mixed; exact E8.
+    - (* [DVALUE_Iptr]: well-typed only at [DTYPE_Iptr], which is not
+         [serializable_base] *)
+      destruct dtb; cbn in HB, HS; try discriminate; contradiction.
+    - (* [DVALUE_Double]: only well-typed at [DTYPE_FP FP_double] *)
+      destruct dtb as [tsz | | | | fp | | | | | | tsz]; cbn in HB; try discriminate.
+      destruct fp; cbn in HB; try discriminate.
+      apply read_base_block_double.
+    - (* [DVALUE_Float]: only well-typed at [DTYPE_FP FP_float] *)
+      destruct dtb as [tsz | | | | fp | | | | | | tsz]; cbn in HB; try discriminate.
+      destruct fp; cbn in HB; try discriminate.
+      apply read_base_block_float.
+    - (* [DVALUE_Poison]: the block is a run of [poison_memory_byte], which
+         every arm of the reader absorbs *)
+      cbn [base_byte_gen]; rewrite map_const_Nseq.
+      apply read_base_block_poison; exact HS.
+    - (* [DVALUE_None]: well-typed only at [DTYPE_Void], which is not
+         [serializable_base] *)
+      destruct dtb; cbn in HB, HS; try discriminate; contradiction.
+    - (* [DVALUE_B]: each constructor of a canonical [dvalue_bv] must come back
+         down the branch of [memory_bytes_to_byte_value] it came from *)
+      destruct dtb as [tsz | | | | fp | | | | | | tsz]; cbn in HB; try discriminate.
+      apply Pos.eqb_eq in HB; subst tsz.
+      cbn [base_byte_gen].
+      destruct bv as [p k | x | bits].
+      + (* [BYTE_Pointer]: canonical only at a whole number of bytes *)
+        apply read_base_block_BYTE_Pointer.
+        cbn in HC; apply N.eqb_eq in HC; exact HC.
+      + (* [BYTE_I] *) apply read_base_block_BYTE_I.
+      + (* [BYTE_Mixed] *)
+        cbn in HC.
+        apply andb_true_iff in HC as [HC3 HC4].
+        apply andb_true_iff in HC3 as [HC2 HC3].
+        apply andb_true_iff in HC2 as [HC1 HC2].
+        apply N.eqb_eq in HC1.
+        apply read_base_block_BYTE_Mixed; assumption.
+  Qed.
+
+
+  (* both aggregate arms of the writer share this body for a poison value *)
+  Lemma poison_block_shape : forall n ta acc,
+      (let '(o, bs) := accumulate_padding_bytes 0%N n acc in
+       ret (accumulate_padding o ta bs) : EOU (N * list memory_byte))
+      = raise_ret (tapad ta n,
+                   List.repeat poison_memory_byte (N.to_nat (tapad ta n)) ++ acc).
+  Proof.
+    intros n ta acc; unfold accumulate_padding_bytes; cbv beta iota.
+    replace (0 + n)%N with n by lia.
+    destruct ta as [a |]; cbn [accumulate_padding tapad].
+    - rewrite 2 accumulate_poison_bytes_app, app_assoc, <- repeat_app.
+      unfold pad_to.
+      replace (N.to_nat (pad_amount a n) + N.to_nat n)%nat
+         with (N.to_nat (n + pad_amount a n)) by lia.
+      reflexivity.
+    - rewrite accumulate_poison_bytes_app; reflexivity.
+  Qed.
+
+  Lemma ser_poison_agg : forall dt ta acc,
+      match dt with DTYPE_Base _ => False | _ => True end ->
+      acc_dvalue_to_memory_bytes_h dt (DVALUE_Base DVALUE_Poison) 0%N ta acc
+      = raise_ret (tapad ta (store_size_dtyp dt),
+                   List.repeat poison_memory_byte
+                     (N.to_nat (tapad ta (store_size_dtyp dt))) ++ acc).
+  Proof.
+    intros dt ta acc H; destruct dt as [db | pk dts | vv sz t]; [contradiction | |].
+    - rewrite ser_struct_poison_unfold; apply poison_block_shape.
+    - rewrite ser_array_poison_unfold; apply poison_block_shape.
+  Qed.
+
+  Lemma poison_split_app_live : forall w extra,
+      snd (poison_split w) <> [] ->
+      poison_split (w ++ extra)
+      = (fst (poison_split w), snd (poison_split w) ++ extra).
+  Proof.
+    induction w as [| b w IH]; intros extra H.
+    - exfalso; apply H; reflexivity.
+    - specialize (IH extra).
+      cbn [poison_split app] in *.
+      destruct (is_all_poison_byte b).
+      + destruct (poison_split w) as [k tl]; cbv beta iota in *.
+        rewrite IH by assumption; reflexivity.
+      + reflexivity.
+  Qed.
+
+  Lemma poison_split_app_poison : forall w extra,
+      snd (poison_split w) = [] ->
+      poison_split (w ++ extra)
+      = ((fst (poison_split w) + fst (poison_split extra))%N,
+         snd (poison_split extra)).
+  Proof.
+    induction w as [| b w IH]; intros extra H.
+    - cbn [poison_split app].
+      destruct (poison_split extra) as [ke te]; cbn [fst snd].
+      rewrite N.add_0_l; reflexivity.
+    - specialize (IH extra).
+      cbn [poison_split app] in *.
+      destruct (is_all_poison_byte b).
+      + destruct (poison_split w) as [k tl]; cbv beta iota in *.
+        rewrite IH by assumption.
+        destruct (poison_split extra) as [ke te]; cbn [fst snd] in *.
+        cbv beta iota.
+        replace (1 + (k + ke))%N with (1 + k + ke)%N by lia; reflexivity.
+      + cbv beta iota in H; discriminate.
+  Qed.
+
+  (** A base read consumes exactly [store_size_dtyp], so anything after the
+      value is invisible to it.  This is what makes the [tail_align] padding
+      harmless, and it is the base case of the same property for aggregates. *)
+  Lemma read_base_trailing : forall dtb w extra,
+      (store_size_dtyp (DTYPE_Base dtb) <= N.of_nat (length w))%N ->
+      memory_bytes_to_dvalue (w ++ extra) (DTYPE_Base dtb)
+      = memory_bytes_to_dvalue w (DTYPE_Base dtb).
+  Proof.
+    intros dtb w extra H; cbn [memory_bytes_to_dvalue].
+    now rewrite take_app_le by exact H.
+  Qed.
+
+  (** The reader's struct loop, lifted out of [memory_bytes_to_dvalue] the same
+      way the writer's loops were, so it can be reasoned about by induction.
+      [read_struct_unfold] says the lift is exact. *)
+  Section ReadStructLoop.
+    Variable rd : list memory_byte -> dtyp -> EOU dvalue.
+    Variable np : N.
+    Variable pad : option N.
+
+    Fixpoint read_struct_loop (offset : N) (dts : list dtyp)
+      (dbs : list memory_byte) {struct dts} : EOU (list dvalue) :=
+      match dts with
+      | [] => ret []
+      | (dt::dts) =>
+          let padding :=
+            if pad
+            then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
+            else 0%N
+          in
+          let dbs' := drop padding dbs in
+          let start := (offset + padding)%N in
+          let ssz := store_size_dtyp dt in
+          let asz := alloc_size_dtyp dt in
+          let rest_bytes := drop asz dbs' in
+          f <- (if N.leb (start + ssz) np
+                then ret (DVALUE_Base DVALUE_Poison)
+                else rd (take ssz dbs') dt) ;;
+          rest <- read_struct_loop (start + asz) dts rest_bytes ;;
+          ret (f :: rest)
+      end.
+  End ReadStructLoop.
+
+  Lemma read_struct_unfold : forall packed dts dbs,
+      memory_bytes_to_dvalue dbs (DTYPE_Struct packed dts)
+      = let '(np, rest) := poison_split dbs in
+        match rest with
+        | [] => ret (DVALUE_Base DVALUE_Poison)
+        | _ :: _ =>
+            (canonicalize_agg (DVALUE_Struct packed))
+              <$> (read_struct_loop memory_bytes_to_dvalue np
+                     (if packed then None
+                      else Some (max_preferred_dtyp_alignment dts))
+                     0%N dts dbs)
+        end.
+  Proof. reflexivity. Qed.
+
+  (* [poison_split] hands back a genuinely all-poison prefix *)
+  Lemma poison_split_prefix : forall l,
+      forallb is_all_poison_byte (take (fst (poison_split l)) l) = true.
+  Proof.
+    induction l as [| b l IH]; [reflexivity |].
+    cbn [poison_split].
+    destruct (is_all_poison_byte b) eqn:Eb.
+    - destruct (poison_split l) as [k tl] eqn:E; cbn [fst] in *.
+      cbn [take]; rewrite N.eqb_sym.
+      destruct (N.eqb_spec (1 + k) 0)%N; [lia |].
+      cbn [forallb]; rewrite Eb, N.pred_sub.
+      replace (1 + k - 1)%N with k by lia; exact IH.
+    - cbn [take fst]; reflexivity.
+  Qed.
+
+  (** A non-poison base value always lays down at least one non-poison byte.
+      This is what lets the aggregate cases justify the reader's [np] skipping:
+      a field lying entirely below the first non-poison byte must itself have
+      been poison. *)
+
+  Lemma forallb_head_false : forall (b : memory_byte) l,
+      is_all_poison_byte b = false -> forallb is_all_poison_byte (b :: l) = false.
+  Proof. intros b l H; cbn [forallb]; rewrite H; reflexivity. Qed.
+
+  Lemma base_block_not_all_poison : forall dtb dv,
+      serializable_base dtb ->
+      dvalue_base_has_dtyp_base dv dtb = true ->
+      dvalue_base_canonical dv = true ->
+      dv <> DVALUE_Poison ->
+      forallb is_all_poison_byte
+        (List.map (base_byte_gen dv)
+                  (Nseq 0 (N.to_nat (store_size_dtyp (DTYPE_Base dtb))))) = false.
+  Proof.
+    intros dtb dv HS HB HC HNP.
+    assert (HK : (0 < N.to_nat (store_size_dtyp (DTYPE_Base dtb)))%nat)
+      by (pose proof (serializable_base_pos dtb HS); lia).
+    destruct (N.to_nat (store_size_dtyp (DTYPE_Base dtb))) as [| K] eqn:EK;
+      [lia |].
+    destruct dv as [p | vsz x | ip | d | fl | | | bsz bv].
+    - (* pointer *) cbn [Nseq List.map base_byte_gen]; reflexivity.
+    - (* integer: reuse the [BYTE_I] block fact *)
+      cbn [base_byte_gen].
+      rewrite <- all_poison_bytes_forallb.
+      apply all_poison_BYTE_I_block; lia.
+    - (* iptr is not serializable *)
+      destruct dtb; cbn in HB, HS; try discriminate; contradiction.
+    - (* double *) cbn [Nseq List.map base_byte_gen]; reflexivity.
+    - (* float *) cbn [Nseq List.map base_byte_gen]; reflexivity.
+    - (* poison, excluded *) contradiction.
+    - (* none is only well-typed at void *)
+      destruct dtb; cbn in HB, HS; try discriminate; contradiction.
+    - (* byte vector *)
+      destruct dtb as [tsz | | | | fp | | | | | | tsz]; cbn in HB; try discriminate.
+      apply Pos.eqb_eq in HB; subst tsz.
+      cbn [base_byte_gen].
+      assert (Hb : (Npos bsz <= 8 * store_size_dtyp (DTYPE_Base (DTYPE_B bsz)))%N).
+      { rewrite store_size_dtyp_bytes.
+        pose proof (N.div_mod (Npos bsz + 7) 8 ltac:(lia)).
+        pose proof (N.mod_upper_bound (Npos bsz + 7) 8 ltac:(lia)); lia. }
+      destruct bv as [q k | x | bits].
+      + cbn [Nseq List.map memory_byte_of_dvalue_bv]; reflexivity.
+      + rewrite <- all_poison_bytes_forallb.
+        apply all_poison_BYTE_I_block; lia.
+      + cbn in HC.
+        apply andb_true_iff in HC as [HC3 HC4].
+        apply andb_true_iff in HC3 as [HC2 _].
+        apply andb_true_iff in HC2 as [HC1 _].
+        apply N.eqb_eq in HC1.
+        destruct (forallb is_all_poison_byte
+                    (List.map (memory_byte_of_dvalue_bv (BYTE_Mixed bsz bits))
+                       (Nseq 0 (S K)))) eqn:E; [| reflexivity].
+        exfalso.
+        erewrite map_ext in E by (intros idx; apply writer_mixed_byte).
+        apply mixed_all_poison in E; [rewrite E in HC4; discriminate | lia].
+  Qed.
+
+  (** The property [round_trip_h] proves, named so that the aggregate loop
+      lemmas can take the induction hypothesis as [Forall rt_spec]. *)
+  Definition rt_spec (dv : dvalue) : Prop :=
+    forall dt, dvalue_has_dtyp dv dt ->
+    serializable dt ->
+    forall ta acc offset' bs,
+      acc_dvalue_to_memory_bytes_h dt dv 0%N ta acc = raise_ret (offset', bs) ->
+      exists w, bs = w ++ acc
+             /\ N.of_nat (length w) = tapad ta (store_size_dtyp dt)
+             /\ memory_bytes_to_dvalue (rev w) dt = ret dv
+             /\ (dv <> DVALUE_Base DVALUE_Poison ->
+                 forallb is_all_poison_byte (rev w) = false).
+
+  (** The reader's array/vector loop, lifted the same way. *)
+  Section ReadArrayLoop.
+    Variable rd : list memory_byte -> dtyp -> EOU dvalue.
+    Variable np : N.
+    Variable stride : N.
+    Variable t : dtyp.
+
+    Fixpoint read_array_loop (n : nat) (offset : N) (dbs : list memory_byte)
+      {struct n} : EOU (list dvalue) :=
+      match n with
+      | O => ret []
+      | S n' =>
+          e <- (if N.leb (offset + store_size_dtyp t) np
+                then ret (DVALUE_Base DVALUE_Poison)
+                else rd (take (store_size_dtyp t) dbs) t) ;;
+          rest <- read_array_loop n' (offset + stride)%N (drop stride dbs) ;;
+          ret (e :: rest)
+      end.
+  End ReadArrayLoop.
+
+  Lemma read_array_unfold : forall vec sz t dbs,
+      memory_bytes_to_dvalue dbs (DTYPE_Array vec sz t)
+      = let '(np, rest) := poison_split dbs in
+        match rest with
+        | [] => ret (DVALUE_Base DVALUE_Poison)
+        | _ :: _ =>
+            elts <- read_array_loop memory_bytes_to_dvalue np
+                      (if vec then store_size_dtyp t else alloc_size_dtyp t) t
+                      (N.to_nat sz) 0%N dbs ;;
+            ret (canonicalize_agg (DVALUE_Array vec) elts)
+        end.
+  Proof. reflexivity. Qed.
+
+  Lemma read_array_loop_cons : forall rd np stride t n offset dbs,
+      read_array_loop rd np stride t (S n) offset dbs
+      = (e <- (if N.leb (offset + store_size_dtyp t) np
+               then ret (DVALUE_Base DVALUE_Poison)
+               else rd (take (store_size_dtyp t) dbs) t) ;;
+         rest <- read_array_loop rd np stride t n (offset + stride)%N
+                   (drop stride dbs) ;;
+         ret (e :: rest)).
+  Proof. reflexivity. Qed.
+
+  (** Shapes of the two padding primitives, and a sublist fact for the
+      reader's poison prefix. *)
+
+  Lemma accumulate_padding_shape : forall offset q acc,
+      accumulate_padding offset q acc
+      = (tapad q offset,
+         List.repeat poison_memory_byte (N.to_nat (tapad q offset - offset)) ++ acc).
+  Proof.
+    intros offset [a |] acc; cbn [accumulate_padding tapad].
+    - rewrite accumulate_poison_bytes_app.
+      unfold pad_to.
+      replace (offset + pad_amount a offset - offset)%N
+        with (pad_amount a offset) by lia.
+      reflexivity.
+    - replace (offset - offset)%N with 0%N by lia; reflexivity.
+  Qed.
+
+  Lemma accumulate_padding_bytes_shape : forall offset n acc,
+      accumulate_padding_bytes offset n acc
+      = ((offset + n)%N, List.repeat poison_memory_byte (N.to_nat n) ++ acc).
+  Proof.
+    intros offset n acc; unfold accumulate_padding_bytes.
+    rewrite accumulate_poison_bytes_app; reflexivity.
+  Qed.
+
+  Lemma forallb_poison_repeat : forall k,
+      forallb is_all_poison_byte (List.repeat poison_memory_byte k) = true.
+  Proof. induction k as [| k IH]; cbn; [reflexivity | exact IH]. Qed.
+  Lemma forallb_sub : forall (l : list memory_byte) n i m,
+      (i + m <= n)%N ->
+      forallb is_all_poison_byte (take n l) = true ->
+      forallb is_all_poison_byte (take m (drop i l)) = true.
+  Proof.
+    intros l n i m Hle H.
+    rewrite <- (@take_take_le _ (drop i l) m (n - i)) by lia.
+    rewrite <- drop_take.
+    apply forallb_take_pres, forallb_drop_pres; exact H.
+  Qed.
+
+
+  Lemma read_struct_loop_cons : forall rd np pad offset dt dts dbs,
+      read_struct_loop rd np pad offset (dt::dts) dbs
+      = (let padding := if pad
+                        then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
+                        else 0%N in
+         let dbs' := drop padding dbs in
+         let start := (offset + padding)%N in
+         f <- (if N.leb (start + store_size_dtyp dt) np
+               then ret (DVALUE_Base DVALUE_Poison)
+               else rd (take (store_size_dtyp dt) dbs') dt) ;;
+         rest <- read_struct_loop rd np pad (start + alloc_size_dtyp dt) dts
+                   (drop (alloc_size_dtyp dt) dbs') ;;
+         ret (f :: rest)).
+  Proof. reflexivity. Qed.
+
+  Lemma dvalue_is_poison_false : forall d,
+      dvalue_is_poison d = false -> d <> DVALUE_Base DVALUE_Poison.
+  Proof. intros d H C; subst; discriminate. Qed.
+
+  (** The struct loops, writer against reader.  The writer emits, per field,
+      [[leading padding][child block][pad to alloc size]]; the reader does
+      [drop padding], [take ssz], [drop asz].  The last clause is the reader
+      side: given that the block's first [np - offset] bytes are poison (which
+      is what [poison_split] reports), the reader's loop rebuilds [fields].
+      A field the reader skips lies wholly inside that poison prefix, so by
+      the fourth clause of [rt_spec] it must have been poison -- which is what
+      the reader answers. *)
+  Lemma struct_loop_read : forall fields dts,
+      Forall2 dvalue_has_dtyp fields dts ->
+      Forall rt_spec fields ->
+      FORALL serializable dts ->
+      forall ta pad offset acc offset' bs,
+        struct_bytes_loop acc_dvalue_to_memory_bytes_h ta pad fields dts offset acc
+          = raise_ret (offset', bs) ->
+        exists w, bs = w ++ acc
+               /\ N.of_nat (length w) = (offset' - offset)%N
+               /\ (offset <= offset')%N
+               /\ (forallb dvalue_is_poison fields = false ->
+                   forallb is_all_poison_byte (rev w) = false)
+               /\ (forall np extra,
+                     forallb is_all_poison_byte
+                       (take (np - offset) (rev w ++ extra)) = true ->
+                     read_struct_loop memory_bytes_to_dvalue np pad offset dts
+                       (rev w ++ extra) = ret fields).
+  Proof.
+    intros fields dts HF2; induction HF2 as [| f dt fs dts Hfdt HF2 IHl];
+      intros HR HSer ta pad offset acc offset' bs Heq.
+    - (* no fields: just the struct's tail padding and the caller's *)
+      rewrite struct_bytes_loop_nil, accumulate_padding_shape in Heq.
+      cbv beta iota in Heq.
+      rewrite accumulate_padding_shape in Heq.
+      inversion Heq; subst; clear Heq.
+      pose proof (tapad_ge pad offset) as G1.
+      pose proof (tapad_ge ta (tapad pad offset)) as G2.
+      exists (List.repeat poison_memory_byte
+                (N.to_nat (tapad ta (tapad pad offset) - tapad pad offset))
+              ++ List.repeat poison_memory_byte
+                   (N.to_nat (tapad pad offset - offset))).
+      split; [now rewrite <- app_assoc | split; [| split; [| split]]].
+      + rewrite length_app, !repeat_length; lia.
+      + lia.
+      + cbn [forallb]; discriminate.
+      + intros np extra Hpre; reflexivity.
+    - (* one field, then the rest *)
+      inversion HR as [| ? ? Hrt HRtl]; subst; clear HR.
+      destruct HSer as [HSdt HSdts].
+      rewrite struct_bytes_loop_cons, accumulate_padding_shape in Heq.
+      cbv beta iota in Heq.
+      set (q := if pad then Some (preferred_alignment (dtyp_alignment dt)) else None)
+        in Heq |- *.
+      set (o1 := tapad q offset) in Heq |- *.
+      set (p1 := List.repeat poison_memory_byte (N.to_nat (o1 - offset)))
+        in Heq |- *.
+      destruct (acc_dvalue_to_memory_bytes_h dt f 0%N None (p1 ++ acc))
+        as [ | | | [coff cbs] ] eqn:EF;
+        cbn -[acc_dvalue_to_memory_bytes_h accumulate_padding
+              accumulate_padding_bytes struct_bytes_loop store_size_dtyp
+              alloc_size_dtyp pad_to_align dtyp_alignment preferred_alignment
+              max_preferred_dtyp_alignment] in Heq;
+        try discriminate.
+      destruct (Hrt dt Hfdt HSdt None (p1 ++ acc) coff cbs EF)
+        as (wf & Ecbs & Lwf & Hrdf & Hlivef).
+      destruct (acc_dvalue_to_memory_bytes_h_spec Hfdt None (p1 ++ acc) EF)
+        as [Ecoff _].
+      cbn [tapad] in Ecoff, Lwf; subst coff.
+      rewrite accumulate_padding_bytes_shape in Heq; cbv beta iota in Heq.
+      set (p2 := List.repeat poison_memory_byte
+                   (N.to_nat (alloc_size_dtyp dt - store_size_dtyp dt)))
+        in Heq |- *.
+      destruct (IHl HRtl HSdts ta pad _ _ _ _ Heq)
+        as (wr & Ebs & Lwr & Hler & Hliver & Hreadr).
+      pose proof (store_le_alloc dt) as SA.
+      replace (o1 + store_size_dtyp dt
+               + (alloc_size_dtyp dt - store_size_dtyp dt))%N
+        with (o1 + alloc_size_dtyp dt)%N in Hreadr, Lwr, Hler by lia.
+      pose proof (tapad_ge q offset) as G1.
+      assert (Lp1 : N.of_nat (length p1) = (o1 - offset)%N)
+        by (subst p1; rewrite repeat_length; lia).
+      assert (Lp2 : N.of_nat (length p2)
+                    = (alloc_size_dtyp dt - store_size_dtyp dt)%N)
+        by (subst p2; rewrite repeat_length; lia).
+      exists (wr ++ p2 ++ wf ++ p1).
+      assert (Erev : rev (wr ++ p2 ++ wf ++ p1)
+                     = p1 ++ rev wf ++ p2 ++ rev wr).
+      { rewrite !rev_app_distr, !app_assoc.
+        subst p1 p2; rewrite !rev_repeat; reflexivity. }
+      split; [rewrite Ebs, Ecbs; rewrite <- !app_assoc; reflexivity | split; [| split; [| split]]].
+      + rewrite !length_app; lia.
+      + lia.
+      + intros Hnp; rewrite Erev, !forallb_app.
+        cbn [forallb] in Hnp; apply andb_false_iff in Hnp as [Hf | Hfs].
+        * rewrite (Hlivef (dvalue_is_poison_false Hf)).
+          rewrite andb_false_l, andb_false_r; reflexivity.
+        * rewrite (Hliver Hfs), !andb_false_r; reflexivity.
+      + intros np extra Hpre.
+        rewrite Erev in Hpre |- *.
+        rewrite <- !app_assoc in Hpre |- *.
+        rewrite read_struct_loop_cons; cbv beta zeta.
+        assert (Epad : (if pad
+                        then pad_amount (preferred_alignment (dtyp_alignment dt)) offset
+                        else 0%N) = (o1 - offset)%N).
+        { subst o1 q; destruct pad; cbn [tapad]; unfold pad_to; lia. }
+        rewrite Epad.
+        assert (Lwf' : N.of_nat (length (rev wf)) = store_size_dtyp dt)
+          by (rewrite length_rev; exact Lwf).
+        assert (Lwfp2 : N.of_nat (length (rev wf ++ p2)) = alloc_size_dtyp dt)
+          by (rewrite length_app, length_rev; lia).
+        rewrite (drop_app_exact p1 Lp1).
+        replace (offset + (o1 - offset))%N with o1 by lia.
+        rewrite (@take_app_exact _ (rev wf) (p2 ++ rev wr ++ extra)
+                   (store_size_dtyp dt) Lwf').
+        rewrite (app_assoc (rev wf) p2).
+        rewrite (drop_app_exact (rev wf ++ p2) Lwfp2).
+        (* the tail's poison prefix *)
+        assert (Edrop : drop (o1 + alloc_size_dtyp dt - offset)%N
+                          (p1 ++ rev wf ++ p2 ++ rev wr ++ extra)
+                        = rev wr ++ extra).
+        { rewrite (app_assoc p1), (app_assoc (p1 ++ rev wf)).
+          apply drop_app_exact.
+          rewrite !length_app, length_rev; lia. }
+        assert (Hr : forallb is_all_poison_byte
+                       (take (np - (o1 + alloc_size_dtyp dt))
+                          (rev wr ++ extra)) = true).
+        { destruct (N.leb_spec np (o1 + alloc_size_dtyp dt)) as [Hle2 | Hgt].
+          - replace (np - (o1 + alloc_size_dtyp dt))%N with 0%N by lia.
+            rewrite take_nil; reflexivity.
+          - rewrite <- Edrop.
+            apply forallb_sub with (n := (np - offset)%N); [lia | exact Hpre]. }
+        rewrite (Hreadr np extra Hr).
+        (* the field itself: read, or skipped because it is poison *)
+        destruct (N.leb_spec (o1 + store_size_dtyp dt) np) as [Hskip | Hread].
+        * assert (Hwf : forallb is_all_poison_byte (rev wf) = true).
+          { assert (Etake : take (store_size_dtyp dt)
+                              (drop (o1 - offset)%N
+                                 (p1 ++ rev wf ++ p2 ++ rev wr ++ extra))
+                            = rev wf).
+            { rewrite (drop_app_exact p1 Lp1).
+              apply (@take_app_exact _ (rev wf) (p2 ++ rev wr ++ extra)
+                       (store_size_dtyp dt) Lwf'). }
+            rewrite <- Etake.
+            apply forallb_sub with (n := (np - offset)%N); [lia | exact Hpre]. }
+          assert (Hfp : f = DVALUE_Base DVALUE_Poison).
+          { destruct (dvalue_eq_dec f (DVALUE_Base DVALUE_Poison)) as [E | NE];
+              [exact E |].
+            exfalso; rewrite (Hlivef NE) in Hwf; discriminate. }
+          rewrite Hfp; reflexivity.
+        * rewrite Hrdf; reflexivity.
+  Qed.
+
+  Lemma array_loop_read : forall elts t,
+      Forall (fun x => dvalue_has_dtyp x t) elts ->
+      Forall rt_spec elts ->
+      serializable t ->
+      forall ta ep offset acc offset' bs,
+        array_bytes_loop acc_dvalue_to_memory_bytes_h ta t ep elts offset acc
+          = raise_ret (offset', bs) ->
+        exists w, bs = w ++ acc
+               /\ N.of_nat (length w) = (offset' - offset)%N
+               /\ (offset <= offset')%N
+               /\ (forallb dvalue_is_poison elts = false ->
+                   forallb is_all_poison_byte (rev w) = false)
+               /\ (forall np extra,
+                     forallb is_all_poison_byte
+                       (take (np - offset) (rev w ++ extra)) = true ->
+                     read_array_loop memory_bytes_to_dvalue np
+                       (store_size_dtyp t + ep)%N t (length elts) offset
+                       (rev w ++ extra) = ret elts).
+  Proof.
+    intros elts t HT; induction HT as [| e es Het HT IHl];
+      intros HR HSt ta ep offset acc offset' bs Heq.
+    - (* no elements: only the caller's padding *)
+      rewrite array_bytes_loop_nil, accumulate_padding_shape in Heq.
+      inversion Heq; subst; clear Heq.
+      pose proof (tapad_ge ta offset) as G.
+      exists (List.repeat poison_memory_byte (N.to_nat (tapad ta offset - offset))).
+      split; [reflexivity | split; [| split; [| split]]].
+      + rewrite repeat_length; lia.
+      + lia.
+      + cbn [forallb]; discriminate.
+      + intros np extra Hpre; reflexivity.
+    - (* one element, then the rest *)
+      inversion HR as [| ? ? Hrt HRtl]; subst; clear HR.
+      rewrite array_bytes_loop_cons in Heq.
+      destruct (acc_dvalue_to_memory_bytes_h t e 0%N None acc)
+        as [ | | | [coff cbs] ] eqn:EF;
+        cbn -[acc_dvalue_to_memory_bytes_h accumulate_padding_bytes
+              array_bytes_loop store_size_dtyp alloc_size_dtyp] in Heq;
+        try discriminate.
+      destruct (Hrt t Het HSt None acc coff cbs EF)
+        as (we & Ecbs & Lwe & Hrde & Hlivee).
+      destruct (acc_dvalue_to_memory_bytes_h_spec Het None acc EF) as [Ecoff _].
+      cbn [tapad] in Ecoff, Lwe; subst coff.
+      rewrite accumulate_padding_bytes_shape in Heq; cbv beta iota in Heq.
+      set (pe := List.repeat poison_memory_byte (N.to_nat ep)) in Heq |- *.
+      destruct (IHl HRtl HSt ta ep _ _ _ _ Heq)
+        as (wr & Ebs & Lwr & Hler & Hliver & Hreadr).
+      assert (Lpe : N.of_nat (length pe) = ep)
+        by (subst pe; rewrite repeat_length; lia).
+      exists (wr ++ pe ++ we).
+      assert (Erev : rev (wr ++ pe ++ we) = rev we ++ pe ++ rev wr).
+      { rewrite !rev_app_distr, !app_assoc; subst pe; rewrite rev_repeat; reflexivity. }
+      assert (Lwe' : N.of_nat (length (rev we)) = store_size_dtyp t)
+        by (rewrite length_rev; exact Lwe).
+      assert (Lwepe : N.of_nat (length (rev we ++ pe)) = (store_size_dtyp t + ep)%N)
+        by (rewrite length_app, length_rev; lia).
+      split; [rewrite Ebs, Ecbs; rewrite <- !app_assoc; reflexivity
+             | split; [| split; [| split]]].
+      + rewrite !length_app; lia.
+      + lia.
+      + intros Hnp; rewrite Erev, !forallb_app.
+        cbn [forallb] in Hnp; apply andb_false_iff in Hnp as [He | Hes].
+        * rewrite (Hlivee (dvalue_is_poison_false He)); reflexivity.
+        * rewrite (Hliver Hes), !andb_false_r; reflexivity.
+      + intros np extra Hpre.
+        rewrite Erev in Hpre |- *.
+        rewrite <- !app_assoc in Hpre |- *.
+        cbn [length]; rewrite read_array_loop_cons.
+        rewrite (@take_app_exact _ (rev we) (pe ++ rev wr ++ extra)
+                   (store_size_dtyp t) Lwe').
+        rewrite (app_assoc (rev we) pe).
+        rewrite (drop_app_exact (rev we ++ pe) Lwepe).
+        replace (offset + (store_size_dtyp t + ep))%N
+          with (offset + store_size_dtyp t + ep)%N by lia.
+        assert (Edrop : drop (offset + store_size_dtyp t + ep - offset)%N
+                          (rev we ++ pe ++ rev wr ++ extra) = rev wr ++ extra).
+        { rewrite (app_assoc (rev we) pe).
+          apply drop_app_exact; rewrite length_app, length_rev; lia. }
+        assert (Hr : forallb is_all_poison_byte
+                       (take (np - (offset + store_size_dtyp t + ep))
+                          (rev wr ++ extra)) = true).
+        { destruct (N.leb_spec np (offset + store_size_dtyp t + ep)) as [Hle2 | Hgt].
+          - replace (np - (offset + store_size_dtyp t + ep))%N with 0%N by lia.
+            rewrite take_nil; reflexivity.
+          - rewrite <- Edrop.
+            apply forallb_sub with (n := (np - offset)%N); [lia | exact Hpre]. }
+        rewrite (Hreadr np extra Hr).
+        destruct (N.leb_spec (offset + store_size_dtyp t) np) as [Hskip | Hread].
+        * assert (Hwe : forallb is_all_poison_byte (rev we) = true).
+          { assert (Etake : take (store_size_dtyp t)
+                              (drop 0%N (rev we ++ pe ++ rev wr ++ extra))
+                            = rev we).
+            { rewrite drop_nil.
+              apply (@take_app_exact _ (rev we) (pe ++ rev wr ++ extra)
+                       (store_size_dtyp t) Lwe'). }
+            rewrite <- Etake.
+            apply forallb_sub with (n := (np - offset)%N); [lia | exact Hpre]. }
+          assert (Hep : e = DVALUE_Base DVALUE_Poison).
+          { destruct (dvalue_eq_dec e (DVALUE_Base DVALUE_Poison)) as [E | NE];
+              [exact E |].
+            exfalso; rewrite (Hlivee NE) in Hwe; discriminate. }
+          rewrite Hep; reflexivity.
+        * rewrite Hrde; reflexivity.
+  Qed.
+
+  (** The invariant the round trip is proved by.  The writer accumulates in
+      reverse on top of [acc], so it contributes a block [w] that [acc] is
+      appended to; [w] has the type's store size, and reading [rev w] back
+      gives [dv]. *)
+  Lemma round_trip_h : forall dv dt, dvalue_has_dtyp dv dt ->
+    serializable dt ->
+    forall ta acc offset' bs,
+      acc_dvalue_to_memory_bytes_h dt dv 0%N ta acc = raise_ret (offset', bs) ->
+      exists w, bs = w ++ acc
+             /\ N.of_nat (length w) = tapad ta (store_size_dtyp dt)
+             /\ memory_bytes_to_dvalue (rev w) dt = ret dv
+             (* carried along for the aggregate cases: a live value always
+                leaves a live byte, which is what justifies the reader
+                skipping fields that fall below its [np] *)
+             /\ (dv <> DVALUE_Base DVALUE_Poison ->
+                 forallb is_all_poison_byte (rev w) = false).
+  Proof.
+    intros dv; induction dv using dvalue_ind; intros dt HT HS ta acc offset' bs Heq.
+    - (* [DVALUE_Base]: either a genuine base type, or poison at an aggregate
+         one ([DVALUE_Poison_typ_agg] is the only constructor that applies
+         there, so the value must be poison). *)
+      destruct dt as [dtb | pk dts | vv sz t].
+      + (* a genuine base type: the writer lays down [base_block], then [ta]'s
+           padding; the reader trims back to exactly the block *)
+        assert (HB : dvalue_base_has_dtyp_base dv dtb = true
+                     /\ dvalue_base_canonical dv = true)
+          by (inversion HT; subst; split; cbn; auto).
+        destruct HB as [HB HC].
+        rewrite ser_base_unfold, acc_base_unfold, rev_loop_acc_app in Heq.
+        cbv beta iota in Heq; rewrite N.add_0_r in Heq.
+        pose proof (base_block_length dtb dv) as Lblk.
+        destruct ta as [a |]; cbn [accumulate_padding tapad] in Heq |- *.
+        * rewrite accumulate_poison_bytes_app in Heq.
+          inversion Heq; subst; clear Heq.
+          eexists; split; [now rewrite <- app_assoc | split; [| split]].
+          -- rewrite length_app, repeat_length, length_rev, length_map, Nseq_length.
+             unfold pad_to; lia.
+          -- rewrite rev_app_distr, rev_involutive, rev_repeat.
+             cbn [memory_bytes_to_dvalue].
+             rewrite take_app_exact by exact Lblk.
+             rewrite read_base_block by assumption; reflexivity.
+          -- intros Hne.
+             rewrite rev_app_distr, rev_involutive, rev_repeat, forallb_app.
+             rewrite base_block_not_all_poison
+               by (first [exact HS | exact HB | exact HC
+                         | intros C; apply Hne; f_equal; exact C]).
+             reflexivity.
+        * inversion Heq; subst; clear Heq.
+          eexists; split; [reflexivity | split; [| split]].
+          -- rewrite length_rev; exact Lblk.
+          -- rewrite rev_involutive.
+             cbn [memory_bytes_to_dvalue].
+             rewrite take_all by lia.
+             rewrite read_base_block by assumption; reflexivity.
+          -- intros Hne; rewrite rev_involutive.
+             apply base_block_not_all_poison;
+               first [exact HS | exact HB | exact HC
+                     | intros C; apply Hne; f_equal; exact C].
+      + (* poison at a struct type *)
+        inversion HT; subst.
+        rewrite ser_poison_agg in Heq by exact I.
+        inversion Heq; subst; clear Heq.
+        eexists; split; [reflexivity | split; [| split]].
+        * rewrite repeat_length, Nnat.N2Nat.id; reflexivity.
+        * rewrite rev_repeat; apply read_repeat_poison_agg; exact I.
+        * intros C; exfalso; apply C; reflexivity.
+      + (* poison at an array/vector type *)
+        inversion HT; subst.
+        rewrite ser_poison_agg in Heq by exact I.
+        inversion Heq; subst; clear Heq.
+        eexists; split; [reflexivity | split; [| split]].
+        * rewrite repeat_length, Nnat.N2Nat.id; reflexivity.
+        * rewrite rev_repeat; apply read_repeat_poison_agg; exact I.
+        * intros C; exfalso; apply C; reflexivity.
+    - (* [DVALUE_Struct]: the loop lemma does the work; here we only have to
+         get past [poison_split]'s fast path and [canonicalize_agg]. *)
+      pose proof Heq as Heq0.
+      inversion HT as [| | pp ffs ddts HNP HF2 |]; subst.
+      rewrite ser_struct_unfold in Heq.
+      destruct (struct_loop_read HF2 IH HS _ _ _ _ Heq)
+        as (w & Ebs & Hlen & Hle & Hlive & Hread).
+      destruct (acc_dvalue_to_memory_bytes_h_spec HT ta acc Heq0) as [Eo _].
+      exists w; split; [exact Ebs | split; [| split]].
+      + rewrite Hlen, Eo; lia.
+      + rewrite read_struct_unfold.
+        destruct (poison_split (rev w)) as [np rest] eqn:Eps.
+        destruct rest as [| b rest].
+        * (* the block cannot be all poison: some field is live *)
+          exfalso.
+          assert (Hap : all_poison_bytes (rev w) = true)
+            by (unfold all_poison_bytes; rewrite Eps; reflexivity).
+          rewrite all_poison_bytes_forallb, (Hlive HNP) in Hap; discriminate.
+        * assert (HPre : forallb is_all_poison_byte
+                           (take (np - 0) (rev w ++ [])) = true).
+          { rewrite app_nil_r, N.sub_0_r.
+            pose proof (poison_split_prefix (rev w)) as HP.
+            rewrite Eps in HP; cbn [fst] in HP; exact HP. }
+          specialize (Hread np [] HPre); rewrite app_nil_r in Hread.
+          rewrite Hread; cbn.
+          unfold canonicalize_agg; rewrite HNP; reflexivity.
+      + intros _; apply Hlive; exact HNP.
+    - (* [DVALUE_Array]: same shape as the struct, with a uniform stride *)
+      pose proof Heq as Heq0.
+      inversion HT as [| | | vv ees sz0 eet HNV HNP HFA HLen]; subst.
+      rewrite ser_array_unfold in Heq.
+      destruct (array_loop_read HFA IH HS _ _ _ _ Heq)
+        as (w & Ebs & Hlen & Hle & Hlive & Hread).
+      destruct (acc_dvalue_to_memory_bytes_h_spec HT ta acc Heq0) as [Eo _].
+      exists w; split; [exact Ebs | split; [| split]].
+      + rewrite Hlen, Eo; lia.
+      + rewrite read_array_unfold.
+        destruct (poison_split (rev w)) as [np rest] eqn:Eps.
+        destruct rest as [| b rest].
+        * exfalso.
+          assert (Hap : all_poison_bytes (rev w) = true)
+            by (unfold all_poison_bytes; rewrite Eps; reflexivity).
+          rewrite all_poison_bytes_forallb, (Hlive HNP) in Hap; discriminate.
+        * assert (HPre : forallb is_all_poison_byte
+                           (take (np - 0) (rev w ++ [])) = true).
+          { rewrite app_nil_r, N.sub_0_r.
+            pose proof (poison_split_prefix (rev w)) as HP.
+            rewrite Eps in HP; cbn [fst] in HP; exact HP. }
+          specialize (Hread np [] HPre); rewrite app_nil_r, HLen in Hread.
+          replace (if v then store_size_dtyp eet else alloc_size_dtyp eet)
+            with (store_size_dtyp eet
+                  + (if v then 0
+                     else alloc_size_dtyp eet - store_size_dtyp eet))%N
+            by (pose proof (store_le_alloc eet); destruct v; lia).
+          rewrite Hread; cbn.
+          unfold canonicalize_agg; rewrite HNP; reflexivity.
+      + intros _; apply Hlive; exact HNP.
+  Qed.
+
+  Lemma memory_bytes_round_trip1 :
+    forall dt dv ta mb,
+      serializable dt ->
+      dvalue_has_dtyp dv dt ->
+      dvalue_to_memory_bytes dt dv ta = ret mb ->
+      memory_bytes_to_dvalue mb dt = ret dv.
+  Proof.
+    intros dt dv ta mb HS HT HW.
+    unfold dvalue_to_memory_bytes in HW.
+    destruct (acc_dvalue_to_memory_bytes_h dt dv 0%N ta [])
+      as [ | | | [off bs] ] eqn:E; cbn in HW; try discriminate.
+    inversion HW; subst; clear HW.
+    destruct (round_trip_h HT HS _ _ E) as (w & Ebs & _ & HR & _).
+    rewrite Ebs, app_nil_r, rev_append_rev, app_nil_r.
+    exact HR.
+  Qed.
 
 End MemoryByte.
 
