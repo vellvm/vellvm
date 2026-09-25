@@ -288,11 +288,11 @@ define void @llvm.lifetime.end.p0i8(i64 immarg %a1, i8* nocapture %a2) {
      ret void
 }
 
-define void @llvm.lifetime.start.p0(i64 %blah, i8* nonnull %foo) {
+define void @llvm.lifetime.start.p0(ptr captures(none) %foo) {
      ret void
 }
 
-define void @llvm.lifetime.end.p0(i64 immarg %a1, i8* nocapture %a2) {
+define void @llvm.lifetime.end.p0(ptr captures(none) %foo) {
      ret void
 }
 
