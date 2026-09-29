@@ -4,6 +4,7 @@ From ExtLib Require Import
   Structures.Monads.
 From Vellvm.Utils Require Import
   ListUtil Tactics.
+Import MonadNotation.
 
 Variant EOU {X : Type} : Type :=
   | raise_error (s : string): EOU
@@ -58,5 +59,34 @@ Definition option_ub {X : Type} (s : string) (x : option X) :=
   match x with
   | None => raise_ub s
   | Some v => ret v
+  end.
+
+(* This function may essentially compute poison, but without a dvalue to embed it into yet.
+     We take an adhoc lightweigh way to handle this currently with the following option return type.
+     It is also tied to how we treat the behavior of running map_monad to extract a list of bytes:
+     currently we want it to result into a Poison dvalue if any byte resulted in poison.
+     We are likely to follow a finer grained approach soon.
+ *)
+Notation MaybePoison := option.
+Notation Pois := None.
+Notation NoPois := Some.
+Definition EOUP Z := EOU (option Z).
+
+#[global] Instance EOUP_Monad : Monad EOUP :=
+  {| ret _ a := ret (NoPois a) ;
+    bind _ _ c k := 
+      bind (m := EOU) c (fun pov => match pov with
+                                 | Pois => ret Pois
+                                 | NoPois a => k a
+                                 end)
+  |}.
+
+Open Scope monad_scope.
+
+Definition catch_pois {A} {Z} (z_default:Z) (c : EOUP A) (k : A -> EOU Z) : EOU Z := 
+  x <- (c : EOU _) ;;
+  match x with
+  | Pois => ret z_default
+  | NoPois v => k v
   end.
 

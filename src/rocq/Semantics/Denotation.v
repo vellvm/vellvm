@@ -609,8 +609,8 @@ Section Denotation.
     | (IId id, INSTR_Load dt (du,ptr) _) =>
       a <- denote_exp' (Some du) ptr;;
       v <- load dt a;;
-      v' <- freeze dt v;;
-      lwrite id v'
+      (* v' <- freeze dt v;; *)
+      lwrite id v
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>

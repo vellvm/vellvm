@@ -1,5 +1,6 @@
 define i64 @main(i64 %argc, i8** %argv) {
   %1 = alloca double
+  store double 0.0, ptr %1
   %2 = load double, double* %1
   %3 = bitcast double %2 to i64
   %4 = icmp eq i64 %3, 0

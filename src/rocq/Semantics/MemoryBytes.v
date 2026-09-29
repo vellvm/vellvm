@@ -947,26 +947,6 @@ Section MemoryByte.
     subst off; destruct ta; reflexivity.
   Qed.
 
-
-  (* This function may essentially compute poison, but without a dvalue to embed it into yet.
-     We take an adhoc lightweigh way to handle this currently with the following option return type.
-     It is also tied to how we treat the behavior of running map_monad to extract a list of bytes:
-     currently we want it to result into a Poison dvalue if any byte resulted in poison.
-     We are likely to follow a finer grained approach soon.
-   *)
-  Variant MaybePoison (A : Type) : Type := | Pois | NoPois (a : A).
-  Arguments Pois {A}.
-  Arguments NoPois {A}.
-  Definition EOUP Z := EOU (MaybePoison Z).
-  #[global] Instance EOUP_Monad : Monad EOUP :=
-    {| ret _ a := ret (NoPois a) ;
-      bind _ _ c k := 
-        bind (m := EOU) c (fun pov => match pov with
-                                   | Pois => ret Pois
-                                   | NoPois a => k a
-                                   end)
-    |}.
-
   Definition memory_bit_to_bit (mb : memory_bit) : EOUP Z :=
     match mb with
     | Bit_ptr p i  => ret (extract_bit_Z (ptr_to_int p) i)
@@ -1010,11 +990,7 @@ Section MemoryByte.
   #[local] Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
 
   Definition absorb_pois {A} (c : EOUP A) (k : A -> EOU dvalue_base) : EOU dvalue_base :=
-    x <- (c : EOU _) ;;
-    match x with
-    | Pois => ret DVALUE_Poison
-    | NoPois v => k v
-    end.
+    catch_pois DVALUE_Poison c k.
   
   (* Recover a pointer from a byte representation for pointer p.
      The byte at index 0 <= i < pointer_size must be of the form:
@@ -2094,8 +2070,8 @@ Section MemoryByte.
       exists v, memory_bytes_to_int sz dbs = raise_ret (NoPois v) /\ repr v = x.
   Proof.
     intros sz x dbs H; cbn [memory_bytes_to_dvalue_base] in H.
-    unfold absorb_pois in H.
-    destruct (memory_bytes_to_int sz dbs) as [ | | | [ | v] ] eqn:E;
+    unfold absorb_pois, catch_pois in H.
+    destruct (memory_bytes_to_int sz dbs) as [ | | | [ v | ] ] eqn:E;
       cbn in H; try discriminate.
     exists v; split; [reflexivity |]. inversion H; reflexivity.
   Qed.
@@ -2510,7 +2486,7 @@ Section MemoryByte.
       unfold pointer_byte_at, valid_pointer_byte, mixed_byte in Hhd.
       rewrite N.mul_0_r, drop_nil in Hhd.
       destruct (valid_pointer_bits p (k * 8) 0
-                  (take 8 bits ++ _)) as [ | | | [ | b] ] eqn:Ev in Hhd;
+                  (take 8 bits ++ _)) as [ | | | [ b | ] ] eqn:Ev in Hhd;
         try discriminate.
       subst b.
       apply valid_pointer_bits_implies in Ev.

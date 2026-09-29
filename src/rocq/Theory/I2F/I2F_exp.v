@@ -1364,7 +1364,7 @@ Proof. exact I. Qed.
 
 Lemma no_cut_bind_EOUP {A B} (c : EOUP A) (k : A -> EOUP B) :
   no_cut c -> (forall a, no_cut (k a)) -> no_cut (bind (m := EOUP) c k).
-Proof. destruct c as [s|s|s|[|a]]; cbn; auto; contradiction. Qed.
+Proof. destruct c as [s|s|s|[a|]]; cbn; auto; contradiction. Qed.
 
 Lemma no_cut_map_monad_EOUP {A B} (f : A -> EOUP B) :
   (forall a, no_cut (f a)) -> forall l, no_cut (map_monad (m := EOUP) f l).

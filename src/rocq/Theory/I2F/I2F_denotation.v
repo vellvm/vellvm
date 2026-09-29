@@ -154,7 +154,7 @@ Lemma I2F_denote_instr :
       destruct ptr.
       bind_exp.
       erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
-      erbind; [apply I2F_freeze'; auto | intros]...
+      auto... (* [apply I2F_freeze'; auto | intros]...*)
     - destruct val,ptr, x; cbn...
       bind_exp.
       bind_exp.
