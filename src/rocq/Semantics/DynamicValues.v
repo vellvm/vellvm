@@ -162,18 +162,6 @@ Section DValue.
   Inductive dvalue : Set :=
   | DVALUE_Base (db : dvalue_base)      
   | DVALUE_Struct (packed:bool) (fields: list dvalue)
-  (* REVISIT: DESIGN CHOICE:
-     Option 1:
-     - Array and Vector values carry their "full" dtyp (which includes a length)
-       this information is then somehow redundant and we need to be careful with (e.g., cstrings)
-
-     - Array and Vector values carry only their element dtyp (which does not include length)
-       this is less redundant, but then the length is determined from the length of the list
-
-     - Array and Vector values carry no dtyp, instead it is in the elements
-       this runs into problems with empty lists (e.g. length 0 arrays)
-
-   *)                  
   | DVALUE_Array (vector:bool) (elts: list dvalue)
   .
   Set Elimination Schemes.
@@ -194,11 +182,61 @@ Section DValue.
     | _ => false
     end.
 
+  Definition is_int_bit (b : memory_bit) : bool :=
+    match b with
+    | Bit_bit _ => true
+    | _ => false
+    end.
+
+  Definition is_ptr_bit (b : memory_bit) : bool :=
+    match b with
+    | Bit_ptr _ _ => true
+    | _ => false
+    end.
+
+  (* The integer denoted by a list of bits, least significant first.  Only
+     meaningful when every bit is an integer bit; other bits count as 0. *)
+  Fixpoint int_bits_to_Z (bits : list memory_bit) : Z :=
+    match bits with
+    | [] => 0
+    | Bit_bit b :: rest => unsigned b + Z.shiftl (int_bits_to_Z rest) 1
+    | _ :: rest => Z.shiftl (int_bits_to_Z rest) 1
+    end.
+
+  (** ** Freezing a byte value
+
+      LangRef ('freeze'): "Values of the byte type are frozen on a per-bit
+      basis."  Poison bit [i] becomes bit [i] of the arbitrary-but-fixed
+      integer [z]; integer and pointer bits are left alone, provenance
+      included. *)
+  Fixpoint freeze_bits (z : Z) (i : N) (bits : list memory_bit) : list memory_bit :=
+    match bits with
+    | [] => []
+    | Bit_psn :: rest =>
+        Bit_bit (repr (if Z.testbit z (Z.of_N i) then 1 else 0)) :: freeze_bits z (1 + i) rest
+    | b :: rest => b :: freeze_bits z (1 + i) rest
+    end.
+
+  (* The frozen bits, re-canonicalised: once the poison is gone the byte is
+     a [BYTE_I] if every bit is an integer bit, and otherwise stays a
+     [BYTE_Mixed] (it still has pointer bits, but not all of them, so it is
+     not a [BYTE_Pointer] either). *)
+  Definition freeze_bv {sz} (z : Z) (bv : dvalue_bv sz) : dvalue_bv sz :=
+    match bv with
+    | BYTE_Mixed bits =>
+        let bits' := freeze_bits z 0 bits in
+        if forallb is_int_bit bits' then BYTE_I (repr (int_bits_to_Z bits'))
+        else BYTE_Mixed sz bits'
+    | _ => bv
+    end.
+
   (** ** Canonical [dvalue_bv]s
 
       [memory_bytes_to_byte_value] picks a representation for the bits it
-      reads back: a slice of a pointer if it can, otherwise an integer,
-      otherwise a raw bit list -- and [memory_bytes_to_dvalue_base] answers
+      reads back: a slice of a pointer if it can, otherwise an integer if
+      every bit is an integer bit, otherwise a raw bit list -- so a
+      [BYTE_Mixed] may mix pointer and integer bits with no poison at all,
+      and keeps the pointer bits' provenance -- and [memory_bytes_to_dvalue_base] answers
       [DVALUE_Poison] before either if every bit is poison.  A [dvalue_bv] is
       *canonical* when it is the one that reader would produce, which is what
       makes serializing and deserializing it the identity.  This formalises
@@ -237,7 +275,7 @@ Section DValue.
                                               (* the invariant [dvalue_bv]'s
                                                  comment already states *)
         && negb (is_pointer_bits bits)        (* else [BYTE_Pointer] is canonical *)
-        && existsb is_poison_bit bits         (* else [BYTE_I] is canonical *)
+        && negb (forallb is_int_bit bits)     (* else [BYTE_I] is canonical *)
         && negb (forallb is_poison_bit bits)  (* else [DVALUE_Poison] is canonical *)
     end.
 

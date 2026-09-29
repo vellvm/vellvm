@@ -152,6 +152,70 @@ Arguments freeze_fields {Pa E HD HF HO HU}.
 Arguments freeze_elts {Pa E HD HF HO HU}.
 
 
+(** ** Per-bit freeze of a byte value
+
+    [freeze_base] freezes a [BYTE_Mixed] bit by bit ([freeze_bv]); the
+    replacement bits come from one [draw] at an integer type.  Related bit
+    lists have the same shape bit for bit, so every test [freeze_bv] makes
+    comes out the same on both sides. *)
+Lemma I2F_freeze_bits z : forall bits bits' i,
+    Forall2 I2F_memory_bit bits bits' ->
+    Forall2 I2F_memory_bit (freeze_bits z i bits) (freeze_bits z i bits').
+Proof.
+  intros bits bits' i F; revert i.
+  induction F as [| b b' bs bs' Hb F IH]; intros i; cbn [freeze_bits]; [constructor |].
+  inversion Hb; subst; constructor; auto; constructor; auto.
+Qed.
+
+Lemma I2F_existsb_poison_bits bits bits' :
+  Forall2 I2F_memory_bit bits bits' ->
+  existsb is_poison_bit bits = existsb is_poison_bit bits'.
+Proof.
+  intros F; induction F as [| b b' bs bs' Hb F IH]; cbn; auto.
+  inversion Hb; subst; cbn; auto.
+Qed.
+
+Lemma I2F_forallb_int_bits bits bits' :
+  Forall2 I2F_memory_bit bits bits' ->
+  forallb is_int_bit bits = forallb is_int_bit bits'.
+Proof.
+  intros F; induction F as [| b b' bs bs' Hb F IH]; cbn; auto.
+  inversion Hb; subst; cbn; auto.
+Qed.
+
+Lemma I2F_int_bits_to_Z bits bits' :
+  Forall2 I2F_memory_bit bits bits' ->
+  int_bits_to_Z bits = int_bits_to_Z bits'.
+Proof.
+  intros F; induction F as [| b b' bs bs' Hb F IH]; cbn; auto.
+  inversion Hb; subst; cbn; now rewrite IH.
+Qed.
+
+(* related draws at an integer type supply the same replacement bits *)
+Lemma I2F_draw_Z (r1 : @dvalue PInf) (r2 : @dvalue PFin) :
+  I2F_dvalue r1 r2 ->
+  match r1 with DVALUE_Base (DVALUE_I _ i) => unsigned i | _ => 0%Z end
+  = match r2 with DVALUE_Base (DVALUE_I _ i) => unsigned i | _ => 0%Z end.
+Proof.
+  intros HR; inversion HR as [b1 b2 HB | |]; subst; try reflexivity.
+  inversion HB; subst; reflexivity.
+Qed.
+
+Lemma I2F_freeze_bv sz z1 z2 (bv : @dvalue_bv PInf sz) (bv' : @dvalue_bv PFin sz) :
+  z1 = z2 ->
+  I2F_dvalue_bv bv bv' ->
+  I2F_dvalue_bv (freeze_bv z1 bv) (freeze_bv z2 bv').
+Proof.
+  intros <- H; inversion H as [i | p p' n HA | bits bits' F]; subst;
+    unfold freeze_bv; try (constructor; auto).
+  pose proof (I2F_freeze_bits z1 0 F) as F'.
+  rewrite (I2F_forallb_int_bits F'), (I2F_int_bits_to_Z F').
+  destruct (forallb is_int_bit (freeze_bits z1 0 bits')); constructor; auto.
+Qed.
+
+(* keep [freeze_bv] folded under [cbn] so [I2F_freeze_bv] applies *)
+#[local] Arguments freeze_bv : simpl never.
+
 (** Generic [freeze]/[freeze_base], parameterized over the single event
       they trigger: [draw]. The MCFG and CFG instances then differ only in
       the [draw]-refinement fed in ([I2F_draw_MCFG] / [I2F_draw_CFG]). *)
@@ -165,10 +229,21 @@ Lemma I2F_freeze_base_gen {E1 E2}
   I2F_dvalue_base a b ->
   ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze_base dt a) (freeze_base dt b).
 Proof.
-  intros HDV; destruct HDV; cbn;
+  intros HDV; destruct HDV as [| | | | | | | sz bv bv' HBV]; cbn;
     try solve [ apply ruttc_ret; auto
-              | apply refine_dvalue_base_map_gen; apply ruttc_ret; auto ].
-  apply Hdraw.
+              | apply refine_dvalue_base_map_gen; apply ruttc_ret; auto
+              | apply Hdraw ].
+  (* [DVALUE_B]: only a [BYTE_Mixed] with poison bits draws *)
+  destruct HBV as [i | p p' n HA | bits bits' F];
+    try solve [ apply refine_dvalue_base_map_gen; apply ruttc_ret;
+                repeat constructor; auto ].
+  rewrite (I2F_existsb_poison_bits F).
+  destruct (existsb is_poison_bit bits');
+    [| apply refine_dvalue_base_map_gen; apply ruttc_ret; repeat constructor; auto ].
+  rbind I2F_dvalue; [apply Hdraw |].
+  intros r1 r2 HR; apply ruttc_ret.
+  do 2 constructor.
+  apply I2F_freeze_bv; [now apply I2F_draw_Z | now constructor].
 Qed.
 
 (* SAZ: I got claude Opus 5.0 to fix the proof of freeze. *)
@@ -1025,10 +1100,38 @@ Proof.
     destruct n; constructor; auto.
 Qed.    
 
+Lemma Forall2_rev_loop_acc {A B} (R : A -> B -> Prop) (f : N -> A) (g : N -> B)
+  (HR : forall i, R (f i) (g i)) :
+  forall n i acc acc', Forall2 R acc acc' ->
+    Forall2 R (N.rev_loop_acc f n i acc) (N.rev_loop_acc g n i acc').
+Proof.
+  intros n; induction n using N.peano_ind; intros i acc acc' HA.
+  - cbn; auto.
+  - rewrite !rev_loop_acc_succ; cbn.
+    apply IHn; constructor; auto.
+Qed.
+
+(** ** Bit-level plumbing *)
+Lemma I2F_memory_byte_to_memory_bits mb mb' :
+  I2F_memory_byte mb mb' ->
+  Forall2 I2F_memory_bit (memory_byte_to_memory_bits mb) (memory_byte_to_memory_bits mb').
+Proof.
+  intros H; red in H; inversion H; subst.
+  - (* BYTE__I *)
+    apply Forall2_rev_append; [| constructor].
+    apply Forall2_rev_loop_acc; [intros; constructor; auto | constructor].
+  - (* BYTE_Pointer *)
+    apply Forall2_rev_append; [| constructor].
+    apply Forall2_rev_loop_acc; [intros; constructor; auto | constructor].
+  - (* BYTE_Mixed *)
+    assumption.
+Qed.
+
 (* [concat_bytes_Z_mixed] now recurses with a positional shift rather than an
-   accumulator, so the induction follows the list directly: the last byte must
-   be a [BYTE_Mixed] (anything else is an error on both sides), and every
-   earlier byte contributes through two binds. *)
+   accumulator, so the induction follows the list directly: the last byte
+   contributes its low bits (the same integer on both sides for a [BYTE_I],
+   related bits otherwise), and every earlier byte contributes through two
+   binds. *)
 Lemma I2F_concat_bytes_Z_mixed extra_bits : forall dbs dbs',
     Forall2 I2F_memory_byte dbs dbs' ->
     I2F_EOUP Logic.eq (concat_bytes_Z_mixed extra_bits dbs)
@@ -1038,10 +1141,12 @@ Proof.
     inversion H as [| ? y ? l' Hxy Hl]; subst.
   - cbn; constructor; reflexivity.
   - destruct l as [| d r].
-    + (* the last byte: only [BYTE_Mixed] carries a value *)
+    + (* the last byte *)
       inversion Hl; subst.
-      destruct Hxy; cbn [concat_bytes_Z_mixed]; try (constructor; fail).
-      apply I2F_memory_bits_to_Z, Forall2_take; assumption.
+      pose proof (I2F_memory_byte_to_memory_bits Hxy) as HB.
+      red in Hxy; destruct Hxy; cbn [concat_bytes_Z_mixed];
+        [ cbn; constructor; reflexivity | .. ];
+        apply I2F_memory_bits_to_Z, Forall2_take; exact HB.
     + (* an earlier byte *)
       inversion Hl as [| ? e ? r' Hde Hr]; subst.
       rewrite 2 concat_bytes_Z_mixed_cons2.
@@ -1210,29 +1315,64 @@ Proof.
     repeat constructor.
 Qed.    
 
+Lemma I2F_from_Z : forall z, I2F_EOU I2F_Iptr (@from_Z IPZ z) (@from_Z IP64Bit z).
+Proof.
+  intros z; cbn; unfold from_Z_bits.
+  destruct ((z <=? @Integers.max_unsigned 64) && (z >=? 0))%Z eqn:RANGE.
+  - constructor.
+    red.
+    apply andb_prop in RANGE as [LE GE].
+    apply Z.leb_le in LE; apply Z.geb_le in GE.
+    symmetry; apply Integers.unsigned_repr.
+    unfold Integers.max_unsigned in *; lia.
+  - constructor.
+Qed.
+
+Lemma I2F_int_to_ptr : forall z pr,
+    I2F_EOU I2F_Addr (@int_to_ptr _ _ (@PIV IPZ) z pr) (@int_to_ptr _ _ (@PIV IP64Bit) z pr).
+Proof.
+  intros z pr.
+  eapply I2F_EOU_bind; [apply I2F_from_Z |].
+  intros a1 a2 Ha; constructor; auto.
+Qed.
+
+(** A byte list that is not one whole pointer reads back as its address,
+    with no provenance: the address is the same on both sides, and only the
+    finite [int_to_ptr] can run out of range (an [OOM] on the right). *)
+Lemma I2F_EOUP_fmap_NoPois {A1 A2} (RR : A1 -> A2 -> Prop) (m1 : EOU A1) (m2 : EOU A2) :
+  I2F_EOU RR m1 m2 -> I2F_EOUP RR (NoPois <$> m1) (NoPois <$> m2).
+Proof. intros []; cbn; constructor; auto. Qed.
+
+Lemma I2F_EOUP_memory_bytes_to_address_ptr dbs dbs'
+  (F : Forall2 I2F_memory_byte dbs dbs') :
+  I2F_EOUP I2F_Addr (memory_bytes_to_address_ptr dbs) (memory_bytes_to_address_ptr dbs').
+Proof.
+  unfold memory_bytes_to_address_ptr.
+  eapply I2F_EOUP_bind with (RA := Forall2 Logic.eq).
+  - apply I2F_EOUP_map_monad2 with (RA:=I2F_memory_byte); auto.
+    apply I2F_memory_byte_to_Z.
+  - intros zs1 zs2 HZ; apply Forall2_eq in HZ; subst.
+    apply I2F_EOUP_fmap_NoPois, I2F_int_to_ptr.
+Qed.
+
 Lemma I2F_EOUP_memory_bytes_to_pointer dbs dbs'
   (F : Forall2 I2F_memory_byte dbs dbs') :
   I2F_EOUP I2F_Addr (memory_bytes_to_pointer dbs) (memory_bytes_to_pointer dbs').
 Proof.
+  pose proof (I2F_EOUP_memory_bytes_to_address_ptr F) as HA.
   unfold memory_bytes_to_pointer.
-  inversion F.
-  - constructor.
-  - inversion H.
-    + constructor.
-    + subst.
-      eapply I2F_EOUP_bind with (RA:=Logic.eq).
-      apply I2F_EOUP_valid_pointer_bytes; auto.
-      intros; subst.
-      destruct a2; auto.
-      constructor; auto.
-    + subst.
-      inversion H3; auto; subst.
-      inversion H1; subst; auto.
-      eapply I2F_EOUP_bind with (RA:=Logic.eq).
-      apply I2F_EOUP_valid_pointer_bytes; auto.
-      intros; subst.
-      destruct a2; auto.
-      constructor; auto.
+  inversion F as [| b b' bs bs' HB FT]; subst; [exact HA |].
+  red in HB; inversion HB as [x | q q' n HQ | bits bits' FB]; subst; try exact HA.
+  - eapply I2F_EOUP_bind with (RA:=Logic.eq).
+    apply I2F_EOUP_valid_pointer_bytes; auto.
+    intros; subst.
+    destruct a2; [constructor; auto | exact HA].
+  - inversion FB as [| c c' cs cs' HC FC]; subst; try exact HA.
+    inversion HC as [q q' j HQ | |]; subst; try exact HA.
+    eapply I2F_EOUP_bind with (RA:=Logic.eq).
+    apply I2F_EOUP_valid_pointer_bytes; auto.
+    intros; subst.
+    destruct a2; [constructor; auto | exact HA].
 Qed.      
       
 
@@ -1247,32 +1387,7 @@ Qed.
     plumbing, the agreement of the poison test, and the branch alignment
     that the fall-through needs. *)
 
-Lemma Forall2_rev_loop_acc {A B} (R : A -> B -> Prop) (f : N -> A) (g : N -> B)
-  (HR : forall i, R (f i) (g i)) :
-  forall n i acc acc', Forall2 R acc acc' ->
-    Forall2 R (N.rev_loop_acc f n i acc) (N.rev_loop_acc g n i acc').
-Proof.
-  intros n; induction n using N.peano_ind; intros i acc acc' HA.
-  - cbn; auto.
-  - rewrite !rev_loop_acc_succ; cbn.
-    apply IHn; constructor; auto.
-Qed.
 
-(** ** Bit-level plumbing *)
-Lemma I2F_memory_byte_to_memory_bits mb mb' :
-  I2F_memory_byte mb mb' ->
-  Forall2 I2F_memory_bit (memory_byte_to_memory_bits mb) (memory_byte_to_memory_bits mb').
-Proof.
-  intros H; red in H; inversion H; subst.
-  - (* BYTE__I *)
-    apply Forall2_rev_append; [| constructor].
-    apply Forall2_rev_loop_acc; [intros; constructor; auto | constructor].
-  - (* BYTE_Pointer *)
-    apply Forall2_rev_append; [| constructor].
-    apply Forall2_rev_loop_acc; [intros; constructor; auto | constructor].
-  - (* BYTE_Mixed *)
-    assumption.
-Qed.
 
 Lemma I2F_get_bits_of_memory_byte_list dbs dbs' :
   Forall2 I2F_memory_byte dbs dbs' ->
@@ -1397,8 +1512,8 @@ Section NoCut.
   Proof.
     induction dbs as [| b rest IH]; [exact I |].
     destruct rest as [| d rest'].
-    - destruct b; try exact I.
-      cbn; apply no_cut_memory_bits_to_Z.
+    - destruct b; cbn [concat_bytes_Z_mixed];
+        first [exact I | apply no_cut_memory_bits_to_Z].
     - rewrite concat_bytes_Z_mixed_cons2.
       apply no_cut_bind_EOUP; [apply no_cut_memory_byte_to_Z | intros].
       apply no_cut_bind_EOUP; [apply IH | intros; exact I].
@@ -1437,12 +1552,6 @@ Section NoCut.
     intros []; [apply IH | exact I].
   Qed.
 
-  Lemma no_cut_memory_bytes_to_pointer dbs : no_cut (memory_bytes_to_pointer dbs).
-  Proof.
-    unfold memory_bytes_to_pointer; repeat break_match_goal; try exact I.
-    all: apply no_cut_bind_EOUP; [apply no_cut_valid_pointer_bytes |];
-         intros []; exact I.
-  Qed.
 End NoCut.
 
 (** ** Putting it together *)
@@ -1463,6 +1572,29 @@ Proof.
   intros F; constructor.
   apply Forall2_rev_append; [| constructor].
   apply I2F_get_bits_of_memory_byte_list; auto.
+Qed.
+
+(** The reader's pointer-bit test, which guards its [BYTE_I] branch,
+    agrees on related byte lists. *)
+Lemma I2F_is_ptr_bit b b' :
+  I2F_memory_bit b b' -> is_ptr_bit b = is_ptr_bit b'.
+Proof. intros H; inversion H; subst; reflexivity. Qed.
+
+Lemma I2F_existsb_ptr_bits sz dbs dbs' :
+  Forall2 I2F_memory_byte dbs dbs' ->
+  existsb is_ptr_bit
+    (rev_append (@get_bits_of_memory_byte_list PInf (N.pos sz) dbs []) [])
+  = existsb is_ptr_bit
+      (rev_append (@get_bits_of_memory_byte_list PFin (N.pos sz) dbs' []) []).
+Proof.
+  intros F.
+  assert (HB : Forall2 I2F_memory_bit
+                 (rev_append (@get_bits_of_memory_byte_list PInf (N.pos sz) dbs []) [])
+                 (rev_append (@get_bits_of_memory_byte_list PFin (N.pos sz) dbs' []) [])).
+  { apply Forall2_rev_append; [| constructor].
+    apply I2F_get_bits_of_memory_byte_list; auto. }
+  induction HB; cbn; auto.
+  erewrite I2F_is_ptr_bit by eauto; now rewrite IHHB.
 Qed.
 
 (** The reader's pointer-slice recognition transports across refinement:
@@ -1552,7 +1684,16 @@ Proof.
     destruct (@memory_bytes_to_pointer_slice PFin dbs') as [[p2 k2] |] eqn:E2;
     try contradiction.
   - destruct HS as [HA ->]; constructor; now constructor.
-  - (* neither side is a pointer slice: fall through to the integer attempt *)
+  - (* neither side is a pointer slice: both sides agree on whether a
+       pointer bit forces [BYTE_Mixed] ... *)
+    cbv zeta.
+    pose proof (I2F_existsb_ptr_bits sz F) as HP.
+    match goal with
+    | |- I2F_EOU _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
+        replace b2 with b1 by exact HP; destruct b1
+    end;
+      [cbn; constructor; now apply I2F_mixed_fallback |].
+    (* ... and otherwise fall through to the integer attempt *)
     pose proof (I2F_memory_bytes_to_int sz F) as HI.
     apply I2F_EOUP_no_cut_inv in HI;
       [| apply (@no_cut_memory_bytes_to_int PInf)
@@ -1890,15 +2031,8 @@ Proof.
   intros H.
   inversion H; subst.
   - unfold memory_byte_of_dvalue_bv.
-    destruct (negb (N.pos bit_sz mod 8 =? 0)%N && (idx + 1 =? store_size_dtyp (DTYPE_I bit_sz))%N).
+    unfold extract_byte_vint.
     repeat constructor.
-    apply Forall2_app.
-    apply Forall2_map2.
-    intros.
-    constructor.
-    apply Forall2_repeat.
-    constructor.
-    constructor.
   - unfold memory_byte_of_dvalue_bv.
     constructor. assumption.
   - (* [BYTE_Mixed]: byte [idx] is now uniformly [take 8 (drop (8 * idx) _)],

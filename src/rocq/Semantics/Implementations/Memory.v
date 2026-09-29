@@ -123,13 +123,17 @@ Section MemoryModel.
     match conv with
     | Inttoptr =>
         assert_inttoptr_types_ok t_from t_to ;;
-        lift (DVALUE_Pointer <$> (int_to_ptr (dvalue_base_int_unsigned dv) wildcard_prov))
+        match dv with
+        | DVALUE_Poison => lift (ret DVALUE_Poison)
+        | _ => lift (DVALUE_Pointer <$> (int_to_ptr (dvalue_base_int_unsigned dv) wildcard_prov))
+        end
                          
     | Ptrtoint | Ptrtoaddr =>
     (* In this memory model there is no difference because we don't (yet) "leak" any state by these casts *)                      
        match dv, t_to with
         | DVALUE_Pointer ptr, DTYPE_I sz => lift (coerce_integer_to_int (Some sz) (ptr_to_int ptr))
         | DVALUE_Pointer ptr, DTYPE_Iptr => lift (coerce_integer_to_int None (ptr_to_int ptr))
+        | DVALUE_Poison, (DTYPE_I _ | DTYPE_Iptr) => lift (ret DVALUE_Poison)
         | _, _ => mub "Invalid PTOI conversion"
        end
 

@@ -51,27 +51,6 @@ Proof.
   intros [z pr] [i pr'] [HI ->]; cbn; red in HI; auto.
 Qed.
 
-Lemma I2F_from_Z : forall z, I2F_EOU I2F_Iptr (@from_Z IPZ z) (@from_Z IP64Bit z).
-Proof.
-  intros z; cbn; unfold from_Z_bits.
-  destruct ((z <=? @Integers.max_unsigned 64) && (z >=? 0))%Z eqn:RANGE.
-  - constructor.
-    red.
-    apply andb_prop in RANGE as [LE GE].
-    apply Z.leb_le in LE; apply Z.geb_le in GE.
-    symmetry; apply Integers.unsigned_repr.
-    unfold Integers.max_unsigned in *; lia.
-  - constructor.
-Qed.
-
-Lemma I2F_int_to_ptr : forall z pr,
-    I2F_EOU I2F_Addr (@int_to_ptr _ _ (@PIV IPZ) z pr) (@int_to_ptr _ _ (@PIV IP64Bit) z pr).
-Proof.
-  intros z pr.
-  eapply I2F_EOU_bind; [apply I2F_from_Z |].
-  intros a1 a2 Ha; constructor; auto.
-Qed.
-
 (** [intptr_seq] traverses the SAME (Params-independent) index list on
     both sides: a single-list [map_monad] compatibility suffices. *)
 Lemma I2F_intptr_seq : forall start size,
@@ -823,17 +802,27 @@ Proof.
   destruct conv.
   - eapply I2F_memS_bind; [apply I2F_assert_inttoptr_types_ok |].
     intros _ _ _.
-    apply I2F_memS_lift.
-    rewrite (I2F_dvalue_base_int_unsigned Hv).
-    eapply I2F_EOU_bind; [apply I2F_int_to_ptr |].
-    intros a1 a2 Ha; repeat constructor; auto.
-  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ]; [ | constructor .. ].
+    pose proof Hv as Hv'; destruct Hv'; cbv beta iota;
+      apply I2F_memS_lift;
+      first [ (* poison maps to poison *) solve [repeat constructor]
+            | rewrite (I2F_dvalue_base_int_unsigned Hv);
+              eapply I2F_EOU_bind; [apply I2F_int_to_ptr |];
+              intros a1 a2 Ha; repeat constructor; auto ].
+  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ];
+      [ | constructor | constructor | constructor | constructor
+        | (* poison maps to poison *)
+          destruct t_to; first [apply I2F_memS_lift; repeat constructor | constructor]
+        | constructor | constructor ].
     destruct HI as [HI ->]; red in HI; subst.
     destruct t_to;
       [ apply I2F_memS_lift; apply I2F_coerce_integer_to_int
       | apply I2F_memS_lift; apply I2F_coerce_integer_to_int
       | constructor .. ].
-  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ]; [ | constructor .. ].
+  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ];
+      [ | constructor | constructor | constructor | constructor
+        | (* poison maps to poison *)
+          destruct t_to; first [apply I2F_memS_lift; repeat constructor | constructor]
+        | constructor | constructor ].
     destruct HI as [HI ->]; red in HI; subst.
     destruct t_to;
       [ apply I2F_memS_lift; apply I2F_coerce_integer_to_int

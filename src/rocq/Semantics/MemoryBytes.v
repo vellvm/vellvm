@@ -144,6 +144,61 @@ Proof.
     eapply Z.lt_trans; [apply Z.mod_pos_bound; lia | lia].
 Qed.
 
+(** The same, for any byte that *starts* inside [x] -- in particular the
+    last byte of an integer whose width is not a multiple of 8, whose
+    missing top bits are the zeros of a zero extension. *)
+Lemma extract_byte_vint_spec_lt : forall sz (x : @bit_int sz) idx,
+    (8 * Z.of_N idx < Z.pos sz)%Z ->
+    extract_byte_vint x idx = ((unsigned x / 2 ^ (8 * Z.of_N idx)) mod 256)%Z.
+Proof.
+  intros sz x idx H.
+  destruct (Z_le_gt_dec (8 * (Z.of_N idx + 1)) (Z.pos sz)) as [Hin | Hout];
+    [now apply extract_byte_vint_spec |].
+  pose proof (unsigned_range x) as [Hlo Hhi].
+  assert (Hm : (@modulus sz = 2 ^ Z.pos sz)%Z)
+    by (rewrite modulus_def; apply two_power_pos_eq).
+  assert (Hpow : (Z.pos sz < 2 ^ Z.pos sz)%Z) by (apply Z.pow_gt_lin_r; lia).
+  assert (Hp : (0 < 2 ^ (8 * Z.of_N idx))%Z) by (apply Z.pow_pos_nonneg; lia).
+  assert (Hq : (0 <= Integers.unsigned x / 2 ^ (8 * Z.of_N idx) < 256)%Z).
+  { split; [apply Z.div_pos; lia |].
+    apply Z.div_lt_upper_bound; [lia |].
+    replace 256%Z with (2 ^ 8)%Z by reflexivity.
+    rewrite <- Z.pow_add_r by lia.
+    rewrite Hm in Hhi.
+    eapply Z.lt_le_trans; [exact Hhi | apply Z.pow_le_mono_r; lia]. }
+  unfold extract_byte_vint.
+  cbn [modu shru unsigned repr VInt_Bounded].
+  unfold Integers.modu, Integers.shru.
+  rewrite !unsigned_repr_eq.
+  rewrite (Z.mod_small (Z.of_N idx * 8)) by lia.
+  rewrite Z.shiftr_div_pow2 by lia.
+  replace (Z.of_N idx * 8)%Z with (8 * Z.of_N idx)%Z by lia.
+  rewrite (Z.mod_small (Integers.unsigned x / 2 ^ (8 * Z.of_N idx))).
+  2:{ split; [lia |].
+      apply Z.le_lt_trans with (Integers.unsigned x); [| lia].
+      apply Z.div_le_upper_bound; [lia | nia]. }
+  rewrite (Z.mod_small (Integers.unsigned x / 2 ^ (8 * Z.of_N idx)) 256) by lia.
+  rewrite Hm.
+  destruct (Z_le_gt_dec (Z.pos sz) 8) as [Hle | Hgt].
+  - (* at most one byte wide: [repr 256] is 0 and [_ mod 0] is the identity *)
+    assert (H0 : (256 mod 2 ^ Z.pos sz = 0)%Z).
+    { replace 256%Z with (2 ^ (8 - Z.pos sz) * 2 ^ Z.pos sz)%Z.
+      - apply Z.mod_mul; apply Z.pow_nonzero; lia.
+      - rewrite <- Z.pow_add_r by lia.
+        replace (8 - Z.pos sz + Z.pos sz)%Z with 8%Z by lia; reflexivity. }
+    rewrite H0, Zmod_0_r.
+    apply Z.mod_small; split; [lia |].
+    apply Z.le_lt_trans with (Integers.unsigned x); [| lia].
+    apply Z.div_le_upper_bound; [lia | nia].
+  - (* wider: [repr 256] is 256 *)
+    assert (H256 : (256 < 2 ^ Z.pos sz)%Z).
+    { apply Z.lt_le_trans with (2 ^ 9)%Z; [cbn; lia |].
+      apply Z.pow_le_mono_r; lia. }
+    rewrite (Z.mod_small 256) by lia.
+    rewrite (Z.mod_small (Integers.unsigned x / 2 ^ (8 * Z.of_N idx))) by lia.
+    apply Z.mod_small; lia.
+Qed.
+
 (** Bit-level analogues of [extract_byte_vint_spec] / [concat_bytes_Z_extract],
     for the last byte of an integer whose width is not a multiple of 8: the
     writer stores [sz mod 8] real bits there and pads the rest with poison. *)
@@ -301,16 +356,11 @@ Section MemoryByte.
         (* TODO: Case when pointer bit_sz is not a mulutiple of 8 ? *)
         BYTE_Pointer 8 p (((Npos bit_sz) * idx' / 8) + idx)
     | BYTE_I x =>
-        (* If bit_sz isn't divisible by 8 and this is the last index, there is bit-level padding *)
-        let extra_bits := N.modulo (Npos bit_sz) 8 in
-        if negb (N.eqb extra_bits 0) && (N.eqb (idx + 1) (store_size_dtyp (DTYPE_Base (DTYPE_I bit_sz))))  then
-          let pad_bits := 8 - extra_bits in
-          let pad := repeat Bit_psn (N.to_nat pad_bits) in
-          let mbits := map (fun i => Z_to_memory_bit (Z.of_N (extract_bit_N (Z.to_N (unsigned x)) i))) (Nseq (8 * idx) (N.to_nat extra_bits))
-          in
-          BYTE_Mixed 8 (mbits ++ pad)
-        else
-          BYTE_I (repr (extract_byte_vint x idx))
+        (* LangRef ('store'): a value whose width is not a whole number of
+           bytes "will be zero extended to the next larger multiple of the
+           byte size" -- so the last byte is just the top bits of [x], which
+           [extract_byte_vint] already fills with zeros. *)
+        BYTE_I (repr (extract_byte_vint x idx))
     | BYTE_Mixed bits =>
         (* byte [idx] is bits [8*idx .. 8*idx+7]; the old [8 * N.pred idx] made
            bytes 0 and 1 identical *)
@@ -1013,7 +1063,8 @@ Section MemoryByte.
             ret false
         else
           ret false
-    | _ => ret Pois
+    | Bit_bit _ :: _ => ret false  (* an integer bit: not this pointer *)
+    | Bit_psn :: _ => ret Pois
     end.
   
   Definition valid_pointer_byte (p:ptr) (idx:N) (mb:memory_byte) : EOUP bool :=
@@ -1033,25 +1084,43 @@ Section MemoryByte.
         if v then valid_pointer_bytes p (1+idx) rest else ret false
     end.
   
+  (* LangRef ('bitcast', a byte value to a pointer type): if no bit is
+     poison but the bits are not all those of one pointer, correctly
+     ordered, the result is a pointer with the address given by the integer
+     value of the bits, and without provenance.  (A load at pointer type
+     follows the same rules.)  Any poison byte makes it poison. *)
+  Definition memory_bytes_to_address_ptr (dbs : list memory_byte) : EOUP ptr :=
+    zs <- map_monad memory_byte_to_Z dbs ;;
+    NoPois <$> int_to_ptr (concat_bytes_Z zs) nil_prov.
+
   Definition memory_bytes_to_pointer (dbs : list memory_byte) : EOUP ptr :=
     match dbs with
     | ((BYTE_Pointer p _) :: _)
     | ((BYTE_Mixed ((Bit_ptr p _)::_)) :: _) =>
         v <- valid_pointer_bytes p 0 dbs ;;
-        if v then ret p else ret Pois
-    | _ => ret Pois
+        if v then ret p else memory_bytes_to_address_ptr dbs
+    | _ => memory_bytes_to_address_ptr dbs
+    end.
+
+  Definition memory_byte_to_memory_bits (mb : memory_byte) : list memory_bit :=
+    match mb with
+    | BYTE_Pointer p idx => rev_append (N.rev_loop_acc (fun i => Bit_ptr p i) 8 (8 * idx) []) []
+    | BYTE_I x  => rev_append (N.rev_loop_acc (fun i => Bit_bit (repr (extract_bit_vint x i))) 8 0 []) []
+    | BYTE_Mixed bits => bits
     end.
 
   (* A version of concat_bytes that trims extra bits from the last byte. *)
-  (* Like [concat_bytes_Z], but the last byte is mixed and only its low
-     [extra] bits belong to the value; the rest is padding.  Each byte has to
+  (* Like [concat_bytes_Z], but only the low [extra] bits of the last byte
+     belong to the value; the rest is padding.  Each byte has to
      be weighted by its position, exactly as [concat_bytes_Z] does -- an
      unweighted running sum reads [i12 4000] back as 175. *)
   Fixpoint concat_bytes_Z_mixed (extra:N) (dbs : list memory_byte) : EOUP Z :=
     match dbs with
     | [] => ret 0%Z
-    | (BYTE_Mixed bits)::[] => memory_bits_to_Z (take extra bits)
-    | _::[] => raise_error "concat_bytes_Z_mixed - broken invariants for memory bytes"
+    (* only the low [extra] bits of the last byte belong to the value,
+       whatever wrote it *)
+    | (BYTE_I y)::[] => ret (unsigned y mod 2 ^ Z.of_N extra)%Z
+    | b::[] => memory_bits_to_Z (take extra (memory_byte_to_memory_bits b))
     | b::rest =>
         z <- memory_byte_to_Z b ;;
         r <- concat_bytes_Z_mixed extra rest ;;
@@ -1077,12 +1146,6 @@ Section MemoryByte.
       v <- map_monad (m := EOUP) (memory_byte_to_Z) dbs ;;
       ret (concat_bytes_Z v).
 
-  Definition memory_byte_to_memory_bits (mb : memory_byte) : list memory_bit :=
-    match mb with
-    | BYTE_Pointer p idx => rev_append (N.rev_loop_acc (fun i => Bit_ptr p i) 8 (8 * idx) []) []
-    | BYTE_I x  => rev_append (N.rev_loop_acc (fun i => Bit_bit (repr (extract_bit_vint x i))) 8 0 []) []
-    | BYTE_Mixed bits => bits
-    end.
 
   Fixpoint get_bits_of_memory_byte_list (bit_sz : N) (dbs : list memory_byte) acc : list memory_bit :=
     match dbs with
@@ -1153,12 +1216,21 @@ Section MemoryByte.
            [BYTE_Pointer 32 p 1] rather than [BYTE_Pointer 32 p 4]. *)
         ret (BYTE_Pointer bit_sz p ((k * 8) / Npos bit_sz))
     | None =>
-        match memory_bytes_to_int bit_sz dbs with
-        (* then as a plain integer *)
-        | raise_ret (NoPois x) => ret (BYTE_I (repr x))
-        | _ => (* otherwise retain as just a list of mixed bits *)
-            ret (BYTE_Mixed bit_sz (rev_append (get_bits_of_memory_byte_list (Npos bit_sz) dbs []) []))
-        end
+        let bits := rev_append (get_bits_of_memory_byte_list (Npos bit_sz) dbs []) [] in
+        (* Then as a plain integer, but only when no bit belongs to a
+           pointer: [memory_byte_to_Z] answers pointer bits with their
+           address, so a pointer bit mixed with integer bits would otherwise
+           lose its provenance.  With no pointer bits, the integer read
+           succeeds exactly when no bit is poison, i.e. when every bit is an
+           integer bit -- the condition under which [dvalue_bv_canonical]
+           takes [BYTE_I]. *)
+        if existsb is_ptr_bit bits then ret (BYTE_Mixed bit_sz bits)
+        else
+          match memory_bytes_to_int bit_sz dbs with
+          | raise_ret (NoPois x) => ret (BYTE_I (repr x))
+          | _ => (* otherwise retain as just a list of mixed bits *)
+              ret (BYTE_Mixed bit_sz bits)
+          end
     end.
 
   (* [is_poison_bit] is defined in DynamicValues.v, next to [dvalue_bv_canonical]. *)
@@ -1577,7 +1649,8 @@ Section MemoryByte.
   Proof.
     intros extra [| [| k'']] Hx Hk; [lia | |].
     - (* exactly one byte: the last-byte-mixed path *)
-      cbn [List.repeat]; unfold poison_memory_byte; cbn [concat_bytes_Z_mixed].
+      cbn [List.repeat]; unfold poison_memory_byte;
+        cbn [concat_bytes_Z_mixed memory_byte_to_memory_bits].
       destruct (@take_repeat_cons _ Bit_psn extra 8 Hx ltac:(lia)) as [r Hr].
       rewrite Hr, memory_bits_to_Z_poison_cons; reflexivity.
     - (* two or more: the first byte already poisons the fold *)
@@ -1729,8 +1802,7 @@ Section MemoryByte.
     (* the generator takes the non-mixed branch *)
     assert (Hgen : forall idx, memory_byte_of_dvalue_bv (BYTE_I x) idx
                                = BYTE_I (repr (extract_byte_vint x idx))).
-    { intros idx; cbn [memory_byte_of_dvalue_bv].
-      rewrite H8; reflexivity. }
+    { intros idx; reflexivity. }
     cbn [memory_bytes_to_dvalue_base].
     unfold memory_bytes_to_int; rewrite H8; cbn [N.eqb negb].
     erewrite map_ext by exact Hgen.
@@ -1757,9 +1829,10 @@ Section MemoryByte.
 
   (** ** Integers whose width is not a whole number of bytes
 
-      The writer puts [sz mod 8] real bits in the last byte and pads the rest
-      with poison; the reader takes [concat_bytes_Z_mixed], which weights each
-      full byte by its position and truncates the last one. *)
+      The writer zero-extends: the last byte holds the top [sz mod 8] bits of
+      the value and zeros above them.  The reader takes
+      [concat_bytes_Z_mixed], which weights each full byte by its position
+      and keeps only the low [sz mod 8] bits of the last one. *)
 
   Lemma map_monad_cons_EOUP : forall {A B} (f : A -> EOUP B) x xs,
       map_monad f (x :: xs) = (y <- f x ;; ys <- map_monad f xs ;; ret (y :: ys)).
@@ -1794,17 +1867,19 @@ Section MemoryByte.
          ret (z + Z.shiftl r 8)%Z).
   Proof. intros extra b [| y ys] lastb; destruct b; reflexivity. Qed.
 
-  (* a run of plain bytes followed by the mixed last one *)
-  Lemma concat_bytes_Z_mixed_app_ret : forall extra ys bits v,
-      memory_bits_to_Z (take extra bits) = raise_ret (NoPois v) ->
+  (* a run of plain bytes followed by the (truncated) last one.  [lastb] is
+     typed as [List.map]'s output ([dvalue_bv 8]) rather than [memory_byte],
+     so that [[lastb]] matches the goals syntactically. *)
+  Lemma concat_bytes_Z_mixed_app_ret : forall extra ys (lastb : @dvalue_bv Pa 8) v,
+      concat_bytes_Z_mixed extra [lastb] = raise_ret (NoPois v) ->
       concat_bytes_Z_mixed extra
-        (List.map (fun y => @BYTE_I Pa 8 y) ys ++ [@BYTE_Mixed Pa 8 bits])
+        (List.map (fun y => @BYTE_I Pa 8 y) ys ++ [lastb])
       = raise_ret (NoPois (concat_bytes_Z (List.map Integers.unsigned ys)
                            + v * 2 ^ (8 * Z.of_nat (length ys)))%Z).
   Proof.
-    intros extra ys bits v Hv; induction ys as [| y ys IH].
+    intros extra ys lastb v Hv; induction ys as [| y ys IH].
     - cbn [List.map app length].
-      cbn [concat_bytes_Z_mixed]; rewrite Hv.
+      rewrite Hv.
       cbn [concat_bytes_Z]; repeat f_equal; lia.
     - cbn [List.map app].
       rewrite concat_bytes_Z_mixed_cons_app, IH.
@@ -1836,34 +1911,11 @@ Section MemoryByte.
     rewrite Hd; lia.
   Qed.
 
-  (* which branch the writer's generator takes *)
+  (* the writer's generator: every byte, the last included, is plain *)
   Lemma gen_plain : forall sz (x : @bit_int sz) idx,
-      (idx + 1 <> store_size_dtyp (DTYPE_Base (DTYPE_I sz)))%N ->
       memory_byte_of_dvalue_bv (BYTE_I x) idx
       = BYTE_I (repr (extract_byte_vint x idx)).
-  Proof.
-    intros sz x idx H; cbn [memory_byte_of_dvalue_bv].
-    destruct (N.eqb_spec (idx + 1) (store_size_dtyp (DTYPE_Base (DTYPE_I sz))));
-      [lia |].
-    rewrite Bool.andb_false_r; reflexivity.
-  Qed.
-
-  Lemma gen_mixed : forall sz (x : @bit_int sz) idx,
-      (Npos sz mod 8 <> 0)%N ->
-      (idx + 1 = store_size_dtyp (DTYPE_Base (DTYPE_I sz)))%N ->
-      memory_byte_of_dvalue_bv (BYTE_I x) idx
-      = BYTE_Mixed 8
-          (List.map Z_to_memory_bit
-             (List.map (fun i => Z.of_N (extract_bit_N (Z.to_N (unsigned x)) i))
-                (Nseq (8 * idx) (N.to_nat (Npos sz mod 8))))
-           ++ List.repeat Bit_psn (N.to_nat (8 - Npos sz mod 8))).
-  Proof.
-    intros sz x idx H8 H; cbn [memory_byte_of_dvalue_bv].
-    destruct (N.eqb_spec (Npos sz mod 8) 0); [lia |].
-    destruct (N.eqb_spec (idx + 1) (store_size_dtyp (DTYPE_Base (DTYPE_I sz))));
-      [| lia].
-    cbn [negb andb]; rewrite map_map; reflexivity.
-  Qed.
+  Proof. reflexivity. Qed.
 
   Lemma read_int_block_mixed : forall sz (x : @bit_int sz),
       (Npos sz mod 8 <> 0)%N ->
@@ -1889,39 +1941,33 @@ Section MemoryByte.
     assert (Hmm : (8 * N.of_nat m + Npos sz mod 8 = Npos sz)%N) by exact Hk2.
     assert (He1 : (1 <= Npos sz mod 8)%N)
       by (revert H8; generalize (Npos sz mod 8)%N; intros e He; lia).
+    (* every byte is a plain [BYTE_I] *)
+    erewrite map_ext with
+      (g := fun i => @BYTE_I Pa 8 (repr (extract_byte_vint x i)))
+      by (intros i; apply gen_plain).
     rewrite Nseq_snoc, List.map_app.
-    (* the leading bytes are plain [BYTE_I]s *)
-    erewrite map_ext_in with
-      (g := fun i => @BYTE_I Pa 8 (repr (extract_byte_vint x i))).
-    2:{ intros i Hi; apply In_Nseq in Hi; apply gen_plain; lia. }
     rewrite <- (map_map (fun i => repr (extract_byte_vint x i))
                         (fun z => @BYTE_I Pa 8 z)).
-    (* the last byte is mixed *)
     cbn [List.map].
-    erewrite gen_mixed by lia.
-    change (unsigned x) with (Integers.unsigned x).
-    (* read the last byte's real bits *)
-    assert (HV : memory_bits_to_Z
-                   (take (Npos sz mod 8)
-                      (List.map Z_to_memory_bit
-                         (List.map (fun i => Z.of_N
-                            (extract_bit_N (Z.to_N (Integers.unsigned x)) i))
-                            (Nseq (8 * (0 + N.of_nat m)) (N.to_nat (Npos sz mod 8))))
-                       ++ List.repeat Bit_psn (N.to_nat (8 - Npos sz mod 8))))
+    (* the last byte contributes its low [sz mod 8] bits *)
+    assert (HV : concat_bytes_Z_mixed (Npos sz mod 8)
+                   [@BYTE_I Pa 8 (repr (extract_byte_vint x (0 + N.of_nat m)))]
                  = raise_ret (NoPois
                      ((Integers.unsigned x / 2 ^ (8 * Z.of_nat m))
                       mod 2 ^ Z.of_N (Npos sz mod 8))%Z)).
-    { rewrite take_app_exact
-        by (rewrite length_map, length_map, Nseq_length; lia).
-      rewrite memory_bits_to_Z_of_bits, map_map.
-      erewrite map_ext with
-        (g := fun i => ((Integers.unsigned x / 2 ^ Z.of_N i) mod 2)%Z).
-      2:{ intros i; rewrite extract_bit_N_spec by lia.
-          rewrite Z.mod_mod by lia; reflexivity. }
-      rewrite concat_bits_Z_extract.
-      replace (Z.of_N (8 * (0 + N.of_nat m))%N) with (8 * Z.of_nat m)%Z by lia.
-      replace (Z.of_nat (N.to_nat (Npos sz mod 8)))
-         with (Z.of_N (Npos sz mod 8)) by lia.
+    { cbn [concat_bytes_Z_mixed ret EOUP_Monad EOU_monad]; do 2 f_equal.
+      rewrite extract_byte_vint_spec_lt by lia.
+      replace (Z.of_N (0 + N.of_nat m)) with (Z.of_nat m) by lia.
+      cbn [repr unsigned VInt_Bounded].
+      rewrite Integers.unsigned_repr_eq.
+      replace (@Integers.modulus 8) with 256%Z by reflexivity.
+      rewrite Z.mod_mod by lia.
+      (* [2 ^ (sz mod 8)] divides 256 *)
+      symmetry; apply Znumtheory.Zmod_div_mod;
+        [apply Z.pow_pos_nonneg; lia | lia |].
+      exists (2 ^ (8 - Z.of_N (Npos sz mod 8)))%Z.
+      rewrite <- Z.pow_add_r by lia.
+      replace (8 - Z.of_N (Npos sz mod 8) + Z.of_N (Npos sz mod 8))%Z with 8%Z by lia.
       reflexivity. }
     cbn [memory_bytes_to_dvalue_base].
     unfold memory_bytes_to_int.
@@ -2095,13 +2141,7 @@ Section MemoryByte.
       \/ exists b bs, memory_byte_of_dvalue_bv (BYTE_I x) 0
                       = @BYTE_Mixed Pa 8 (Bit_bit b :: bs).
   Proof.
-    intros sz x; cbn [memory_byte_of_dvalue_bv].
-    destruct (N.eqb_spec (Npos sz mod 8) 0) as [E | E]; cbn [negb andb]; [now left |].
-    destruct (N.eqb_spec (0 + 1) (store_size_dtyp (DTYPE_Base (DTYPE_I sz))));
-      [| now left].
-    right.
-    destruct (N.to_nat (Npos sz mod 8)) as [| n] eqn:En; [exfalso; lia |].
-    cbn [Nseq List.map app]; unfold Z_to_memory_bit; eauto.
+    intros sz x; now left.
   Qed.
 
   Lemma all_poison_BYTE_I_block : forall sz (x : @bit_int sz) K,
@@ -2123,6 +2163,75 @@ Section MemoryByte.
     intros sz x [| K] H; [lia |].
     cbn [Nseq List.map]; unfold memory_bytes_to_pointer_slice.
     destruct (BYTE_I_byte0 x) as [E | (b & bs & E)]; rewrite E; reflexivity.
+  Qed.
+
+  (** The reader takes the [BYTE_I] branch only when no extracted bit is a
+      pointer bit.  Every bit [get_bits_of_memory_byte_list] returns comes
+      from its accumulator, from one of the bytes, or is poison padding. *)
+  Lemma In_rev_loop_acc : forall {A} (f : N -> A) n i acc b,
+      In b (N.rev_loop_acc f n i acc) -> In b acc \/ exists j, b = f j.
+  Proof.
+    intros A f n i acc b H.
+    rewrite rev_loop_acc_app in H.
+    apply in_app_or in H as [H | H]; [| now left].
+    apply in_rev, in_map_iff in H as (j & <- & _); eauto.
+  Qed.
+
+  Lemma In_get_bits : forall dbs n acc b,
+      In b (get_bits_of_memory_byte_list n dbs acc) ->
+      In b acc \/ b = Bit_psn \/
+        exists d, In d dbs /\ In b (memory_byte_to_memory_bits d).
+  Proof.
+    induction dbs as [| d dbs IH]; intros n acc b H;
+      cbn [get_bits_of_memory_byte_list] in H.
+    - destruct (N.eqb n 0); [now left |].
+      apply In_rev_loop_acc in H as [H | (j & ->)]; [now left | now (right; left)].
+    - destruct (N.ltb n 8).
+      + rewrite rev_append_rev in H; apply in_app_or in H as [H | H]; [| now left].
+        apply in_rev in H.
+        right; right; exists d; split; [now left |].
+        rewrite <- (@take_drop_app _ n (memory_byte_to_memory_bits d)).
+        apply in_or_app; now left.
+      + apply IH in H as [H | [H | (d' & Hd' & H)]].
+        * rewrite rev_append_rev in H; apply in_app_or in H as [H | H]; [| now left].
+          apply in_rev in H; right; right; exists d; split; [now left | exact H].
+        * now (right; left).
+        * right; right; exists d'; split; [now right | exact H].
+  Qed.
+
+  Lemma BYTE_I_byte_no_ptr : forall sz (x : @bit_int sz) idx b,
+      In b (memory_byte_to_memory_bits (memory_byte_of_dvalue_bv (BYTE_I x) idx)) ->
+      is_ptr_bit b = false.
+  Proof.
+    intros sz x idx b H;
+      cbn [memory_byte_of_dvalue_bv memory_byte_to_memory_bits] in H.
+    rewrite rev_append_rev, app_nil_r in H; apply in_rev in H.
+    apply In_rev_loop_acc in H as [[] | (j & ->)]; reflexivity.
+  Qed.
+
+  Lemma no_ptr_bits_BYTE_I_block : forall sz (x : @bit_int sz) K,
+      existsb is_ptr_bit
+        (rev_append (get_bits_of_memory_byte_list (Npos sz)
+           (List.map (memory_byte_of_dvalue_bv (BYTE_I x)) (Nseq 0 K)) []) [])
+      = false.
+  Proof.
+    intros sz x K.
+    apply not_true_iff_false; intros H.
+    apply existsb_exists in H as (b & Hin & Hb).
+    rewrite rev_append_rev, app_nil_r in Hin; apply in_rev in Hin.
+    apply In_get_bits in Hin as [[] | [-> | (d & Hd & Hin)]]; [discriminate |].
+    apply in_map_iff in Hd as (idx & <- & _).
+    rewrite (BYTE_I_byte_no_ptr Hin) in Hb; discriminate.
+  Qed.
+
+  (* a canonical [BYTE_Mixed] with no pointer bits must contain poison *)
+  Lemma not_all_int_no_ptr_pois : forall bits,
+      negb (forallb is_int_bit bits) = true ->
+      existsb is_ptr_bit bits = false ->
+      existsb is_poison_bit bits = true.
+  Proof.
+    induction bits as [| b bits IH]; intros H1 H2; cbn in *; [discriminate |].
+    destruct b; cbn in *; [discriminate | reflexivity | auto].
   Qed.
 
   Lemma read_base_block_BYTE_I : forall sz (x : @bit_int sz),
@@ -2147,6 +2256,7 @@ Section MemoryByte.
     rewrite all_poison_BYTE_I_block by exact HK.
     unfold memory_bytes_to_byte_value.
     rewrite pointer_slice_BYTE_I_block by exact HK.
+    cbv zeta; rewrite no_ptr_bits_BYTE_I_block.
     rewrite Ev; cbv beta iota.
     rewrite Hv; cbn; reflexivity.
   Qed.
@@ -2408,7 +2518,7 @@ Section MemoryByte.
     induction n as [| n IH]; intros extra bits Hx Hlen H.
     - (* a single, partial byte *)
       cbn [Nseq List.map concat_bytes_Z_mixed].
-      unfold mixed_byte.
+      unfold mixed_byte; cbn [memory_byte_to_memory_bits].
       rewrite N.mul_0_r, drop_nil, (@take_all _ bits 8) by lia.
       rewrite take_app_exact by lia.
       apply memory_bits_to_Z_pois; exact H.
@@ -2569,7 +2679,7 @@ Section MemoryByte.
   Lemma read_base_block_BYTE_Mixed : forall sz bits,
       (N.of_nat (List.length bits) = Npos sz)%N ->
       negb (is_pointer_bits bits) = true ->
-      existsb is_poison_bit bits = true ->
+      negb (forallb is_int_bit bits) = true ->
       negb (forallb is_poison_bit bits) = true ->
       memory_bytes_to_dvalue_base
         (List.map (memory_byte_of_dvalue_bv (@BYTE_Mixed Pa sz bits))
@@ -2577,7 +2687,7 @@ Section MemoryByte.
         (DTYPE_B sz)
       = ret (@DVALUE_B Pa sz (BYTE_Mixed sz bits)).
   Proof.
-    intros sz bits Hlen Hptr Hex Hnall.
+    intros sz bits Hlen Hptr Hnint Hnall.
     erewrite map_ext with (g := mixed_byte bits)
       by (intros idx; apply writer_mixed_byte).
     pose proof (serializable_base_pos (DTYPE_B sz) I) as HKpos.
@@ -2602,7 +2712,15 @@ Section MemoryByte.
     unfold memory_bytes_to_byte_value.
     (* not a pointer slice *)
     rewrite pointer_slice_mixed_none by (first [exact HKb | exact Hptr]).
-    (* the integer read poisons *)
+    (* the bits come back unchanged *)
+    cbv zeta.
+    rewrite <- Hlen, get_bits_writer by exact HKb.
+    rewrite rev_append_rev, app_nil_r, rev_append_rev, app_nil_r, rev_involutive.
+    (* a pointer bit sends the read straight to [BYTE_Mixed] *)
+    destruct (existsb is_ptr_bit bits) eqn:Eptr; [reflexivity |].
+    (* otherwise some bit is poison, and the integer read poisons *)
+    assert (Hex : existsb is_poison_bit bits = true)
+      by (apply not_all_int_no_ptr_pois; assumption).
     assert (Hint : memory_bytes_to_int sz (List.map (mixed_byte bits) (Nseq 0 (S n)))
                    = raise_ret (@Pois Z)).
     { unfold memory_bytes_to_int.
@@ -2618,11 +2736,7 @@ Section MemoryByte.
         { pose proof (N.mod_upper_bound (Npos sz) 8 ltac:(lia)) as U.
           revert E8 U; generalize (Npos sz mod 8)%N; intros m HA HB; lia. }
         apply concat_bytes_Z_mixed_mixed_pois; [exact Hx | lia | exact Hex]. }
-    rewrite Hint; cbv beta iota.
-    (* the bits come back unchanged *)
-    rewrite <- Hlen, get_bits_writer by exact HKb.
-    rewrite rev_append_rev, app_nil_r, rev_append_rev, app_nil_r, rev_involutive.
-    reflexivity.
+    rewrite Hint; reflexivity.
   Qed.
 
 

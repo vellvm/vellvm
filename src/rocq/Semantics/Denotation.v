@@ -151,6 +151,9 @@ Section Denotation.
                      ret (DVALUE_Base v)
     | DTYPE_Iptr   => v <- coerce_integer_to_int None (denote_int_syntax x) ;;
                      ret (DVALUE_Base v)
+    (* LangRef: byte constants are "strictly equivalent to integer
+       constants", so [bN k] carries the bits of [iN k]. *)
+    | DTYPE_B sz   => ret (DVALUE_Base (@DVALUE_B _ sz (BYTE_I (repr (denote_int_syntax x)))))
     | typ          => raise_error ("bad type for constant int: " ++ show typ)
     end.
 
@@ -178,6 +181,17 @@ Section Denotation.
   Definition freeze_base {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dt:dtyp) (dv : dvalue_base) : itree E dvalue :=
     match dv with
     | DVALUE_Poison => draw dt
+    (* bytes freeze per bit: draw the replacement bits as an integer of the
+       byte's width (a non-integer answer leaves them all 0) *)
+    | @DVALUE_B _ sz (BYTE_Mixed bits) =>
+        if existsb is_poison_bit bits then
+          x <- draw (DTYPE_I sz) ;;
+          let z := match x with
+                   | DVALUE_Base (DVALUE_I _ i) => unsigned i
+                   | _ => 0%Z
+                   end in
+          ret (DVALUE_Base (DVALUE_B (freeze_bv z (BYTE_Mixed sz bits))))
+        else DVALUE_Base <$> ret dv
     | _ => DVALUE_Base <$> ret dv
     end.
 
