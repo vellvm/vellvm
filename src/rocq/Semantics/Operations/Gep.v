@@ -19,7 +19,7 @@ Section GEP.
       The offset is therefore incremented by this index times the size of the type of elements stored. Finally, a recursive call
       at this new offset allows for deeper unbundling of a nested structure.
    *)
-  Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): EOU Z :=
+  Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): EOUP Z :=
     match vs with
     | v :: vs' =>
         match v with
@@ -73,7 +73,8 @@ Section GEP.
                 handle_gep_h ta (off + k * (Z.of_N (alloc_size_dtyp ta))) vs'                
             | _ => raise_error ("non-iptr-indexable type")
             end
-              
+        | DVALUE_Base (DVALUE_Poison) =>
+            ret Pois 
         | _ => raise_error "handle_gep_h: unsupported index type"
         end
     | [] => ret off
@@ -83,22 +84,24 @@ Section GEP.
      The pointer set the block into which we look, and the initial offset. The first index value add to the initial offset passed to [handle_gep_h] for the actual access to structured data.
    *)
   (* TODO: This should take into account padding too... May break get_consecutive_ptrs and friends. *)
-  Definition handle_gep_ptr (t:dtyp) (a:ptr) (vs:list dvalue) : EOU ptr :=
+  Definition handle_gep_ptr (t:dtyp) (a:ptr) (vs:list dvalue) : EOUP ptr :=
     let ptr := ptr_to_int a in
     let prov := ptr_provenance a in
     match vs with
     | DVALUE_Base (DVALUE_I 8 i) :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (alloc_size_dtyp t) * (signed i)) vs' ;;
-        int_to_ptr ptr' prov
+        NoPois <$> (int_to_ptr ptr' prov)
     | DVALUE_Base (DVALUE_I 32 i) :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (alloc_size_dtyp t) * (signed i)) vs' ;;
-        int_to_ptr ptr' prov
+        NoPois <$> (int_to_ptr ptr' prov)
     | DVALUE_Base (DVALUE_I 64 i) :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (alloc_size_dtyp t) * (signed i)) vs' ;;
-        int_to_ptr ptr' prov
+        NoPois <$> (int_to_ptr ptr' prov)
     | DVALUE_Base (DVALUE_Iptr i) :: vs' =>
         ptr' <- handle_gep_h t (ptr + Z.of_N (alloc_size_dtyp t) * (to_Z i)) vs' ;;
-        int_to_ptr ptr' prov
+        NoPois <$> (int_to_ptr ptr' prov)
+    | DVALUE_Base (DVALUE_Poison)::_ =>
+        ret Pois
     | [] => raise_error "handle_gep_ptr: no indices"
     | _ => raise_error "handle_gep_ptr: unsupported index type"
     end.
@@ -129,7 +132,7 @@ Section GEP.
   Proof.
     intros dt p p' ix GEP.
     cbn in *.
-    inv GEP.
+    break_match_hyp; inv GEP.
     erewrite ptr_to_int_int_to_ptr; eauto.
   Qed.
 
@@ -142,7 +145,7 @@ Section GEP.
     intros dt p p' ix msg GEP.
     cbn in *.
     exists msg.
-    inv GEP.
+    break_match_hyp; inv GEP.    
     auto.
   Qed.
 
@@ -165,7 +168,7 @@ Section GEP.
     intros dt p p' ix msg IX.
     cbn in *.
     exists msg.
-    inv IX.
+    rewrite IX.
     auto.
   Qed.
 
@@ -188,7 +191,10 @@ Section GEP.
 
   Definition eval_gep (t:dtyp) (dv:dvalue) (vs:list dvalue) : EOU dvalue :=
     match dv with
-    | DVALUE_Base (DVALUE_Pointer a) => (fun x => DVALUE_Base (DVALUE_Pointer x)) <$> handle_gep_ptr t a vs
+    | DVALUE_Base (DVALUE_Pointer a) =>
+        catch_pois (DVALUE_Base DVALUE_Poison)
+          ((fun x => DVALUE_Base (DVALUE_Pointer x)) <$> handle_gep_ptr t a vs)
+          ret
     | _ => raise_error "non-ptr"%string
     end.
 End GEP.

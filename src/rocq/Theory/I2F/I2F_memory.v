@@ -82,6 +82,16 @@ Proof.
   intros a _; apply I2F_from_Z.
 Qed.
 
+Lemma I2F_ptr_byte_offset : forall p p' ix1 ix2,
+    I2F_Addr p p' ->
+    I2F_Iptr ix1 ix2 ->
+    I2F_EOU I2F_Addr (@ptr_byte_offset PInf p ix1) (@ptr_byte_offset PFin p' ix2).
+Proof.
+  intros p p' ix1 ix2 HA HI.
+  destruct p, p'; destruct HA as [HA ->]; red in HA, HI; subst.
+  apply I2F_int_to_ptr.
+Qed.
+
 Lemma I2F_get_consecutive_ptrs : forall p p',
     I2F_Addr p p' ->
     forall n,
@@ -94,7 +104,7 @@ Proof.
   intros ixs1 ixs2 HIXS.
   eapply I2F_EOU_map_monad_acc2; eauto.
   intros ix1 ix2 Hix.
-  apply I2F_handle_gep_ptr; auto.
+  apply I2F_ptr_byte_offset; auto.
 Qed.
 
 Lemma I2F_coerce_integer_to_int : forall b z,

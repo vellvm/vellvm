@@ -286,7 +286,7 @@ Proof.
   - apply I2F_refine_lift', I2F_from_Z.
   - intros iptr1 iptr2 Hiptr.
     rbind I2F_Addr.
-    + apply I2F_refine_lift', I2F_handle_gep_ptr; auto.
+    + apply I2F_refine_lift', I2F_ptr_byte_offset; auto.
     + intros addr1 addr2 Haddr.
       rbind I2F_dvalue.
       * unfold load.

@@ -34,12 +34,21 @@ From Vellvm.Semantics Require Import
   Params
   LLVMEvents
   Interfaces.Memory
-  Operations.
+  MemoryBytes
+  Operations.Conversion.
 From Stdlib Require Import FunctionalExtensionality.
 Import Logic.
 
+
 Section MemoryModel.
   Context {Pa : Params} {MMP : @MemoryModelPrimitives Pa}.
+
+  Definition ptr_byte_offset (a : ptr) (ix : iptr) : EOU ptr :=
+    let ptr := ptr_to_int a in
+    let prov := ptr_provenance a in
+    let byte_size := alloc_size_dtyp (DTYPE_B 8) in
+    let addr := (ptr + (Z.of_N (byte_size) * (to_Z ix)))%Z in
+    int_to_ptr addr prov.
 
   (* We would like a better representation than a list *)
   (* [map_monad_acc] rather than [map_monad]: the list is as long as the
@@ -47,7 +56,7 @@ Section MemoryModel.
   Definition get_consecutive_ptrs (p : ptr) (size : N) : EOU (list ptr) :=
     ixs <- intptr_seq 0 size;;
     map_monad_acc
-      (fun ix => handle_gep_ptr (DTYPE_I 8) p [DVALUE_Base (DVALUE_Iptr ix)])
+      (ptr_byte_offset p)
       ixs.
 
   (** Reading dvalues *)

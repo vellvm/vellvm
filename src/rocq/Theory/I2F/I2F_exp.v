@@ -2387,10 +2387,22 @@ Proof.
   repeat (break_goal_fast; cbn); auto.
 Qed.
 
+(* [break_match_goal_safe], also refusing [EOUP]-typed scrutinees (which
+     do not syntactically match [EOU _]). *)
+Ltac break_match_goal_safeP :=
+  match goal with
+  | |- context [match ?X with _ => _ end] =>
+      lazymatch type of X with
+      | EOU _ => fail
+      | EOUP _ => fail
+      | _ => destruct X eqn:?
+      end
+  end.
+
 Lemma I2F_handle_gep_ptr : forall t a a' vs vs',
     I2F_Addr a a' ->
     Forall2 I2F_dvalue vs vs' ->
-    I2F_EOU I2F_Addr
+    I2F_EOUP I2F_Addr
       (@handle_gep_ptr PInf t a vs)
       (@handle_gep_ptr PFin t a' vs').
 Proof.
@@ -2409,16 +2421,17 @@ Proof.
        | HI : I2F_Iptr _ _ |- _ => red in HI; subst
        end);
   unfold from_Z_bits;
-  (* bitwidth-literal dispatch first; the [EOU]-typed scrutinees are
-         skipped, exposing the offset computations at the top *)
-  repeat (break_match_goal_safe; cbn); auto;
-  (* align the two offset computations, then reduce them in lockstep *)
+  (* bitwidth-literal dispatch first; the [EOU]/[EOUP]-typed scrutinees
+       are skipped, exposing the offset computations at the top *)
+  repeat (break_match_goal_safeP; cbn); auto;
+  (* align the two offset computations, then reduce them in lockstep,
+       including the poison outcome *)
   try (erewrite I2F_handle_gep_h by eauto;
        match goal with
        | |- context [match @handle_gep_h ?pa ?u ?o ?ws with _ => _ end] =>
-           destruct (@handle_gep_h pa u o ws); cbn; auto
+           destruct (@handle_gep_h pa u o ws) as [| | | [|]]; cbn; auto
        end);
-  repeat (break_match_goal_safe; cbn); repeat constructor; auto; 
+  repeat (break_match_goal_safeP; cbn); repeat constructor; auto;
   i2f_in_range_case; unfold I2F_Iptr; apply in_bounds_case; auto.
 Qed.
 
@@ -2433,9 +2446,11 @@ Proof.
   | HB : I2F_dvalue_base _ _ |- _ =>
       inversion HB; subst; cbn; try (repeat constructor)
   end.
-  (* Pointer *)
-  eapply I2F_EOU_bind; [now apply I2F_handle_gep_ptr|].
-  intros; do 3 constructor; auto.
+  (* Pointer: [catch_pois] turns a poisoned offset into a poison value *)
+  match goal with
+  | HA : I2F_Addr _ _ |- _ =>
+      destruct (I2F_handle_gep_ptr t _ _ HA F); cbn; repeat constructor; auto
+  end.
 Qed.
 
 (** * extract_element *)

@@ -81,7 +81,7 @@ Definition EOUP Z := EOU (option Z).
                                  end)
   |}.
 
-Open Scope monad_scope.
+#[local] Open Scope monad_scope.
 
 Definition catch_pois {A} {Z} (z_default:Z) (c : EOUP A) (k : A -> EOU Z) : EOU Z := 
   x <- (c : EOU _) ;;
