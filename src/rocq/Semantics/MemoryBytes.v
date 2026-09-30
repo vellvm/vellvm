@@ -3629,28 +3629,6 @@ Section MemoryByte.
     | _ => True
     end.
 
-  Lemma In_take_N : forall {A} n (l : list A) x, In x (take n l) -> In x l.
-  Proof.
-    intros A n l x H; rewrite <- (@take_drop_app _ n l); apply in_or_app; now left.
-  Qed.
-
-  Lemma In_drop_N : forall {A} n (l : list A) x, In x (drop n l) -> In x l.
-  Proof.
-    intros A n l x H; rewrite <- (@take_drop_app _ n l); apply in_or_app; now right.
-  Qed.
-
-  Lemma Forall_take_N : forall {A} (P : A -> Prop) n l, Forall P l -> Forall P (take n l).
-  Proof.
-    intros A P n l H; apply Forall_forall; intros x Hx.
-    eapply Forall_forall; [exact H | eapply In_take_N; exact Hx].
-  Qed.
-
-  Lemma Forall_drop_N : forall {A} (P : A -> Prop) n l, Forall P l -> Forall P (drop n l).
-  Proof.
-    intros A P n l H; apply Forall_forall; intros x Hx.
-    eapply Forall_forall; [exact H | eapply In_drop_N; exact Hx].
-  Qed.
-
   Lemma memory_byte_bits_length : forall mb,
       memory_byte_wf mb -> List.length (memory_byte_to_memory_bits mb) = 8%nat.
   Proof.
@@ -4029,7 +4007,190 @@ Section MemoryByte.
     eapply memory_bytes_round_trip1;
       [exact HS | eapply memory_bytes_to_dvalue_has_dtyp; eauto | exact H2].
   Qed.
-  
+
+  (** ** The writer produces well-formed bytes
+
+      Every byte [dvalue_to_memory_bytes] emits is a [BYTE_I], a
+      [BYTE_Pointer], or an 8-bit [BYTE_Mixed] -- a poison byte, or one byte
+      of a [BYTE_Mixed] value, padded out to 8 bits -- so written memory
+      meets the [memory_byte_wf] precondition of
+      [memory_bytes_to_dvalue_idempotent].  No typing hypothesis is
+      needed. *)
+  Lemma memory_byte_of_dvalue_bv_wf : forall sz (bv : @dvalue_bv Pa sz) idx,
+      memory_byte_wf (memory_byte_of_dvalue_bv bv idx).
+  Proof.
+    intros sz [p k | x | bits] idx; cbn [memory_byte_of_dvalue_bv memory_byte_wf];
+      try exact I.
+    cbv zeta; rewrite length_app.
+    pose proof (take_length_le (drop (8 * idx) bits) 8) as HL.
+    destruct (N.eqb_spec (N.of_nat (List.length (take 8 (drop (8 * idx) bits)))) 8)
+      as [E | NE]; cbn [negb].
+    - cbn [List.length]; lia.
+    - rewrite repeat_length; lia.
+  Qed.
+
+  Lemma poison_memory_byte_wf : memory_byte_wf poison_memory_byte.
+  Proof. reflexivity. Qed.
+
+  Lemma Forall_wf_poison_app : forall k acc,
+      Forall memory_byte_wf acc ->
+      Forall memory_byte_wf (List.repeat poison_memory_byte k ++ acc).
+  Proof.
+    intros k acc H; apply Forall_app; split; [| exact H].
+    apply Forall_forall; intros x Hx; apply repeat_spec in Hx; subst x.
+    exact poison_memory_byte_wf.
+  Qed.
+
+  Lemma accumulate_padding_wf : forall o q acc,
+      Forall memory_byte_wf acc ->
+      Forall memory_byte_wf (snd (accumulate_padding o q acc)).
+  Proof.
+    intros o q acc H; rewrite accumulate_padding_shape; apply Forall_wf_poison_app, H.
+  Qed.
+
+  Lemma accumulate_padding_bytes_wf : forall o n acc,
+      Forall memory_byte_wf acc ->
+      Forall memory_byte_wf (snd (accumulate_padding_bytes o n acc)).
+  Proof.
+    intros o n acc H; rewrite accumulate_padding_bytes_shape; apply Forall_wf_poison_app, H.
+  Qed.
+
+  Lemma acc_memory_bytes_of_dvalue_base_wf : forall dtb dv offset acc,
+      Forall memory_byte_wf acc ->
+      Forall memory_byte_wf (snd (acc_memory_bytes_of_dvalue_base dtb dv offset acc)).
+  Proof.
+    intros dtb dv offset acc H; unfold acc_memory_bytes_of_dvalue_base; cbv zeta;
+      cbn [snd].
+    rewrite rev_loop_acc_app; apply Forall_app; split; [| exact H].
+    apply Forall_rev, Forall_forall; intros b Hb; apply in_map_iff in Hb as (i & <- & _).
+    destruct dv;
+      first [apply memory_byte_of_dvalue_bv_wf | exact I | exact poison_memory_byte_wf].
+  Qed.
+
+  (* the two aggregate loops, given that each field / element writes
+     well-formed bytes *)
+  Lemma struct_bytes_loop_wf : forall ser ta pad fields types offset acc r,
+      (forall f, In f fields -> forall dt o ta' acc' r',
+          Forall memory_byte_wf acc' -> ser dt f o ta' acc' = ret r' ->
+          Forall memory_byte_wf (snd r')) ->
+      Forall memory_byte_wf acc ->
+      struct_bytes_loop ser ta pad fields types offset acc = ret r ->
+      Forall memory_byte_wf (snd r).
+  Proof.
+    intros ser ta pad; induction fields as [| f fs IH];
+      intros types offset acc r HS HW H;
+      destruct types as [| t ts]; cbn [struct_bytes_loop] in H; try discriminate.
+    - destruct (accumulate_padding offset pad acc) as [o1 a1] eqn:E1.
+      inversion H; subst r.
+      apply accumulate_padding_wf.
+      change a1 with (snd (o1, a1)); rewrite <- E1; apply accumulate_padding_wf, HW.
+    - cbv zeta in H.
+      match type of H with
+      | context [accumulate_padding ?o ?q ?a] =>
+          destruct (accumulate_padding o q a) as [o1 a1] eqn:E1
+      end.
+      apply EOU_bind_ret_inv in H as ([coff bs] & Es & H).
+      match type of H with
+      | context [accumulate_padding_bytes ?o ?n ?a] =>
+          destruct (accumulate_padding_bytes o n a) as [o2 a2] eqn:E2
+      end.
+      eapply IH; [intros; eapply HS; [right; eassumption | eassumption | eassumption]
+                 | | exact H].
+      change a2 with (snd (o2, a2)); rewrite <- E2; apply accumulate_padding_bytes_wf.
+      change bs with (snd (coff, bs)).
+      eapply (HS f (or_introl eq_refl)); [| exact Es].
+      change a1 with (snd (o1, a1)); rewrite <- E1; apply accumulate_padding_wf, HW.
+  Qed.
+
+  Lemma array_bytes_loop_wf : forall ser ta dt elt_pad elts offset acc r,
+      (forall e, In e elts -> forall o ta' acc' r',
+          Forall memory_byte_wf acc' -> ser dt e o ta' acc' = ret r' ->
+          Forall memory_byte_wf (snd r')) ->
+      Forall memory_byte_wf acc ->
+      array_bytes_loop ser ta dt elt_pad elts offset acc = ret r ->
+      Forall memory_byte_wf (snd r).
+  Proof.
+    intros ser ta dt elt_pad; induction elts as [| e es IH];
+      intros offset acc r HS HW H; cbn [array_bytes_loop] in H.
+    - inversion H; subst r; apply accumulate_padding_wf, HW.
+    - apply EOU_bind_ret_inv in H as ([coff bs] & Es & H).
+      match type of H with
+      | context [accumulate_padding_bytes ?o ?n ?a] =>
+          destruct (accumulate_padding_bytes o n a) as [o2 a2] eqn:E2
+      end.
+      eapply IH; [intros; eapply HS; [right; eassumption | eassumption | eassumption]
+                 | | exact H].
+      change a2 with (snd (o2, a2)); rewrite <- E2; apply accumulate_padding_bytes_wf.
+      change bs with (snd (coff, bs)).
+      eapply (HS e (or_introl eq_refl)); [exact HW | exact Es].
+  Qed.
+
+  Lemma acc_dvalue_to_memory_bytes_h_wf : forall dv dt offset ta acc r,
+      Forall memory_byte_wf acc ->
+      acc_dvalue_to_memory_bytes_h dt dv offset ta acc = ret r ->
+      Forall memory_byte_wf (snd r).
+  Proof.
+    intros dv; induction dv as [db | p fields IH | v elts IH] using dvalue_ind;
+      intros dt offset ta acc r HW H.
+    - (* [DVALUE_Base]: the value's bytes, or poison at an aggregate type *)
+      destruct dt as [dtb | packed dts | vec sz t].
+      + rewrite ser_base_unfold in H.
+        destruct (acc_memory_bytes_of_dvalue_base dtb db offset acc) as [o1 a1] eqn:E1.
+        inversion H; subst r; apply accumulate_padding_wf.
+        change a1 with (snd (o1, a1)); rewrite <- E1.
+        apply acc_memory_bytes_of_dvalue_base_wf, HW.
+      + destruct db; cbn [acc_dvalue_to_memory_bytes_h] in H; try discriminate.
+        destruct (accumulate_padding_bytes offset _ acc) as [o1 a1] eqn:E1.
+        inversion H; subst r; apply accumulate_padding_wf.
+        change a1 with (snd (o1, a1)); rewrite <- E1.
+        apply accumulate_padding_bytes_wf, HW.
+      + destruct db; cbn [acc_dvalue_to_memory_bytes_h] in H; try discriminate.
+        destruct (accumulate_padding_bytes offset _ acc) as [o1 a1] eqn:E1.
+        inversion H; subst r; apply accumulate_padding_wf.
+        change a1 with (snd (o1, a1)); rewrite <- E1.
+        apply accumulate_padding_bytes_wf, HW.
+    - (* [DVALUE_Struct] *)
+      destruct dt as [dtb | packed dts | vec sz t];
+        [cbn [acc_dvalue_to_memory_bytes_h] in H; discriminate | |
+         cbn [acc_dvalue_to_memory_bytes_h] in H; discriminate].
+      rewrite ser_struct_unfold in H.
+      eapply struct_bytes_loop_wf; [| exact HW | exact H].
+      intros f Hf dt' o ta' acc' r' HW' H'.
+      eapply (proj1 (Forall_forall _ _) IH f Hf); eauto.
+    - (* [DVALUE_Array] *)
+      destruct dt as [dtb | packed dts | vec sz t];
+        [cbn [acc_dvalue_to_memory_bytes_h] in H; discriminate
+        | cbn [acc_dvalue_to_memory_bytes_h] in H; discriminate |].
+      rewrite ser_array_unfold in H.
+      eapply array_bytes_loop_wf; [| exact HW | exact H].
+      intros e He o ta' acc' r' HW' H'.
+      eapply (proj1 (Forall_forall _ _) IH e He); eauto.
+  Qed.
+
+  Lemma dvalue_to_memory_bytes_wf : forall dt dv ta mb,
+      dvalue_to_memory_bytes dt dv ta = ret mb -> Forall memory_byte_wf mb.
+  Proof.
+    intros dt dv ta mb H; unfold dvalue_to_memory_bytes in H.
+    apply EOU_bind_ret_inv in H as ([o bs] & E & H).
+    inversion H; subst mb.
+    rewrite rev_append_rev, app_nil_r; apply Forall_rev.
+    change bs with (snd (o, bs)).
+    eapply acc_dvalue_to_memory_bytes_h_wf; [constructor | exact E].
+  Qed.
+
+  (** So for memory the writer produced, reading is idempotent outright. *)
+  Corollary memory_bytes_to_dvalue_idempotent_written :
+    forall dt dv0 ta dv mb1 mb2,
+      serializable dt ->
+      dvalue_to_memory_bytes dt dv0 ta = ret mb1 ->
+      memory_bytes_to_dvalue mb1 dt = ret dv ->
+      dvalue_to_memory_bytes dt dv None = ret mb2 ->
+      memory_bytes_to_dvalue mb2 dt = ret dv.
+  Proof.
+    intros dt dv0 ta dv mb1 mb2 HS HW1 H1 H2.
+    eapply memory_bytes_to_dvalue_idempotent;
+      [exact HS | eapply dvalue_to_memory_bytes_wf; exact HW1 | exact H1 | exact H2].
+  Qed.
+
 
 End MemoryByte.
-
