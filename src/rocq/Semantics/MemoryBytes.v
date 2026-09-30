@@ -1778,7 +1778,7 @@ Section MemoryByte.
   Proof.
     intros sz H; rewrite store_size_dtyp_int.
     assert (Hq : (Npos sz = 8 * (Npos sz / 8))%N)
-      by (apply N.div_exact; [lia | exact H]).
+      by (apply N.Div0.div_exact; exact H).
     remember (Npos sz / 8)%N as q.
     rewrite Hq.
     replace (8 * q + 7)%N with (7 + q * 8)%N by lia.
@@ -2311,7 +2311,7 @@ Section MemoryByte.
     rewrite N.add_0_r.
     remember (Npos sz / 8)%N as q eqn:Eq.
     assert (Hq : (Npos sz = 8 * q)%N)
-      by (subst q; apply N.div_exact; [lia | exact H8]).
+      by (subst q; apply N.Div0.div_exact; exact H8).
     assert (Hqnz : (q <> 0)%N) by lia.
     assert (Harith : ((Npos sz * k / 8) * 8 / Npos sz = k)%N).
     { rewrite Hq.
@@ -2669,7 +2669,7 @@ Section MemoryByte.
       cbn [andb] in Hall.
       destruct (N.eqb_spec j (8 * (j / 8))%N) as [Ej | ]; [exact Ej | discriminate]. }
     assert (Hmod : (j mod 8 = 0)%N).
-    { rewrite Ej at 1; rewrite N.mul_comm, N.mod_mul; lia. }
+    { rewrite Ej at 1; rewrite N.mul_comm, N.Div0.mod_mul; reflexivity. }
     unfold is_pointer_bits in H.
     rewrite Hmod, N.eqb_refl in H; cbn [andb] in H.
     rewrite <- Ej in Hall.
