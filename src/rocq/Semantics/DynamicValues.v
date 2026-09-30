@@ -536,6 +536,14 @@ Section DValue.
       | DVALUE_Base DVALUE_Poison => true
       | _ => false
       end.
+
+    Lemma dvalue_is_poison_true : forall d,
+        dvalue_is_poison d = true -> d = DVALUE_Base DVALUE_Poison.
+    Proof. intros [db | p f | v e] H; [destruct db | |]; cbn in H; try discriminate; reflexivity. Qed.
+
+    Lemma dvalue_is_poison_false : forall d,
+        dvalue_is_poison d = false -> d <> DVALUE_Base DVALUE_Poison.
+    Proof. intros d H C; subst; discriminate. Qed.
     
     Lemma ibinop_eq_dec : forall (op1 op2:ibinop), {op1 = op2} + {op1 <> op2}.
       intros.

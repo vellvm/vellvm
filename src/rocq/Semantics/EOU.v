@@ -90,3 +90,14 @@ Definition catch_pois {A} {Z} (z_default:Z) (c : EOUP A) (k : A -> EOU Z) : EOU 
   | NoPois v => k v
   end.
 
+Lemma map_monad_cons_EOUP : forall {A B} (f : A -> EOUP B) x xs,
+    map_monad f (x :: xs) = (y <- f x ;; ys <- map_monad f xs ;; ret (y :: ys)).
+Proof. reflexivity. Qed.
+
+Lemma map_monad_EOUP_pois_head : forall {A B} (f : A -> EOUP B) x rest,
+    f x = raise_ret Pois -> map_monad f (x :: rest) = raise_ret Pois.
+Proof. intros A B f x rest H; cbn; rewrite H; reflexivity. Qed.
+
+Lemma EOU_bind_ret_inv : forall {A B} (m : EOU A) (k : A -> EOU B) v,
+    bind m k = ret v -> exists a, m = ret a /\ k a = ret v.
+Proof. intros A B [] k v H; cbn in H; try discriminate; eauto. Qed.

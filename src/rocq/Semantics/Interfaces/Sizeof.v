@@ -194,3 +194,67 @@ Class SizeofTheory {S : Sizeof} : Prop :=
     forall dts,
       alloc_size_dtyp (DTYPE_Struct false dts) = store_size_dtyp (DTYPE_Struct false dts);
   }.
+
+(** ** Consequences of [SizeofTheory] *)
+Section SizeofFacts.
+  Context {S : Sizeof} {ST : @SizeofTheory S}.
+
+  Lemma store_le_alloc : forall t, (store_size_dtyp t <= alloc_size_dtyp t)%N.
+  Proof. intros t; unfold alloc_size_dtyp, pad_to_align, pad_to; lia. Qed.
+
+  Lemma store_size_B_I : forall sz,
+      store_size_dtyp (DTYPE_Base (DTYPE_B sz))
+      = store_size_dtyp (DTYPE_Base (DTYPE_I sz)).
+  Proof. intros sz; rewrite store_size_dtyp_bytes, store_size_dtyp_int; reflexivity. Qed.
+
+  Lemma store_size_int_mult8 : forall sz,
+      (Npos sz mod 8 = 0)%N ->
+      (8 * store_size_dtyp (DTYPE_Base (DTYPE_I sz)) = Npos sz)%N.
+  Proof.
+    intros sz H; rewrite store_size_dtyp_int.
+    assert (Hq : (Npos sz = 8 * (Npos sz / 8))%N)
+      by (apply N.Div0.div_exact; exact H).
+    remember (Npos sz / 8)%N as q.
+    rewrite Hq.
+    replace (8 * q + 7)%N with (7 + q * 8)%N by lia.
+    rewrite N.div_add by lia.
+    replace (7 / 8)%N with 0%N by reflexivity.
+    lia.
+  Qed.
+
+  Lemma store_size_int_mixed : forall sz,
+      (Npos sz mod 8 <> 0)%N ->
+      (1 <= store_size_dtyp (DTYPE_Base (DTYPE_I sz))
+       /\ 8 * (store_size_dtyp (DTYPE_Base (DTYPE_I sz)) - 1) + Npos sz mod 8
+          = Npos sz)%N.
+  Proof.
+    intros sz H; rewrite store_size_dtyp_int.
+    pose proof (N.div_mod (Npos sz) 8 ltac:(lia)) as D.
+    pose proof (N.mod_upper_bound (Npos sz) 8 ltac:(lia)) as U.
+    remember (Npos sz / 8)%N as q; remember (Npos sz mod 8)%N as e.
+    replace (Npos sz + 7)%N with (7 + e + q * 8)%N by lia.
+    rewrite N.div_add by lia.
+    assert (Hd : ((7 + e) / 8 = 1)%N).
+    { replace (7 + e)%N with (1 * 8 + (e - 1))%N by lia.
+      rewrite N.div_add_l by lia.
+      rewrite (N.div_small (e - 1) 8) by lia; lia. }
+    rewrite Hd; lia.
+  Qed.
+
+  Lemma store_size_int_bits : forall sz,
+      (Npos sz <= 8 * N.of_nat (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_I sz)))))%N.
+  Proof.
+    intros sz; rewrite Nnat.N2Nat.id, store_size_dtyp_int.
+    pose proof (N.div_mod (Npos sz + 7) 8 ltac:(lia)) as D.
+    pose proof (N.mod_upper_bound (Npos sz + 7) 8 ltac:(lia)) as U.
+    lia.
+  Qed.
+
+  Lemma store_size_B_bytes : forall sz,
+      (Npos sz mod 8 = 0)%N ->
+      (8 * store_size_dtyp (DTYPE_Base (DTYPE_B sz)) = Npos sz)%N.
+  Proof.
+    intros sz H; rewrite store_size_B_I; apply store_size_int_mult8; exact H.
+  Qed.
+
+End SizeofFacts.

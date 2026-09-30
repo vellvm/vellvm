@@ -16,6 +16,7 @@
 ./rocq/Utils/ParserHelper.v
 ./rocq/Utils/Tactics.v
 ./rocq/Utils/ListUtil.v
+./rocq/Utils/ZUtil.v
 ./rocq/Utils/StringUtil.v
 ./rocq/Utils/BoolUtil.v
 ./rocq/Utils/OptionUtil.v

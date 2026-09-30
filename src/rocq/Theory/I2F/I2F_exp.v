@@ -629,11 +629,6 @@ Section ArithBridge.
     - now rewrite Z.geb_leb, Z.leb_antisym.
   Qed.
 
-  Lemma Z_gtb_irrefl : forall z : Z, (z >? z)%Z = false.
-  Proof.
-    intros; rewrite Z.gtb_ltb; apply Z.ltb_irrefl.
-  Qed.
-
 End ArithBridge.
 
 (* Keep the overflow bounds abstract in goals rather than computed to
@@ -1088,28 +1083,6 @@ Proof.
     constructor.
     reflexivity.
 Qed.  
-
-Lemma Forall2_take {A B: Type} (RR : A -> B -> Prop) : forall n l l',
-  Forall2 RR l l' ->
-  Forall2 RR (take n l) (take n l').
-Proof.
-  intros n l l' H. revert n.
-  induction H.
-  - constructor.
-  - cbn.
-    destruct n; constructor; auto.
-Qed.    
-
-Lemma Forall2_rev_loop_acc {A B} (R : A -> B -> Prop) (f : N -> A) (g : N -> B)
-  (HR : forall i, R (f i) (g i)) :
-  forall n i acc acc', Forall2 R acc acc' ->
-    Forall2 R (N.rev_loop_acc f n i acc) (N.rev_loop_acc g n i acc').
-Proof.
-  intros n; induction n using N.peano_ind; intros i acc acc' HA.
-  - cbn; auto.
-  - rewrite !rev_loop_acc_succ; cbn.
-    apply IHn; constructor; auto.
-Qed.
 
 (** ** Bit-level plumbing *)
 Lemma I2F_memory_byte_to_memory_bits mb mb' :
@@ -2026,29 +1999,6 @@ Proof.
           intros m1 m2 GO; destruct GO; cbn;
           first [ constructor; apply I2F_canonicalize_agg; auto
                 | repeat constructor ].
-Qed.
-
-Lemma length_take {A B} (l : list A) (l' : list B) n :
-  length l = length l' -> length (take n l) = length (take n l').
-Proof.
-  revert l' n.
-  induction l; intros.
-  - destruct l'.  reflexivity.
-    inversion H.
-  - destruct l'.  inversion H.
-    cbn. destruct n; auto.
-    cbn. erewrite IHl; eauto.
-Qed.    
-
-Lemma length_drop {A B} (l : list A) (l' : list B) n :
-  length l = length l' -> length (drop n l) = length (drop n l').
-Proof.
-  revert l' n.
-  induction l; intros.
-  - destruct l'.  reflexivity.
-    inversion H.
-  - destruct l'.  inversion H.
-    cbn. destruct n; auto.
 Qed.
 
 

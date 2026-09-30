@@ -100,9 +100,6 @@ Proof.
     lia.
 Qed.
 
-Lemma two_power_pos_eq : forall p, two_power_pos p = (2 ^ Z.pos p)%Z.
-Proof. intros p; rewrite two_power_pos_equiv; reflexivity. Qed.
-
 Lemma extract_byte_vint_spec : forall sz (x : @bit_int sz) idx,
     (8 * (Z.of_N idx + 1) <= Z.pos sz)%Z ->
     extract_byte_vint x idx = ((unsigned x / 2 ^ (8 * Z.of_N idx)) mod 256)%Z.
@@ -748,9 +745,6 @@ Section MemoryByte.
 
   Lemma tapad_ge : forall ta x, (x <= tapad ta x)%N.
   Proof. intros [a|] x; cbn; unfold pad_to; lia. Qed.
-
-  Lemma store_le_alloc : forall t, (store_size_dtyp t <= alloc_size_dtyp t)%N.
-  Proof. intros t; unfold alloc_size_dtyp, pad_to_align, pad_to; lia. Qed.
 
   (** The offset a struct's field loop reaches after one field: align (unpacked
       only), then advance by the field's *alloc* size.  [fold_left sfe_step]
@@ -1626,10 +1620,6 @@ Section MemoryByte.
     - rewrite store_size_dtyp_bytes; apply N.div_str_pos; lia.
   Qed.
 
-  Lemma map_monad_EOUP_pois_head : forall {A B} (f : A -> EOUP B) x rest,
-      f x = raise_ret Pois -> map_monad f (x :: rest) = raise_ret Pois.
-  Proof. intros A B f x rest H; cbn; rewrite H; reflexivity. Qed.
-
   Lemma memory_byte_to_Z_poison : memory_byte_to_Z poison_memory_byte = raise_ret Pois.
   Proof. reflexivity. Qed.
 
@@ -1646,15 +1636,6 @@ Section MemoryByte.
   Proof.
     intros [| k'] H; [lia |]; cbn [List.repeat].
     apply map_monad_EOUP_pois_head, memory_byte_to_Z_poison.
-  Qed.
-
-  Lemma take_repeat_cons : forall {A} (x : A) n k,
-      (0 < n)%N -> (0 < k)%nat -> exists r, take n (List.repeat x k) = x :: r.
-  Proof.
-    intros A x n [| k'] Hn Hk; [lia |].
-    cbn [List.repeat take].
-    destruct (N.eqb_spec 0 n); [lia |].
-    eexists; reflexivity.
   Qed.
 
   Lemma concat_bytes_Z_mixed_poison : forall extra k,
@@ -1786,21 +1767,6 @@ Section MemoryByte.
     rewrite IH; reflexivity.
   Qed.
 
-  (* a multiple-of-8 width occupies exactly [sz/8] bytes *)
-  Lemma store_size_int_mult8 : forall sz,
-      (Npos sz mod 8 = 0)%N ->
-      (8 * store_size_dtyp (DTYPE_Base (DTYPE_I sz)) = Npos sz)%N.
-  Proof.
-    intros sz H; rewrite store_size_dtyp_int.
-    assert (Hq : (Npos sz = 8 * (Npos sz / 8))%N)
-      by (apply N.Div0.div_exact; exact H).
-    remember (Npos sz / 8)%N as q.
-    rewrite Hq.
-    replace (8 * q + 7)%N with (7 + q * 8)%N by lia.
-    rewrite N.div_add by lia.
-    replace (7 / 8)%N with 0%N by reflexivity.
-    lia.
-  Qed.
   Lemma read_int_block_mult8 : forall sz (x : @bit_int sz),
       (Npos sz mod 8 = 0)%N ->
       memory_bytes_to_dvalue_base
@@ -1810,7 +1776,7 @@ Section MemoryByte.
       = ret (DVALUE_I sz x).
   Proof.
     intros sz x H8.
-    pose proof (store_size_int_mult8 sz H8) as Hk.
+    pose proof (@store_size_int_mult8 _ _ sz H8) as Hk.
     pose proof (Integers.unsigned_range x) as [Hlo Hhi].
     assert (Hm : (@Integers.modulus sz = 2 ^ Z.pos sz)%Z)
       by (rewrite Integers.modulus_def; apply two_power_pos_eq).
@@ -1848,10 +1814,6 @@ Section MemoryByte.
       the value and zeros above them.  The reader takes
       [concat_bytes_Z_mixed], which weights each full byte by its position
       and keeps only the low [sz mod 8] bits of the last one. *)
-
-  Lemma map_monad_cons_EOUP : forall {A B} (f : A -> EOUP B) x xs,
-      map_monad f (x :: xs) = (y <- f x ;; ys <- map_monad f xs ;; ret (y :: ys)).
-  Proof. reflexivity. Qed.
 
   (* the last byte's real bits, read back *)
   Lemma memory_bits_to_Z_of_bits : forall zs,
@@ -1907,25 +1869,6 @@ Section MemoryByte.
       rewrite Z.pow_add_r by lia.
       do 2 f_equal; ring.
   Qed.
-  Lemma store_size_int_mixed : forall sz,
-      (Npos sz mod 8 <> 0)%N ->
-      (1 <= store_size_dtyp (DTYPE_Base (DTYPE_I sz))
-       /\ 8 * (store_size_dtyp (DTYPE_Base (DTYPE_I sz)) - 1) + Npos sz mod 8
-          = Npos sz)%N.
-  Proof.
-    intros sz H; rewrite store_size_dtyp_int.
-    pose proof (N.div_mod (Npos sz) 8 ltac:(lia)) as D.
-    pose proof (N.mod_upper_bound (Npos sz) 8 ltac:(lia)) as U.
-    remember (Npos sz / 8)%N as q; remember (Npos sz mod 8)%N as e.
-    replace (Npos sz + 7)%N with (7 + e + q * 8)%N by lia.
-    rewrite N.div_add by lia.
-    assert (Hd : ((7 + e) / 8 = 1)%N).
-    { replace (7 + e)%N with (1 * 8 + (e - 1))%N by lia.
-      rewrite N.div_add_l by lia.
-      rewrite (N.div_small (e - 1) 8) by lia; lia. }
-    rewrite Hd; lia.
-  Qed.
-
   (* the writer's generator: every byte, the last included, is plain *)
   Lemma gen_plain : forall sz (x : @bit_int sz) idx,
       memory_byte_of_dvalue_bv (BYTE_I x) idx
@@ -1941,7 +1884,7 @@ Section MemoryByte.
       = ret (DVALUE_I sz x).
   Proof.
     intros sz x H8.
-    destruct (store_size_int_mixed sz H8) as [Hk1 Hk2].
+    destruct (@store_size_int_mixed _ _ sz H8) as [Hk1 Hk2].
     pose proof (Integers.unsigned_range x) as [Hlo Hhi].
     pose proof (N.mod_upper_bound (Npos sz) 8 ltac:(lia)) as Hub.
     assert (Hm : (@Integers.modulus sz = 2 ^ Z.pos sz)%Z)
@@ -2121,11 +2064,6 @@ Section MemoryByte.
       constructor of a canonical [dvalue_bv] has to be shown to come back down
       the branch it came from. *)
 
-  Lemma store_size_B_I : forall sz,
-      store_size_dtyp (DTYPE_Base (DTYPE_B sz))
-      = store_size_dtyp (DTYPE_Base (DTYPE_I sz)).
-  Proof. intros sz; rewrite store_size_dtyp_bytes, store_size_dtyp_int; reflexivity. Qed.
-
   Lemma memory_bytes_to_int_of_read : forall sz (x : @bit_int sz) dbs,
       memory_bytes_to_dvalue_base dbs (DTYPE_I sz) = ret (DVALUE_I sz x) ->
       exists v, memory_bytes_to_int sz dbs = raise_ret (NoPois v) /\ repr v = x.
@@ -2183,15 +2121,6 @@ Section MemoryByte.
   (** The reader takes the [BYTE_I] branch only when no extracted bit is a
       pointer bit.  Every bit [get_bits_of_memory_byte_list] returns comes
       from its accumulator, from one of the bytes, or is poison padding. *)
-  Lemma In_rev_loop_acc : forall {A} (f : N -> A) n i acc b,
-      In b (N.rev_loop_acc f n i acc) -> In b acc \/ exists j, b = f j.
-  Proof.
-    intros A f n i acc b H.
-    rewrite rev_loop_acc_app in H.
-    apply in_app_or in H as [H | H]; [| now left].
-    apply in_rev, in_map_iff in H as (j & <- & _); eauto.
-  Qed.
-
   Lemma In_get_bits : forall dbs n acc b,
       In b (get_bits_of_memory_byte_list n dbs acc) ->
       In b acc \/ b = Bit_psn \/
@@ -2291,16 +2220,6 @@ Section MemoryByte.
     rewrite (BYTE_I_byte_no_psn Hin) in Hb; discriminate.
   Qed.
 
-  (* an integer's bytes hold all of its bits *)
-  Lemma store_size_int_bits : forall sz,
-      (Npos sz <= 8 * N.of_nat (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_I sz)))))%N.
-  Proof.
-    intros sz; rewrite Nnat.N2Nat.id, store_size_dtyp_int.
-    pose proof (N.div_mod (Npos sz + 7) 8 ltac:(lia)) as D.
-    pose proof (N.mod_upper_bound (Npos sz + 7) 8 ltac:(lia)) as U.
-    lia.
-  Qed.
-
   (* a canonical [BYTE_Mixed] with no pointer bits must contain poison *)
   Lemma not_all_int_no_ptr_pois : forall bits,
       negb (forallb is_int_bit bits) = true ->
@@ -2338,16 +2257,6 @@ Section MemoryByte.
       by apply store_size_int_bits.
     cbn [orb]; rewrite Ev.
     rewrite Hv; cbn; reflexivity.
-  Qed.
-
-  Lemma map_Nseq_shift : forall {A} (f : N -> A) n a s,
-      List.map (fun i => f (s + i)%N) (Nseq a n) = List.map f (Nseq (s + a)%N n).
-  Proof.
-    intros A f; induction n as [| n IH]; intros a s; cbn [Nseq List.map];
-      [reflexivity |].
-    f_equal.
-    rewrite (IH (N.succ a) s).
-    do 2 f_equal; lia.
   Qed.
 
 
@@ -3204,10 +3113,6 @@ Section MemoryByte.
          ret (f :: rest)).
   Proof. reflexivity. Qed.
 
-  Lemma dvalue_is_poison_false : forall d,
-      dvalue_is_poison d = false -> d <> DVALUE_Base DVALUE_Poison.
-  Proof. intros d H C; subst; discriminate. Qed.
-
   (** The struct loops, writer against reader.  The writer emits, per field,
       [[leading padding][child block][pad to alloc size]]; the reader does
       [drop padding], [take ssz], [drop asz].  The last clause is the reader
@@ -3798,13 +3703,6 @@ Section MemoryByte.
     destruct b; cbn; auto.
   Qed.
 
-  Lemma store_size_B_bytes : forall sz,
-      (Npos sz mod 8 = 0)%N ->
-      (8 * store_size_dtyp (DTYPE_Base (DTYPE_B sz)) = Npos sz)%N.
-  Proof.
-    intros sz H; rewrite store_size_B_I; apply store_size_int_mult8; exact H.
-  Qed.
-
   (* the bits read as bits are canonical, unless they are a whole aligned
      pointer chunk -- which the reader will have recognised first *)
   Lemma memory_bytes_to_bits_value_canonical : forall sz dbs,
@@ -3831,7 +3729,7 @@ Section MemoryByte.
       apply andb_true_iff in Ec as [Ec _]; apply andb_true_iff in Ec as [Ec _].
       apply N.eqb_eq; exact Ec. }
     assert (Hn : (8 * N.of_nat (List.length dbs) <= Npos sz)%N)
-      by (rewrite <- (@store_size_B_bytes sz H8); lia).
+      by (rewrite <- (@store_size_B_bytes _ _ sz H8); lia).
     destruct (@pointer_slice_of_chunk sz dbs HW Hn Ec) as (p & k & Es & Ea).
     rewrite (NA p k Es) in Ea; discriminate.
   Qed.
@@ -3897,10 +3795,6 @@ Section MemoryByte.
 
   (** Aggregates: each field or element is a read of a sub-block, or
       poison. *)
-  Lemma EOU_bind_ret_inv : forall {A B} (m : EOU A) (k : A -> EOU B) v,
-      bind m k = ret v -> exists a, m = ret a /\ k a = ret v.
-  Proof. intros A B [] k v H; cbn in H; try discriminate; eauto. Qed.
-
   Lemma read_struct_loop_has_dtyp : forall rd np pad dts offset dbs vs,
       (forall t, In t dts -> forall mb v, Forall memory_byte_wf mb ->
                  rd mb t = ret v -> dvalue_has_dtyp v t) ->
@@ -4282,56 +4176,13 @@ Section MemoryByte.
   (** *** Digit arithmetic
 
       [concat_bits_Z] and [concat_bytes_Z] are both little-endian
-      concatenations of digits, of 1 and 8 bits. *)
-  Fixpoint concat_digits (w : Z) (l : list Z) : Z :=
-    match l with
-    | [] => 0
-    | z :: l => z + Z.shiftl (concat_digits w l) w
-    end.
-
+      concatenations of digits, of 1 and 8 bits: instances of
+      [concat_digits] (Utils/ZUtil.v). *)
   Lemma concat_bits_Z_digits : forall l, concat_bits_Z l = concat_digits 1 l.
   Proof. induction l as [| z l IH]; cbn; [reflexivity | now rewrite IH]. Qed.
 
   Lemma concat_bytes_Z_digits : forall l, concat_bytes_Z l = concat_digits 8 l.
   Proof. induction l as [| z l IH]; cbn; [reflexivity | now rewrite IH]. Qed.
-
-  Lemma concat_digits_range : forall w l,
-      (0 < w)%Z -> Forall (fun z => 0 <= z < 2 ^ w)%Z l ->
-      (0 <= concat_digits w l < 2 ^ (w * Z.of_nat (List.length l)))%Z.
-  Proof.
-    intros w l Hw; induction l as [| z l IH]; intros HF; cbn [concat_digits List.length].
-    - replace (w * Z.of_nat 0)%Z with 0%Z by lia; cbn; lia.
-    - inversion HF as [| ? ? Hz Hl]; subst; specialize (IH Hl).
-      assert (Hp : (0 < 2 ^ w)%Z) by (apply Z.pow_pos_nonneg; lia).
-      rewrite Z.shiftl_mul_pow2 by lia.
-      replace (w * Z.of_nat (S (List.length l)))%Z
-        with (w + w * Z.of_nat (List.length l))%Z by lia.
-      rewrite Z.pow_add_r by lia.
-      nia.
-  Qed.
-
-  Lemma concat_digits_nth : forall w l i,
-      (0 < w)%Z -> Forall (fun z => 0 <= z < 2 ^ w)%Z l -> (i < List.length l)%nat ->
-      ((concat_digits w l / 2 ^ (w * Z.of_nat i)) mod 2 ^ w)%Z = nth i l 0%Z.
-  Proof.
-    intros w l; induction l as [| z l IH]; intros i Hw HF Hi; cbn [List.length] in Hi;
-      [lia |].
-    inversion HF as [| ? ? Hz Hl]; subst.
-    assert (Hp : (0 < 2 ^ w)%Z) by (apply Z.pow_pos_nonneg; lia).
-    cbn [concat_digits]; rewrite Z.shiftl_mul_pow2 by lia.
-    destruct i as [| i].
-    - cbn [nth]; replace (w * Z.of_nat 0)%Z with 0%Z by lia.
-      rewrite Z.pow_0_r, Z.div_1_r, Z_mod_plus_full.
-      apply Z.mod_small; lia.
-    - cbn [nth].
-      replace (w * Z.of_nat (S i))%Z with (w + w * Z.of_nat i)%Z by lia.
-      rewrite Z.pow_add_r by lia.
-      rewrite <- Z.div_div by (try lia; apply Z.pow_pos_nonneg; lia).
-      replace ((z + concat_digits w l * 2 ^ w) / 2 ^ w)%Z with (concat_digits w l).
-      + apply IH; auto; lia.
-      + rewrite Z.add_comm, Z.div_add_l by lia.
-        rewrite (Z.div_small z) by lia; lia.
-  Qed.
 
   Lemma extract_bit_vint_8 : forall (y : @bit_int 8) i,
       (i < 8)%N -> extract_bit_vint y i = ((unsigned y / 2 ^ Z.of_N i) mod 2)%Z.
@@ -4365,22 +4216,6 @@ Section MemoryByte.
     reflexivity.
   Qed.
 
-  (** *** Lists indexed by [Nseq] *)
-
-  Lemma Forall2_nth_Nseq : forall {A B} (R : A -> B -> Prop) (f : N -> B) d l s,
-      (forall i, (i < List.length l)%nat -> R (nth i l d) (f (s + N.of_nat i)%N)) ->
-      Forall2 R l (List.map f (Nseq s (List.length l))).
-  Proof.
-    intros A B R f d; induction l as [| x l IH]; intros s H; cbn [List.length Nseq List.map];
-      [constructor |].
-    constructor.
-    - specialize (H 0%nat ltac:(cbn; lia)); cbn [nth] in H.
-      rewrite N.add_0_r in H; exact H.
-    - apply IH; intros i Hi.
-      specialize (H (S i) ltac:(cbn; lia)); cbn [nth] in H.
-      replace (N.succ s + N.of_nat i)%N with (s + N.of_nat (S i))%N by lia; exact H.
-  Qed.
-
   (** *** The reader's bits at a whole-byte width
 
       Exactly [8 * length dbs] bits: the bytes' bits, concatenated. *)
@@ -4397,23 +4232,6 @@ Section MemoryByte.
       rewrite (IH (n - 8)%N Hbs) by lia; reflexivity.
   Qed.
 
-  Lemma existsb_concat_map : forall {A B} (f : B -> bool) (g : A -> list B) l x,
-      existsb f (List.concat (List.map g l)) = false -> In x l -> existsb f (g x) = false.
-  Proof.
-    intros A B f g l x H Hin; induction l as [| y l IH]; [destruct Hin |].
-    cbn [List.map List.concat] in H; rewrite existsb_app in H.
-    apply orb_false_iff in H as [H1 H2].
-    destruct Hin as [-> | Hin]; auto.
-  Qed.
-
-  Lemma forallb_concat_map : forall {A B} (f : B -> bool) (g : A -> list B) l x,
-      forallb f (List.concat (List.map g l)) = true -> In x l -> forallb f (g x) = true.
-  Proof.
-    intros A B f g l x H Hin; induction l as [| y l IH]; [destruct Hin |].
-    cbn [List.map List.concat] in H; rewrite forallb_app in H.
-    apply andb_true_iff in H as [H1 H2].
-    destruct Hin as [-> | Hin]; auto.
-  Qed.
 
   (** *** Pointer bytes *)
 
@@ -4495,7 +4313,7 @@ Section MemoryByte.
                   (Nseq 0 (List.length dbs))).
   Proof.
     intros dbs HW.
-    apply (Forall2_nth_Nseq same_bits _ poison_memory_byte); intros i Hi.
+    apply (@Forall2_nth_Nseq _ _ same_bits _ poison_memory_byte); intros i Hi.
     rewrite N.add_0_l; unfold same_bits; rewrite memory_byte_to_memory_bits_mixed; cbv zeta.
     rewrite take_drop_concat_bytes by assumption.
     rewrite (memory_byte_bits_length _ (proj1 (Forall_forall _ _) HW _ (nth_In _ _ Hi))).
@@ -4530,18 +4348,6 @@ Section MemoryByte.
   Proof.
     intros b; pose proof (unsigned_range b) as H.
     replace (2 ^ 1)%Z with (@modulus 1) by reflexivity; exact H.
-  Qed.
-
-  Lemma map_Nseq_nth : forall {A} (l : list A) d s,
-      List.map (fun i => nth (N.to_nat (i - s)) l d) (Nseq s (List.length l)) = l.
-  Proof.
-    intros A l d; induction l as [| x l IH]; intros s; [reflexivity |].
-    cbn [List.length Nseq List.map].
-    replace (N.to_nat (s - s)) with 0%nat by lia; cbn [nth]; f_equal.
-    rewrite <- (IH (N.succ s)) at 2.
-    apply map_ext_in; intros i Hi; apply In_Nseq in Hi.
-    replace (N.to_nat (i - s)) with (S (N.to_nat (i - N.succ s))) by lia.
-    reflexivity.
   Qed.
 
   Lemma same_bits_int_byte : forall b z,
@@ -4693,7 +4499,7 @@ Section MemoryByte.
     assert (HR : Forall (fun z => 0 <= z < 256)%Z (List.map byte_val dbs)).
     { apply Forall_forall; intros z Hz; apply in_map_iff in Hz as (b & <- & Hb).
       destruct (Hin b Hb) as (Hw & H1 & H2); apply byte_val_range; assumption. }
-    apply (Forall2_nth_Nseq same_bits _ poison_memory_byte); intros i Hi.
+    apply (@Forall2_nth_Nseq _ _ same_bits _ poison_memory_byte); intros i Hi.
     rewrite N.add_0_l.
     cbn [memory_byte_of_dvalue_bv].
     rewrite extract_byte_vint_concat;
@@ -4828,10 +4634,6 @@ Section MemoryByte.
   Qed.
 
   (** *** Aggregates *)
-
-  Lemma dvalue_is_poison_true : forall d,
-      dvalue_is_poison d = true -> d = DVALUE_Base DVALUE_Poison.
-  Proof. intros [db | p f | v e] H; [destruct db | |]; cbn in H; try discriminate; reflexivity. Qed.
 
   (* the reader's element loop against the writer's, with no padding: each
      element reads its own [store_size] chunk and writes it back *)
@@ -4969,14 +4771,6 @@ Section MemoryByte.
         exists (w2 ++ w1); split; [rewrite app_assoc; reflexivity |].
         rewrite rev_app_distr, <- (@take_drop_app _ ssz dbs).
         apply Forall2_app; assumption.
-  Qed.
-
-  Lemma fold_left_add_right : forall (f : dtyp -> N) l a,
-      fold_left (fun acc dt => (acc + f dt)%N) l a
-      = (a + fold_right (fun dt acc => (f dt + acc)%N) 0%N l)%N.
-  Proof.
-    intros f; induction l as [| t l IH]; intros a; cbn [fold_left fold_right]; [lia |].
-    rewrite IH; lia.
   Qed.
 
   Lemma packed_extent_store : forall dts,
