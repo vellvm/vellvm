@@ -23,6 +23,7 @@ From Vellvm Require Import
 
 From Vellvm Require Import
   Utils.rutt_cutoff
+  Theory.MemoryBytesFacts
   Theory.I2F.Refinement.
 
 From Paco Require Import paco.
@@ -245,8 +246,6 @@ Proof.
   do 2 constructor.
   apply I2F_freeze_bv; [now apply I2F_draw_Z | now constructor].
 Qed.
-
-(* SAZ: I got claude Opus 5.0 to fix the proof of freeze. *)
 
 (** The [FailureE] branches of [freeze]: a value/type shape mismatch
     raises on *both* sides at once (the two [dvalue]s are [I2F_dvalue]-
