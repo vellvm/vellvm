@@ -362,13 +362,6 @@ Section MemoryByteFacts.
         ret (accumulate_padding offset' ta bs).
   Proof. reflexivity. Qed.
 
-  (* Shape of the accumulator invariant: the returned offset says how many
-     bytes were appended to [acc]. *)
-  Definition acc_ok (offset : N) (acc : list memory_byte)
-                    (r : N * list memory_byte) : Prop :=
-    N.of_nat (length (snd r)) = (N.of_nat (length acc) + (fst r - offset))%N
-    /\ (offset <= fst r)%N.
-
   Lemma tapad_ge : forall ta x, (x <= tapad ta x)%N.
   Proof. intros [a|] x; cbn; unfold pad_to; lia. Qed.
 

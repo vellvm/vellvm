@@ -421,26 +421,6 @@ Section MemoryByte.
         memory_bits_to_Z bits
     end.
     
-  
-  
-  (* Gets an integral byte value from a list of memory bits, stripping away provenance:
-       given [b0; b1; ... ; bn]
-       extracts bits numbered [idx*8 + 0; idx*8 + 1; ... idx*8 + 7]
-       if none of them are poison, return the byte obtained by concatenating them
-       if any are poison, raise poison
-        
-   *)
-  Definition extract_byte_mixed_bits (bits : list memory_bit) (idx : N) : EOUP Z :=
-    let suffix := if N.eqb idx 0 then bits else drop (8 * (N.pred idx)) bits in
-    let mbits := take 8 suffix in
-    if negb (N.of_nat (List.length mbits) =? 8) then
-      raise_ub "extract_byte_mixed_bits: not enough bits"
-    else
-      vs <- map_monad memory_bit_to_bit mbits ;;
-      ret (concat_bits_Z vs).
-  
-
-  #[local] Obligation Tactic := try Tactics.program_simpl; try solve [cbn; try lia].
 
   Definition absorb_pois {A} (c : EOUP A) (k : A -> EOU dvalue_base) : EOU dvalue_base :=
     catch_pois DVALUE_Poison c k.
