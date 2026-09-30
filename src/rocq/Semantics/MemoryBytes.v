@@ -1202,35 +1202,48 @@ Section MemoryByte.
     | _ => None
     end.
 
+  (* Is a pointer slice starting at byte [k] a whole [BYTE_Pointer] chunk at
+     width [bit_sz]?  The chunk index counts [bit_sz]-bit chunks, so the
+     width must be a whole number of bytes and the slice must start on a
+     chunk boundary.  This is [is_pointer_chunk] (DynamicValues.v), stated
+     on the starting byte rather than the starting bit. *)
+  Definition pointer_chunk_aligned (bit_sz : positive) (k : N) : bool :=
+    N.eqb (Npos bit_sz mod 8) 0 && N.eqb ((k * 8) mod Npos bit_sz) 0.
+
+  (* The bits read as bits: [BYTE_Mixed] if any of them is poison or part of
+     a pointer, otherwise [BYTE_I].  The pointer test must come first:
+     [memory_byte_to_Z] answers pointer bits with their address, so reading
+     a pointer bit as an integer would strip its provenance.  With neither
+     pointer nor poison bits the integer read cannot fail; its fall-through
+     is not reached. *)
+  Definition memory_bytes_to_bits_value (bit_sz : positive) (dbs : list memory_byte)
+    : @dvalue_bv _ bit_sz :=
+    let bits := rev_append (get_bits_of_memory_byte_list (Npos bit_sz) dbs []) [] in
+    if existsb is_ptr_bit bits || existsb is_poison_bit bits then BYTE_Mixed bit_sz bits
+    else
+      match memory_bytes_to_int bit_sz dbs with
+      | raise_ret (NoPois x) => BYTE_I (repr x)
+      | _ => BYTE_I (repr (int_bits_to_Z bits))
+      end.
+
+  (* The canonical representation of the bits (see "Canonical
+     [dvalue_bv]s" in DynamicValues.v), except for the all-poison case,
+     which [memory_bytes_to_dvalue_base] handles. *)
   Definition memory_bytes_to_byte_value (bit_sz : positive) (dbs : list memory_byte) : EOU (@dvalue_bv _ bit_sz) :=
     match memory_bytes_to_pointer_slice dbs with
-    (* First try to retain a slice of a pointer, provenance and index intact.
-       This must come before the integer attempt: [memory_byte_to_Z] answers
-       pointer bytes with a concrete address rather than poison, so an
-       integer-first order would strip provenance from every pointer byte. *)
+    (* A slice of one pointer keeps its provenance and index -- as a
+       [BYTE_Pointer] when it is a whole aligned chunk, otherwise as bits. *)
     | Some (p, k) =>
-        (* [k] is a *byte* index, but [BYTE_Pointer]'s index counts chunks of
-           [bit_sz] bits -- [memory_byte_of_dvalue_bv] writes chunk [i] of a
-           [BYTE_Pointer _ i] starting at byte [(bit_sz * i) / 8].  Invert
-           that here, so reading bytes 4..7 of [p] at [DTYPE_B 32] gives
-           [BYTE_Pointer 32 p 1] rather than [BYTE_Pointer 32 p 4]. *)
-        ret (BYTE_Pointer bit_sz p ((k * 8) / Npos bit_sz))
-    | None =>
-        let bits := rev_append (get_bits_of_memory_byte_list (Npos bit_sz) dbs []) [] in
-        (* Then as a plain integer, but only when no bit belongs to a
-           pointer: [memory_byte_to_Z] answers pointer bits with their
-           address, so a pointer bit mixed with integer bits would otherwise
-           lose its provenance.  With no pointer bits, the integer read
-           succeeds exactly when no bit is poison, i.e. when every bit is an
-           integer bit -- the condition under which [dvalue_bv_canonical]
-           takes [BYTE_I]. *)
-        if existsb is_ptr_bit bits then ret (BYTE_Mixed bit_sz bits)
-        else
-          match memory_bytes_to_int bit_sz dbs with
-          | raise_ret (NoPois x) => ret (BYTE_I (repr x))
-          | _ => (* otherwise retain as just a list of mixed bits *)
-              ret (BYTE_Mixed bit_sz bits)
-          end
+        if pointer_chunk_aligned bit_sz k
+        then
+          (* [k] is a *byte* index, but [BYTE_Pointer]'s index counts chunks
+             of [bit_sz] bits -- [memory_byte_of_dvalue_bv] writes chunk [i]
+             of a [BYTE_Pointer _ i] starting at byte [(bit_sz * i) / 8].
+             Invert that here, so reading bytes 4..7 of [p] at [DTYPE_B 32]
+             gives [BYTE_Pointer 32 p 1]. *)
+          ret (BYTE_Pointer bit_sz p ((k * 8) / Npos bit_sz))
+        else ret (memory_bytes_to_bits_value bit_sz dbs)
+    | None => ret (memory_bytes_to_bits_value bit_sz dbs)
     end.
 
   (* [is_poison_bit] is defined in DynamicValues.v, next to [dvalue_bv_canonical]. *)
@@ -1313,14 +1326,16 @@ Section MemoryByte.
     | DTYPE_Opaque =>
         raise_error "memory_bytes_to_dvalue: unsupported DTYPE_Opaque."
     | DTYPE_B sz =>
-        (* If all the bits are poison then create the poison value *)
-        (* Question: do we have to check the length too *)
+        (* If all the bytes are poison then create the poison value *)
         if all_poison_bytes dbs then
           ret DVALUE_Poison
         else
-        (* otherwise at least one is non-poison *)
         dv <- memory_bytes_to_byte_value sz dbs ;;
-        ret (@DVALUE_B _ sz dv)
+        (* The byte test above also sees bits beyond the value (the padding
+           of a last, partial byte), so the value's own bits can still all be
+           poison. *)
+        if dvalue_bv_all_poison dv then ret DVALUE_Poison
+        else ret (@DVALUE_B _ sz dv)
     end.
 
   
@@ -2199,6 +2214,30 @@ Section MemoryByte.
         * right; right; exists d'; split; [now right | exact H].
   Qed.
 
+  (* With enough bytes there is no poison padding: every bit comes from the
+     accumulator or from a byte. *)
+  Lemma In_get_bits_full : forall dbs n acc b,
+      (n <= 8 * N.of_nat (List.length dbs))%N ->
+      In b (get_bits_of_memory_byte_list n dbs acc) ->
+      In b acc \/ exists d, In d dbs /\ In b (memory_byte_to_memory_bits d).
+  Proof.
+    induction dbs as [| d dbs IH]; intros n acc b Hn H;
+      cbn [get_bits_of_memory_byte_list] in H.
+    - cbn [List.length] in Hn.
+      destruct (N.eqb_spec n 0); [now left | lia].
+    - destruct (N.ltb n 8).
+      + rewrite rev_append_rev in H; apply in_app_or in H as [H | H]; [| now left].
+        apply in_rev in H.
+        right; exists d; split; [now left |].
+        rewrite <- (@take_drop_app _ n (memory_byte_to_memory_bits d)).
+        apply in_or_app; now left.
+      + apply IH in H as [H | (d' & Hd' & H)].
+        * rewrite rev_append_rev in H; apply in_app_or in H as [H | H]; [| now left].
+          apply in_rev in H; right; exists d; split; [now left | exact H].
+        * right; exists d'; split; [now right | exact H].
+        * cbn [List.length] in Hn; lia.
+  Qed.
+
   Lemma BYTE_I_byte_no_ptr : forall sz (x : @bit_int sz) idx b,
       In b (memory_byte_to_memory_bits (memory_byte_of_dvalue_bv (BYTE_I x) idx)) ->
       is_ptr_bit b = false.
@@ -2222,6 +2261,44 @@ Section MemoryByte.
     apply In_get_bits in Hin as [[] | [-> | (d & Hd & Hin)]]; [discriminate |].
     apply in_map_iff in Hd as (idx & <- & _).
     rewrite (BYTE_I_byte_no_ptr Hin) in Hb; discriminate.
+  Qed.
+
+  Lemma BYTE_I_byte_no_psn : forall sz (x : @bit_int sz) idx b,
+      In b (memory_byte_to_memory_bits (memory_byte_of_dvalue_bv (BYTE_I x) idx)) ->
+      is_poison_bit b = false.
+  Proof.
+    intros sz x idx b H;
+      cbn [memory_byte_of_dvalue_bv memory_byte_to_memory_bits] in H.
+    rewrite rev_append_rev, app_nil_r in H; apply in_rev in H.
+    apply In_rev_loop_acc in H as [[] | (j & ->)]; reflexivity.
+  Qed.
+
+  (* the writer lays down enough bytes that none of the bits is padding *)
+  Lemma no_psn_bits_BYTE_I_block : forall sz (x : @bit_int sz) K,
+      (Npos sz <= 8 * N.of_nat K)%N ->
+      existsb is_poison_bit
+        (rev_append (get_bits_of_memory_byte_list (Npos sz)
+           (List.map (memory_byte_of_dvalue_bv (BYTE_I x)) (Nseq 0 K)) []) [])
+      = false.
+  Proof.
+    intros sz x K HK.
+    apply not_true_iff_false; intros H.
+    apply existsb_exists in H as (b & Hin & Hb).
+    rewrite rev_append_rev, app_nil_r in Hin; apply in_rev in Hin.
+    apply In_get_bits_full in Hin as [[] | (d & Hd & Hin)];
+      [| rewrite length_map, Nseq_length; exact HK].
+    apply in_map_iff in Hd as (idx & <- & _).
+    rewrite (BYTE_I_byte_no_psn Hin) in Hb; discriminate.
+  Qed.
+
+  (* an integer's bytes hold all of its bits *)
+  Lemma store_size_int_bits : forall sz,
+      (Npos sz <= 8 * N.of_nat (N.to_nat (store_size_dtyp (DTYPE_Base (DTYPE_I sz)))))%N.
+  Proof.
+    intros sz; rewrite Nnat.N2Nat.id, store_size_dtyp_int.
+    pose proof (N.div_mod (Npos sz + 7) 8 ltac:(lia)) as D.
+    pose proof (N.mod_upper_bound (Npos sz + 7) 8 ltac:(lia)) as U.
+    lia.
   Qed.
 
   (* a canonical [BYTE_Mixed] with no pointer bits must contain poison *)
@@ -2256,8 +2333,10 @@ Section MemoryByte.
     rewrite all_poison_BYTE_I_block by exact HK.
     unfold memory_bytes_to_byte_value.
     rewrite pointer_slice_BYTE_I_block by exact HK.
-    cbv zeta; rewrite no_ptr_bits_BYTE_I_block.
-    rewrite Ev; cbv beta iota.
+    unfold memory_bytes_to_bits_value; cbv zeta.
+    rewrite no_ptr_bits_BYTE_I_block, no_psn_bits_BYTE_I_block
+      by apply store_size_int_bits.
+    cbn [orb]; rewrite Ev.
     rewrite Hv; cbn; reflexivity.
   Qed.
 
@@ -2320,12 +2399,20 @@ Section MemoryByte.
       replace (q * k * 8)%N with (k * (8 * q))%N by lia.
       rewrite N.div_mul by lia.
       reflexivity. }
+    (* the writer's chunk starts on a chunk boundary *)
+    assert (Hal : pointer_chunk_aligned sz (Npos sz * k / 8) = true).
+    { unfold pointer_chunk_aligned; rewrite H8, N.eqb_refl; cbn [andb].
+      apply N.eqb_eq; rewrite Hq.
+      replace (8 * q * k)%N with (q * k * 8)%N by lia.
+      rewrite N.div_mul by lia.
+      replace (q * k * 8)%N with (k * (8 * q))%N by lia.
+      apply N.Div0.mod_mul. }
     cbn [memory_bytes_to_dvalue_base].
     rewrite all_poison_pointer_run.
     unfold memory_bytes_to_byte_value.
     rewrite memory_bytes_to_pointer_slice_run.
     cbv beta iota.
-    rewrite Harith; cbn; reflexivity.
+    rewrite Hal, Harith; cbn; reflexivity.
   Qed.
 
   (** The reader's [get_bits_of_memory_byte_list] inverts the writer's
@@ -2646,20 +2733,22 @@ Section MemoryByte.
           = None
       end.
   Proof. intros [| [q j | | ] bits'] n; reflexivity. Qed.
-  Lemma pointer_slice_mixed_none : forall n bits,
+  (* A pointer slice in the writer's rendering of a canonical [BYTE_Mixed]
+     is not a whole aligned chunk -- else [is_pointer_chunk] would hold. *)
+  Lemma pointer_slice_mixed_unaligned : forall sz n bits p k,
       (N.of_nat (List.length bits) <= 8 * N.of_nat (S n))%N ->
-      negb (is_pointer_bits bits) = true ->
+      negb (is_pointer_chunk sz bits) = true ->
       memory_bytes_to_pointer_slice (List.map (mixed_byte bits) (Nseq 0 (S n)))
-      = None.
+      = Some (p, k) ->
+      pointer_chunk_aligned sz k = false.
   Proof.
-    intros n bits Hlen H.
+    intros sz n bits p k Hlen H Hs.
     pose proof (pointer_slice_head bits n) as HP.
-    destruct bits as [| [q j | | ] bits']; try exact HP.
-    rewrite HP.
+    destruct bits as [| [q j | | ] bits']; rewrite HP in Hs; try discriminate.
     destruct (pointer_slice_from q (j / 8)%N
                 (List.map (mixed_byte (Bit_ptr q j :: bits')) (Nseq 0 (S n))))
-      eqn:E; [| reflexivity].
-    exfalso.
+      eqn:E; [| discriminate].
+    inversion Hs; subst p k; clear Hs.
     assert (Hall : all_pointer_bits_from q (8 * (j / 8))%N (Bit_ptr q j :: bits')
                    = true)
       by (apply (pointer_slice_implies_bits (S n)); [exact Hlen | exact E]).
@@ -2668,17 +2757,20 @@ Section MemoryByte.
       destruct (eq_dec_ptr q q) as [_ | NE]; [| now contradiction NE].
       cbn [andb] in Hall.
       destruct (N.eqb_spec j (8 * (j / 8))%N) as [Ej | ]; [exact Ej | discriminate]. }
-    assert (Hmod : (j mod 8 = 0)%N).
-    { rewrite Ej at 1; rewrite N.mul_comm, N.Div0.mod_mul; reflexivity. }
-    unfold is_pointer_bits in H.
-    rewrite Hmod, N.eqb_refl in H; cbn [andb] in H.
+    unfold pointer_chunk_aligned.
+    destruct (N.eqb_spec (Npos sz mod 8) 0) as [H8 | ]; [| reflexivity].
+    destruct (N.eqb_spec ((j / 8) * 8 mod Npos sz) 0) as [Hj | ]; [| reflexivity].
+    exfalso.
+    unfold is_pointer_chunk in H.
+    replace ((j / 8) * 8)%N with j in Hj by lia.
+    rewrite H8, Hj, N.eqb_refl in H; cbn [andb] in H.
     rewrite <- Ej in Hall.
     rewrite Hall in H; discriminate.
   Qed.
 
   Lemma read_base_block_BYTE_Mixed : forall sz bits,
       (N.of_nat (List.length bits) = Npos sz)%N ->
-      negb (is_pointer_bits bits) = true ->
+      negb (is_pointer_chunk sz bits) = true ->
       negb (forallb is_int_bit bits) = true ->
       negb (forallb is_poison_bit bits) = true ->
       memory_bytes_to_dvalue_base
@@ -2709,34 +2801,26 @@ Section MemoryByte.
       apply mixed_all_poison in Eap; [| exact HKb].
       rewrite Eap in Hnall; discriminate. }
     rewrite Hap.
-    unfold memory_bytes_to_byte_value.
-    (* not a pointer slice *)
-    rewrite pointer_slice_mixed_none by (first [exact HKb | exact Hptr]).
+    (* a pointer slice, if there is one, is not a whole aligned chunk: the
+       bytes are read as bits *)
+    assert (Hfb : memory_bytes_to_byte_value sz (List.map (mixed_byte bits) (Nseq 0 (S n)))
+                  = ret (memory_bytes_to_bits_value sz
+                           (List.map (mixed_byte bits) (Nseq 0 (S n))))).
+    { unfold memory_bytes_to_byte_value.
+      destruct (memory_bytes_to_pointer_slice (List.map (mixed_byte bits) (Nseq 0 (S n))))
+        as [[p k] |] eqn:Es; [| reflexivity].
+      rewrite (pointer_slice_mixed_unaligned _ _ HKb Hptr Es); reflexivity. }
+    rewrite Hfb; cbn [bind ret EOU_monad].
     (* the bits come back unchanged *)
-    cbv zeta.
+    unfold memory_bytes_to_bits_value; cbv zeta.
     rewrite <- Hlen, get_bits_writer by exact HKb.
     rewrite rev_append_rev, app_nil_r, rev_append_rev, app_nil_r, rev_involutive.
-    (* a pointer bit sends the read straight to [BYTE_Mixed] *)
-    destruct (existsb is_ptr_bit bits) eqn:Eptr; [reflexivity |].
-    (* otherwise some bit is poison, and the integer read poisons *)
-    assert (Hex : existsb is_poison_bit bits = true)
-      by (apply not_all_int_no_ptr_pois; assumption).
-    assert (Hint : memory_bytes_to_int sz (List.map (mixed_byte bits) (Nseq 0 (S n)))
-                   = raise_ret (@Pois Z)).
-    { unfold memory_bytes_to_int.
-      destruct (N.eqb_spec (Npos sz mod 8) 0) as [E8 | E8]; cbn [negb].
-      - rewrite map_monad_byte_mixed_pois by (first [exact HKb | exact Hex]);
-          reflexivity.
-      - rewrite store_size_B_I in EK.
-        destruct (store_size_int_mixed sz E8) as [_ Hk2].
-        assert (HK : (store_size_dtyp (DTYPE_Base (DTYPE_I sz))
-                      = N.of_nat (S n))%N)
-          by (rewrite EK; symmetry; apply Nnat.N2Nat.id).
-        assert (Hx : (0 < Npos sz mod 8 <= 8)%N).
-        { pose proof (N.mod_upper_bound (Npos sz) 8 ltac:(lia)) as U.
-          revert E8 U; generalize (Npos sz mod 8)%N; intros m HA HB; lia. }
-        apply concat_bytes_Z_mixed_mixed_pois; [exact Hx | lia | exact Hex]. }
-    rewrite Hint; reflexivity.
+    (* a pointer or poison bit sends the read to [BYTE_Mixed] *)
+    assert (Hmix : (existsb is_ptr_bit bits || existsb is_poison_bit bits)%bool = true).
+    { destruct (existsb is_ptr_bit bits) eqn:Eptr; [reflexivity |].
+      cbn [orb]; apply not_all_int_no_ptr_pois; assumption. }
+    rewrite Hmix; cbn [dvalue_bv_all_poison].
+    apply negb_true_iff in Hnall; rewrite Hnall; reflexivity.
   Qed.
 
 
@@ -3528,6 +3612,424 @@ Section MemoryByte.
     rewrite Ebs, app_nil_r, rev_append_rev, app_nil_r.
     exact HR.
   Qed.
+
+  (** ** The reader produces well-typed, canonical values
+
+      [memory_bytes_to_dvalue] answers only with a value of the type it was
+      asked for, in canonical form ([memory_bytes_to_dvalue_has_dtyp]).
+      Together with [memory_bytes_round_trip1] this makes reading
+      idempotent: writing back a value that was read, and reading again,
+      gives the same value.
+
+      The bytes must be well formed: a [BYTE_Mixed] byte has exactly 8
+      bits.  The writer only produces such bytes. *)
+  Definition memory_byte_wf (mb : memory_byte) : Prop :=
+    match mb with
+    | BYTE_Mixed bits => List.length bits = 8%nat
+    | _ => True
+    end.
+
+  Lemma In_take_N : forall {A} n (l : list A) x, In x (take n l) -> In x l.
+  Proof.
+    intros A n l x H; rewrite <- (@take_drop_app _ n l); apply in_or_app; now left.
+  Qed.
+
+  Lemma In_drop_N : forall {A} n (l : list A) x, In x (drop n l) -> In x l.
+  Proof.
+    intros A n l x H; rewrite <- (@take_drop_app _ n l); apply in_or_app; now right.
+  Qed.
+
+  Lemma Forall_take_N : forall {A} (P : A -> Prop) n l, Forall P l -> Forall P (take n l).
+  Proof.
+    intros A P n l H; apply Forall_forall; intros x Hx.
+    eapply Forall_forall; [exact H | eapply In_take_N; exact Hx].
+  Qed.
+
+  Lemma Forall_drop_N : forall {A} (P : A -> Prop) n l, Forall P l -> Forall P (drop n l).
+  Proof.
+    intros A P n l H; apply Forall_forall; intros x Hx.
+    eapply Forall_forall; [exact H | eapply In_drop_N; exact Hx].
+  Qed.
+
+  Lemma memory_byte_bits_length : forall mb,
+      memory_byte_wf mb -> List.length (memory_byte_to_memory_bits mb) = 8%nat.
+  Proof.
+    intros [p i | x | bits] H; cbn [memory_byte_to_memory_bits memory_byte_wf] in *;
+      try exact H;
+      rewrite rev_append_rev, app_nil_r, length_rev, rev_loop_acc_length; reflexivity.
+  Qed.
+
+  (** The reader's bit list, in forward order. *)
+  Fixpoint get_bits_fwd (n : N) (dbs : list memory_byte) : list memory_bit :=
+    match dbs with
+    | [] => List.repeat Bit_psn (N.to_nat n)
+    | b :: bs =>
+        if N.ltb n 8 then take n (memory_byte_to_memory_bits b)
+        else memory_byte_to_memory_bits b ++ get_bits_fwd (n - 8) bs
+    end.
+
+  Lemma get_bits_fwd_spec : forall dbs n acc,
+      get_bits_of_memory_byte_list n dbs acc = rev_append (get_bits_fwd n dbs) acc.
+  Proof.
+    induction dbs as [| b bs IH]; intros n acc;
+      cbn [get_bits_of_memory_byte_list get_bits_fwd].
+    - destruct (N.eqb_spec n 0).
+      + subst; reflexivity.
+      + rewrite rev_loop_acc_const, rev_append_rev, rev_repeat; reflexivity.
+    - destruct (N.ltb n 8); [reflexivity |].
+      rewrite IH, !rev_append_rev, rev_app_distr, <- app_assoc; reflexivity.
+  Qed.
+
+  Lemma reader_bits_fwd : forall n dbs,
+      rev_append (get_bits_of_memory_byte_list n dbs []) [] = get_bits_fwd n dbs.
+  Proof.
+    intros n dbs; rewrite get_bits_fwd_spec, !rev_append_rev, !app_nil_r, rev_involutive.
+    reflexivity.
+  Qed.
+
+  Lemma get_bits_fwd_length : forall dbs n,
+      Forall memory_byte_wf dbs ->
+      N.of_nat (List.length (get_bits_fwd n dbs)) = n.
+  Proof.
+    induction dbs as [| b bs IH]; intros n HW; cbn [get_bits_fwd].
+    - rewrite repeat_length, Nnat.N2Nat.id; reflexivity.
+    - inversion HW as [| ? ? Hb Hbs]; subst.
+      pose proof (memory_byte_bits_length _ Hb) as HL.
+      destruct (N.ltb_spec n 8).
+      + apply take_length_exact; rewrite HL; lia.
+      + rewrite length_app, Nnat.Nat2N.inj_add, HL, IH by exact Hbs; lia.
+  Qed.
+
+  (** A whole aligned pointer chunk among the bits is a pointer slice among
+      the bytes, and the reader finds it. *)
+  Lemma valid_pointer_bits_of_run : forall bits p base off,
+      all_pointer_bits_from p (base + off) bits = true ->
+      (N.of_nat (List.length bits) + off = 8)%N ->
+      valid_pointer_bits p base off bits = ret true.
+  Proof.
+    induction bits as [| b bits IH]; intros p base off H HL; cbn [valid_pointer_bits].
+    - cbn [List.length] in HL; replace off with 8%N by lia; reflexivity.
+    - destruct b as [q i | | x]; cbn [all_pointer_bits_from] in H; try discriminate.
+      destruct (eq_dec_ptr p q) as [E | NE]; cbn [andb] in H; [| discriminate].
+      destruct (N.eqb_spec i (base + off)) as [Ei | NE]; cbn [andb] in H; [| discriminate].
+      apply IH.
+      + replace (base + (1 + off))%N with (1 + (base + off))%N by lia; exact H.
+      + cbn [List.length] in HL; lia.
+  Qed.
+
+  Lemma BYTE_Pointer_bits : forall p k,
+      memory_byte_to_memory_bits (@BYTE_Pointer Pa 8 p k)
+      = List.map (fun t => Bit_ptr p t) (Nseq (8 * k) 8).
+  Proof.
+    intros p k; cbn [memory_byte_to_memory_bits].
+    rewrite rev_loop_acc_app, !rev_append_rev, !app_nil_r, rev_involutive.
+    reflexivity.
+  Qed.
+
+  Lemma pointer_byte_at_run : forall b p i,
+      memory_byte_wf b ->
+      all_pointer_bits_from p (8 * i) (memory_byte_to_memory_bits b) = true ->
+      pointer_byte_at p i b = true.
+  Proof.
+    intros [q k | x | bits] p i Hb H; unfold pointer_byte_at, valid_pointer_byte.
+    - rewrite BYTE_Pointer_bits in H; cbn [Nseq List.map all_pointer_bits_from] in H.
+      destruct (eq_dec_ptr p q) as [E | NE]; cbn [andb] in H; [| discriminate].
+      destruct (N.eqb_spec (8 * k) (8 * i)); cbn [andb] in H; [| discriminate].
+      cbn; apply N.eqb_eq; lia.
+    - cbn [memory_byte_to_memory_bits] in H.
+      rewrite rev_loop_acc_app in H; cbn in H; discriminate.
+    - cbn [memory_byte_to_memory_bits memory_byte_wf] in H, Hb.
+      rewrite (valid_pointer_bits_of_run bits p (i * 8) 0);
+        [reflexivity | rewrite N.add_0_r, N.mul_comm; exact H | rewrite Hb; reflexivity].
+  Qed.
+
+  Lemma pointer_slice_from_chunk : forall dbs p i n,
+      Forall memory_byte_wf dbs ->
+      (8 * N.of_nat (List.length dbs) <= n)%N ->
+      all_pointer_bits_from p (8 * i) (get_bits_fwd n dbs) = true ->
+      pointer_slice_from p i dbs = true.
+  Proof.
+    induction dbs as [| b bs IH]; intros p i n HW Hn H; [reflexivity |].
+    inversion HW as [| ? ? Hb Hbs]; subst.
+    cbn [List.length] in Hn; cbn [get_bits_fwd] in H.
+    destruct (N.ltb_spec n 8); [lia |].
+    rewrite all_pointer_bits_from_app in H; apply andb_true_iff in H as [H1 H2].
+    rewrite (memory_byte_bits_length _ Hb) in H2.
+    cbn [pointer_slice_from]; rewrite (pointer_byte_at_run _ _ _ Hb H1); cbn [andb].
+    apply (IH p (1 + i) (n - 8)); [exact Hbs | lia |].
+    replace (8 * (1 + i))%N with (8 * i + N.of_nat 8)%N by lia; exact H2.
+  Qed.
+
+  Lemma pointer_slice_of_chunk : forall sz dbs,
+      Forall memory_byte_wf dbs ->
+      (8 * N.of_nat (List.length dbs) <= Npos sz)%N ->
+      is_pointer_chunk sz (get_bits_fwd (Npos sz) dbs) = true ->
+      exists p k, memory_bytes_to_pointer_slice dbs = Some (p, k)
+                  /\ pointer_chunk_aligned sz k = true.
+  Proof.
+    intros sz dbs HW Hn H.
+    unfold is_pointer_chunk in H.
+    destruct (get_bits_fwd (Npos sz) dbs) as [| [p j | | x] tl] eqn:Ef; try discriminate.
+    apply andb_true_iff in H as [H Hall]; apply andb_true_iff in H as [H8 Hj].
+    apply N.eqb_eq in H8, Hj.
+    (* the run starts at byte [j / 8] *)
+    assert (Ej : j = (8 * (j / 8))%N).
+    { pose proof (N.div_mod j (Npos sz) ltac:(lia)) as Dj.
+      pose proof (N.div_mod (Npos sz) 8 ltac:(lia)) as Ds.
+      rewrite Hj, N.add_0_r in Dj; rewrite H8, N.add_0_r in Ds.
+      rewrite Dj at 2; rewrite Ds at 1.
+      replace (8 * (Npos sz / 8) * (j / Npos sz))%N
+        with ((Npos sz / 8 * (j / Npos sz)) * 8)%N by lia.
+      rewrite N.div_mul by lia; lia. }
+    assert (Hsl : pointer_slice_from p (j / 8) dbs = true).
+    { eapply pointer_slice_from_chunk; [exact HW | exact Hn |].
+      rewrite Ef, <- Ej; exact Hall. }
+    assert (Hal : pointer_chunk_aligned sz (j / 8) = true).
+    { unfold pointer_chunk_aligned; rewrite H8, N.eqb_refl; cbn [andb].
+      apply N.eqb_eq; rewrite N.mul_comm, <- Ej; exact Hj. }
+    (* the first byte starts the run *)
+    destruct dbs as [| b bs]; cbn [get_bits_fwd] in Ef.
+    { destruct (Pos2Nat.is_succ sz) as [m Em].
+      cbn [N.to_nat] in Ef; rewrite Em in Ef; discriminate. }
+    inversion HW as [| ? ? Hb Hbs]; subst.
+    destruct (N.ltb_spec (Npos sz) 8).
+    { exfalso; pose proof (N.mod_small (Npos sz) 8 ltac:(lia)); lia. }
+    destruct b as [q k | y | bits].
+    - rewrite BYTE_Pointer_bits in Ef; cbn [Nseq List.map app] in Ef.
+      injection Ef as Eq Ejk _; subst q.
+      assert (E8k : (8 * k = j)%N) by (rewrite <- Ejk; reflexivity).
+      assert (Hk : (j / 8 = k)%N)
+        by (rewrite <- E8k, N.mul_comm, N.div_mul; lia).
+      rewrite Hk in Hsl, Hal.
+      exists p, k; cbn [memory_bytes_to_pointer_slice].
+      rewrite Hsl; split; [reflexivity | exact Hal].
+    - cbn [memory_byte_to_memory_bits] in Ef; rewrite rev_loop_acc_app in Ef.
+      cbn in Ef; discriminate.
+    - cbn [memory_byte_to_memory_bits memory_byte_wf] in Ef, Hb.
+      destruct bits as [| b0 bits]; [discriminate |].
+      cbn [app] in Ef; inversion Ef; subst b0.
+      exists p, (j / 8)%N; cbn [memory_bytes_to_pointer_slice].
+      rewrite Hsl; split; [reflexivity | exact Hal].
+  Qed.
+
+  Lemma mix_not_all_int : forall l : list memory_bit,
+      (existsb is_ptr_bit l || existsb is_poison_bit l)%bool = true ->
+      forallb is_int_bit l = false.
+  Proof.
+    induction l as [| b l IH]; cbn; [discriminate |].
+    destruct b; cbn; auto.
+  Qed.
+
+  Lemma store_size_B_bytes : forall sz,
+      (Npos sz mod 8 = 0)%N ->
+      (8 * store_size_dtyp (DTYPE_Base (DTYPE_B sz)) = Npos sz)%N.
+  Proof.
+    intros sz H; rewrite store_size_B_I; apply store_size_int_mult8; exact H.
+  Qed.
+
+  (* the bits read as bits are canonical, unless they are a whole aligned
+     pointer chunk -- which the reader will have recognised first *)
+  Lemma memory_bytes_to_bits_value_canonical : forall sz dbs,
+      Forall memory_byte_wf dbs ->
+      (N.of_nat (List.length dbs) <= store_size_dtyp (DTYPE_Base (DTYPE_B sz)))%N ->
+      (forall p k, memory_bytes_to_pointer_slice dbs = Some (p, k) ->
+                   pointer_chunk_aligned sz k = false) ->
+      dvalue_bv_all_poison (memory_bytes_to_bits_value sz dbs) = false ->
+      dvalue_bv_canonical (memory_bytes_to_bits_value sz dbs) = true.
+  Proof.
+    intros sz dbs HW HL NA HNP.
+    unfold memory_bytes_to_bits_value in *; cbv zeta in *.
+    rewrite reader_bits_fwd in *.
+    destruct (existsb is_ptr_bit (get_bits_fwd (Npos sz) dbs)
+              || existsb is_poison_bit (get_bits_fwd (Npos sz) dbs))%bool eqn:Emix.
+    2:{ destruct (memory_bytes_to_int sz dbs) as [| | | [x |]]; reflexivity. }
+    cbn [dvalue_bv_canonical dvalue_bv_all_poison] in *.
+    rewrite (get_bits_fwd_length _ HW), N.eqb_refl, HNP, (mix_not_all_int _ Emix).
+    destruct (is_pointer_chunk sz (get_bits_fwd (Npos sz) dbs)) eqn:Ec; [| reflexivity].
+    exfalso.
+    assert (H8 : (Npos sz mod 8 = 0)%N).
+    { unfold is_pointer_chunk in Ec.
+      destruct (get_bits_fwd (Npos sz) dbs) as [| [p j | |] tl]; try discriminate.
+      apply andb_true_iff in Ec as [Ec _]; apply andb_true_iff in Ec as [Ec _].
+      apply N.eqb_eq; exact Ec. }
+    assert (Hn : (8 * N.of_nat (List.length dbs) <= Npos sz)%N)
+      by (rewrite <- (@store_size_B_bytes sz H8); lia).
+    destruct (@pointer_slice_of_chunk sz dbs HW Hn Ec) as (p & k & Es & Ea).
+    rewrite (NA p k Es) in Ea; discriminate.
+  Qed.
+
+  Lemma memory_bytes_to_byte_value_canonical : forall sz dbs bv,
+      Forall memory_byte_wf dbs ->
+      (N.of_nat (List.length dbs) <= store_size_dtyp (DTYPE_Base (DTYPE_B sz)))%N ->
+      memory_bytes_to_byte_value sz dbs = ret bv ->
+      dvalue_bv_all_poison bv = false ->
+      dvalue_bv_canonical bv = true.
+  Proof.
+    intros sz dbs bv HW HL H HNP.
+    unfold memory_bytes_to_byte_value in H.
+    destruct (memory_bytes_to_pointer_slice dbs) as [[p k] |] eqn:Es.
+    - destruct (pointer_chunk_aligned sz k) eqn:Ea; cbn in H; inversion H; subst bv.
+      + unfold pointer_chunk_aligned in Ea; apply andb_true_iff in Ea as [Ea _].
+        exact Ea.
+      + apply memory_bytes_to_bits_value_canonical; auto.
+        intros p' k' Es'; rewrite Es in Es'; inversion Es'; subst; exact Ea.
+    - cbn in H; inversion H; subst bv.
+      apply memory_bytes_to_bits_value_canonical; auto.
+      intros p' k' Es'; rewrite Es in Es'; discriminate.
+  Qed.
+
+  (** Base types. *)
+  Lemma memory_bytes_to_dvalue_base_has_dtyp : forall dt dbs v,
+      serializable_base dt ->
+      Forall memory_byte_wf dbs ->
+      (N.of_nat (List.length dbs) <= store_size_dtyp (DTYPE_Base dt))%N ->
+      memory_bytes_to_dvalue_base dbs dt = ret v ->
+      dvalue_has_dtyp (DVALUE_Base v) (DTYPE_Base dt).
+  Proof.
+    intros dt dbs v HS HW HL H.
+    destruct dt as [sz | | | | fp | | | | | | sz]; cbn in HS; try contradiction;
+      cbn [memory_bytes_to_dvalue_base] in H.
+    - (* [DTYPE_I] *)
+      unfold absorb_pois, catch_pois in H.
+      destruct (memory_bytes_to_int sz dbs) as [| | | [x |]]; cbn in H;
+        inversion H; subst; [| apply DVALUE_Poison_typ_agg].
+      constructor; [apply Pos.eqb_refl | reflexivity].
+    - (* [DTYPE_Pointer] *)
+      unfold absorb_pois, catch_pois in H.
+      destruct (memory_bytes_to_pointer dbs) as [| | | [p |]]; cbn in H;
+        inversion H; subst; [| apply DVALUE_Poison_typ_agg].
+      constructor; reflexivity.
+    - (* [DTYPE_FP] *)
+      destruct fp; cbn in HS; try contradiction;
+        unfold absorb_pois, catch_pois in H;
+        destruct (map_monad memory_byte_to_Z dbs) as [| | | [zs |]]; cbn in H;
+        inversion H; subst; try apply DVALUE_Poison_typ_agg;
+        constructor; reflexivity.
+    - (* [DTYPE_B] *)
+      destruct (all_poison_bytes dbs).
+      { cbn in H; inversion H; subst; apply DVALUE_Poison_typ_agg. }
+      destruct (memory_bytes_to_byte_value sz dbs) as [| | | bv] eqn:Eb;
+        cbn in H; try discriminate.
+      destruct (dvalue_bv_all_poison bv) eqn:Ep; inversion H; subst;
+        [apply DVALUE_Poison_typ_agg |].
+      constructor; [apply Pos.eqb_refl |].
+      cbn [dvalue_base_canonical].
+      eapply memory_bytes_to_byte_value_canonical; eauto.
+  Qed.
+
+  (** Aggregates: each field or element is a read of a sub-block, or
+      poison. *)
+  Lemma EOU_bind_ret_inv : forall {A B} (m : EOU A) (k : A -> EOU B) v,
+      bind m k = ret v -> exists a, m = ret a /\ k a = ret v.
+  Proof. intros A B [] k v H; cbn in H; try discriminate; eauto. Qed.
+
+  Lemma read_struct_loop_has_dtyp : forall rd np pad dts offset dbs vs,
+      (forall t, In t dts -> forall mb v, Forall memory_byte_wf mb ->
+                 rd mb t = ret v -> dvalue_has_dtyp v t) ->
+      Forall memory_byte_wf dbs ->
+      read_struct_loop rd np pad offset dts dbs = ret vs ->
+      Forall2 dvalue_has_dtyp vs dts.
+  Proof.
+    intros rd np pad; induction dts as [| t ts IH]; intros offset dbs vs HR HW H.
+    - cbn in H; inversion H; constructor.
+    - cbn [read_struct_loop] in H; cbv zeta in H.
+      apply EOU_bind_ret_inv in H as (f & Ef & H).
+      apply EOU_bind_ret_inv in H as (rest & Er & H).
+      cbn in H; inversion H; subst vs; clear H.
+      constructor.
+      + match type of Ef with
+        | (if ?c then _ else _) = _ => destruct c
+        end.
+        * cbn in Ef; inversion Ef; apply DVALUE_Poison_typ_agg.
+        * eapply HR; [now left | | exact Ef].
+          apply Forall_take_N, Forall_drop_N, HW.
+      + eapply IH; [intros u Hu; apply HR; now right | | exact Er].
+        apply Forall_drop_N, Forall_drop_N, HW.
+  Qed.
+
+  Lemma read_array_loop_has_dtyp : forall rd np stride t n offset dbs vs,
+      (forall mb v, Forall memory_byte_wf mb -> rd mb t = ret v -> dvalue_has_dtyp v t) ->
+      Forall memory_byte_wf dbs ->
+      read_array_loop rd np stride t n offset dbs = ret vs ->
+      Forall (fun v => dvalue_has_dtyp v t) vs /\ List.length vs = n.
+  Proof.
+    intros rd np stride t; induction n as [| n IH]; intros offset dbs vs HR HW H.
+    - cbn in H; inversion H; split; [constructor | reflexivity].
+    - rewrite read_array_loop_cons in H.
+      apply EOU_bind_ret_inv in H as (e & Ee & H).
+      apply EOU_bind_ret_inv in H as (rest & Er & H).
+      cbn in H; inversion H; subst vs; clear H.
+      destruct (IH _ _ _ HR (Forall_drop_N _ HW) Er) as [HF HL].
+      split; [constructor; [| exact HF] | cbn; rewrite HL; reflexivity].
+      match type of Ee with
+      | (if ?c then _ else _) = _ => destruct c
+      end.
+      + cbn in Ee; inversion Ee; apply DVALUE_Poison_typ_agg.
+      + eapply HR; [apply Forall_take_N, HW | exact Ee].
+  Qed.
+
+  Lemma memory_bytes_to_dvalue_has_dtyp : forall dt mb dv,
+      serializable dt ->
+      Forall memory_byte_wf mb ->
+      memory_bytes_to_dvalue mb dt = ret dv ->
+      dvalue_has_dtyp dv dt.
+  Proof.
+    induction dt as [db | pk dts IH | vv sz t IHt]; intros mb dv HS HW H.
+    - (* base: the reader trims to the store size *)
+      cbn [memory_bytes_to_dvalue] in H.
+      destruct (memory_bytes_to_dvalue_base (take (store_size_dtyp (DTYPE_Base db)) mb) db)
+        as [| | | v] eqn:E; cbn in H; try discriminate.
+      inversion H; subst dv.
+      eapply memory_bytes_to_dvalue_base_has_dtyp;
+        [exact HS | apply Forall_take_N, HW | apply take_length_le | exact E].
+    - (* struct *)
+      rewrite read_struct_unfold in H.
+      destruct (poison_split mb) as [np rest]; destruct rest as [| b rest].
+      { cbn in H; inversion H; apply DVALUE_Poison_typ_agg. }
+      destruct (read_struct_loop memory_bytes_to_dvalue np
+                  (if pk then None else Some (max_preferred_dtyp_alignment dts)) 0%N dts mb)
+        as [| | | vs] eqn:Ev; cbn in H; try discriminate.
+      inversion H; subst dv; clear H.
+      unfold canonicalize_agg.
+      destruct (forallb dvalue_is_poison vs) eqn:Ep; [apply DVALUE_Poison_typ_agg |].
+      apply DVALUE_Struct_typ; [exact Ep |].
+      eapply read_struct_loop_has_dtyp; [| exact HW | exact Ev].
+      intros u Hu mb' v' HW' H'.
+      apply FORALL_forall in HS.
+      eapply IH; [exact Hu | eapply Forall_forall; [exact HS | exact Hu] | exact HW' | exact H'].
+    - (* array / vector *)
+      rewrite read_array_unfold in H.
+      destruct (poison_split mb) as [np rest]; destruct rest as [| b rest].
+      { cbn in H; inversion H; apply DVALUE_Poison_typ_agg. }
+      apply EOU_bind_ret_inv in H as (elts & Ee & H).
+      cbn in H; inversion H; subst dv; clear H.
+      assert (HR : forall mb' v', Forall memory_byte_wf mb' ->
+                     memory_bytes_to_dvalue mb' t = ret v' -> dvalue_has_dtyp v' t)
+        by (intros mb' v' HW' H'; eapply IHt; eauto).
+      destruct (@read_array_loop_has_dtyp memory_bytes_to_dvalue _ _ t _ _ mb elts HR HW Ee)
+        as [HF HL].
+      unfold canonicalize_agg.
+      destruct (forallb dvalue_is_poison elts) eqn:Ep; [apply DVALUE_Poison_typ_agg |].
+      apply DVALUE_Array_typ; [apply serializable_NO_VOID, HS | exact Ep | exact HF | exact HL].
+  Qed.
+
+  (** Reading is idempotent: what one read loses (poison bits that poison a
+      whole value, padding, provenance read at an integer type, ...) stays
+      lost, and nothing more is lost by writing the value back and reading
+      it again. *)
+  Lemma memory_bytes_to_dvalue_idempotent :
+    forall dt dv mb1 mb2,
+      serializable dt ->
+      Forall memory_byte_wf mb1 ->
+      memory_bytes_to_dvalue mb1 dt = ret dv ->
+      dvalue_to_memory_bytes dt dv None = ret mb2 ->
+      memory_bytes_to_dvalue mb2 dt = ret dv.
+  Proof.
+    intros dt dv mb1 mb2 HS HW H1 H2.
+    eapply memory_bytes_round_trip1;
+      [exact HS | eapply memory_bytes_to_dvalue_has_dtyp; eauto | exact H2].
+  Qed.
+  
 
 End MemoryByte.
 

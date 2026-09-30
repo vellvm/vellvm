@@ -78,7 +78,7 @@ Definition ll_double := Floats.float.
 Section DValue.
   Context {Pa : Params}.
 
-  (* SAZ: TODO - move [memory_bit] and [dvalue_bv] to the memory model *)
+  (* SAZ: TODO - move [memory_bit] and [dvalue_bv] to the memory model? *)
   Variant memory_bit :=
   | Bit_ptr (p:ptr) (idx : N)  (* idx'th bit of pointer p *)
   | Bit_psn                    (* poison *)
@@ -88,52 +88,55 @@ Section DValue.
   Definition Z_to_memory_bit (z:Z) :=
     Bit_bit (repr z).
   
-  (* On the LLVM SIDE there is an invariant:
+  (** ** Byte values
 
-           Byte_mixed must _not_ have all pointer bits (otherwise BYTE_Pointer is canonical)
-        
-      for other sizes
-      values otherwise one of the two representations above, or DVALUE_Poison
-      (DTYPE_B sz) would work.
+      A [dvalue_bv bit_sz] is [bit_sz] bits of raw memory data, least
+      significant first, each bit an integer bit, a bit of a pointer, or
+      poison (LangRef, "Byte Type").  It is the carrier of [DVALUE_B], and at
+      [bit_sz = 8] it is also a byte of memory ([memory_byte] in
+      MemoryBytes.v).  There are three representations; which one a given
+      bit pattern must use is fixed by [dvalue_bv_canonical] below:
 
-   *)        
+      - [BYTE_Pointer]: a whole, aligned chunk of one pointer.
+      - [BYTE_I]: only integer bits.
+      - [BYTE_Mixed]: everything else, as an explicit list of bits.
+
+      The canonicity invariants hold for values (e.g. inside a [DVALUE_B]).
+      In the memory model a [BYTE_Mixed 8] may also be all poison: that is
+      how an uninitialized byte is stored. *)
   Variant dvalue_bv (bit_sz:positive) :=
-    (* Represents [bit_sz] continuous _bits_ of pointer [p] as laid out in
-       memory.  If [pointer_size] is the size of pointers in bytes, we have:
-         num_chunks := (8 * pointer_size / bit_sz) and 
-         0 <= idx < num_chunks is the index of this chunk of the
-       pointer when broken up into [bit_sz] sized chunks
+    (* Chunk number [idx] of pointer [p], when the pointer's bits are cut
+       into consecutive [bit_sz]-bit chunks: bits
+       [bit_sz * idx, ..., bit_sz * idx + bit_sz - 1] of [p].  None of the
+       bits is poison.
 
-       For example, if [bit_sz] = 8 and pointer_size = 8 (bytes) then
-         num_chunks = 8 and 
-         0 <= idx < 8 and each BYTE_Pointer represents one byte of a full pointer value.  If
-       [bit_sz] = 64 and pointer_size = 8 (bytes) then 0 <= idx < 1 and there is only one
-       such chunk (at index 0).
+       For example, with 8-byte pointers: at [bit_sz = 8] the chunks are the
+       eight bytes of [p], [0 <= idx < 8]; at [bit_sz = 64] there is a single
+       chunk, the whole pointer, at [idx = 0]; at [bit_sz = 32],
+       [BYTE_Pointer p 1] is bytes 4..7.
 
-       None of the bits may be poison. *)
+       Canonical only when [bit_sz] is a whole number of bytes.  A run of
+       pointer bits that is not a whole chunk -- an odd width, or a slice
+       that does not start on a chunk boundary (bytes 1..2 of [p] at
+       [bit_sz = 16]) -- has no index here, and is a [BYTE_Mixed]. *)
     | BYTE_Pointer (p:ptr) (idx:N)
 
-    (* Represents [bit_sz] continuous _bits_ of binary data [x] as laid out in memory.
-       None of these bits may be poison. *)
+    (* [bit_sz] integer bits, the value [x].  None of the bits is poison or
+       part of a pointer. *)
     | BYTE_I (x:@bit_int bit_sz)
 
-   (* Represents [bit_sz] continuous _bits_ of mixed binary/poison/pointer data as
-      laid out in memory.
-      Invariants:
-      - List.length bits = [bit_sz]
-      - BYTE_mixed must _not_ have all correctly ordered pointer bits with compatible provenance
-        (otherwise BYTE_Pointer is canonical).
-      - BYTE_mixed must _not_ have all integer bits (otherwise BYTE_I is canonical).
-
-      On the LLVM SIDE: (e.g. within a DVALUE_B),
-      - BYTE_mixed must _not_ have all poison bits
-        (otherwise DVALUE_Poison (DTYPE_Base (DTYPE_B bit_sz)) is canonical).
-
-      In the MEMORY MODEL the poison invariant above might not hold.
-      Instead  we must ensure that the translation establishes/respects the invariant.
-      In particular, the list of memory_bits might be all poison.
-    *)         
-    | BYTE_Mixed (bits : list memory_bit)        
+    (* [bit_sz] bits given one by one.  Canonical when:
+       - [length bits = bit_sz];
+       - the bits are not a whole aligned pointer chunk
+         (else [BYTE_Pointer] is canonical) -- see [is_pointer_chunk];
+       - not every bit is an integer bit (else [BYTE_I] is canonical), so
+         some bit is poison or part of a pointer: pointer and integer bits
+         may be mixed with no poison at all, and the pointer bits keep their
+         provenance;
+       - not every bit is poison (else [DVALUE_Poison] is canonical).
+       The last invariant is about values only: in memory, an all-poison
+       [BYTE_Mixed 8] is an uninitialized byte. *)
+    | BYTE_Mixed (bits : list memory_bit)
   .
                
   Variant dvalue_base : Set :=
@@ -219,8 +222,9 @@ Section DValue.
 
   (* The frozen bits, re-canonicalised: once the poison is gone the byte is
      a [BYTE_I] if every bit is an integer bit, and otherwise stays a
-     [BYTE_Mixed] (it still has pointer bits, but not all of them, so it is
-     not a [BYTE_Pointer] either). *)
+     [BYTE_Mixed].  It cannot have become a [BYTE_Pointer] chunk: it still
+     has pointer bits, but at least one former poison bit is now an integer
+     bit. *)
   Definition freeze_bv {sz} (z : Z) (bv : dvalue_bv sz) : dvalue_bv sz :=
     match bv with
     | BYTE_Mixed bits =>
@@ -232,17 +236,20 @@ Section DValue.
 
   (** ** Canonical [dvalue_bv]s
 
-      [memory_bytes_to_byte_value] picks a representation for the bits it
-      reads back: a slice of a pointer if it can, otherwise an integer if
-      every bit is an integer bit, otherwise a raw bit list -- so a
-      [BYTE_Mixed] may mix pointer and integer bits with no poison at all,
-      and keeps the pointer bits' provenance -- and [memory_bytes_to_dvalue_base] answers
-      [DVALUE_Poison] before either if every bit is poison.  A [dvalue_bv] is
-      *canonical* when it is the one that reader would produce, which is what
-      makes serializing and deserializing it the identity.  This formalises
-      the invariant sketched in the comment on [dvalue_bv] above:
-      "[BYTE_Mixed] must _not_ have all pointer bits (otherwise
-      [BYTE_Pointer] is canonical)". *)
+      Each bit pattern has exactly one canonical representation, the one
+      the reader [memory_bytes_to_byte_value] produces:
+
+      1. every bit poison: [DVALUE_Poison] (not a [dvalue_bv] at all);
+      2. a whole, aligned chunk of one pointer ([is_pointer_chunk]):
+         [BYTE_Pointer];
+      3. every bit an integer bit: [BYTE_I];
+      4. otherwise: [BYTE_Mixed].
+
+      [dvalue_bv_canonical] states the conditions under which each
+      constructor is the right one (the invariants in the comments on
+      [dvalue_bv] above), and [dvalue_has_dtyp] demands them of every
+      [DVALUE_B].  Canonicity is what makes serializing and then
+      deserializing a value the identity. *)
 
   (* [bits] are the consecutive bits [j], [j+1], ... of the one pointer [p] *)
   Fixpoint all_pointer_bits_from (p : ptr) (j : N) (bits : list memory_bit) : bool :=
@@ -254,11 +261,23 @@ Section DValue.
     | _ => false
     end.
 
-  (* ... and they start on a byte boundary, since the reader recognises a
-     pointer slice byte by byte *)
-  Definition is_pointer_bits (bits : list memory_bit) : bool :=
+  (* [BYTE_Pointer]'s domain: [bit_sz] divides into bytes, and a run of
+     [p]'s bits starting at bit [j] is chunk [j / bit_sz] exactly when it
+     starts on a chunk boundary.  The reader applies the same test to the
+     pointer slices it finds ([pointer_chunk_aligned], stated there on the
+     slice's starting byte). *)
+  Definition is_pointer_chunk (bit_sz : positive) (bits : list memory_bit) : bool :=
     match bits with
-    | Bit_ptr p j :: _ => N.eqb (j mod 8) 0 && all_pointer_bits_from p j bits
+    | Bit_ptr p j :: _ =>
+        N.eqb (Npos bit_sz mod 8) 0 && N.eqb (j mod Npos bit_sz) 0
+        && all_pointer_bits_from p j bits
+    | _ => false
+    end.
+
+  (* only a [BYTE_Mixed] can be all poison; such a value is [DVALUE_Poison] *)
+  Definition dvalue_bv_all_poison {sz : positive} (bv : dvalue_bv sz) : bool :=
+    match bv with
+    | BYTE_Mixed bits => forallb is_poison_bit bits
     | _ => false
     end.
 
@@ -267,14 +286,12 @@ Section DValue.
     | BYTE_I _ => true
     (* [memory_byte_of_dvalue_bv] starts chunk [i] at byte [(sz * i) / 8] and
        the reader inverts that with [(k * 8) / sz]; the two agree exactly when
-       [sz] is a whole number of bytes.  (The writer has an open TODO for the
-       other case.) *)
+       [sz] is a whole number of bytes.  Pointer bits at any other width are
+       a [BYTE_Mixed]. *)
     | BYTE_Pointer _ _ => N.eqb ((Npos sz) mod 8) 0
     | BYTE_Mixed bits =>
         N.eqb (N.of_nat (List.length bits)) (Npos sz)
-                                              (* the invariant [dvalue_bv]'s
-                                                 comment already states *)
-        && negb (is_pointer_bits bits)        (* else [BYTE_Pointer] is canonical *)
+        && negb (is_pointer_chunk sz bits)    (* else [BYTE_Pointer] is canonical *)
         && negb (forallb is_int_bit bits)     (* else [BYTE_I] is canonical *)
         && negb (forallb is_poison_bit bits)  (* else [DVALUE_Poison] is canonical *)
     end.

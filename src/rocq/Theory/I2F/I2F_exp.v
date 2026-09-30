@@ -1671,6 +1671,37 @@ Proof.
     end.
 Qed.
 
+(* The bit-level reading: related bytes agree on whether a pointer or
+   poison bit sends it to [BYTE_Mixed]; otherwise both read the same
+   integer. *)
+Lemma I2F_memory_bytes_to_bits_value sz dbs dbs' :
+  Forall2 I2F_memory_byte dbs dbs' ->
+  I2F_dvalue_bv
+    (@memory_bytes_to_bits_value PInf sz dbs)
+    (@memory_bytes_to_bits_value PFin sz dbs').
+Proof.
+  intros F.
+  assert (HB : Forall2 I2F_memory_bit
+                 (rev_append (@get_bits_of_memory_byte_list PInf (N.pos sz) dbs []) [])
+                 (rev_append (@get_bits_of_memory_byte_list PFin (N.pos sz) dbs' []) [])).
+  { apply Forall2_rev_append; [| constructor].
+    apply I2F_get_bits_of_memory_byte_list; auto. }
+  unfold memory_bytes_to_bits_value; cbv zeta.
+  match goal with
+  | |- I2F_dvalue_bv (if ?b1 then _ else _) (if ?b2 then _ else _) =>
+      replace b2 with b1
+        by (rewrite (I2F_existsb_ptr_bits sz F), (I2F_existsb_poison_bits HB);
+            reflexivity);
+      destruct b1; [constructor; exact HB |]
+  end.
+  pose proof (I2F_memory_bytes_to_int sz F) as HI.
+  apply I2F_EOUP_no_cut_inv in HI;
+    [| apply (@no_cut_memory_bytes_to_int PInf)
+     | apply (@no_cut_memory_bytes_to_int PFin) ].
+  destruct HI as [(x1 & x2 & -> & -> & <-) | [(-> & ->) | (s1 & s2 & -> & ->)]];
+    [constructor | rewrite (I2F_int_bits_to_Z HB); constructor ..].
+Qed.
+
 Lemma I2F_memory_bytes_to_byte_value sz dbs dbs' :
   Forall2 I2F_memory_byte dbs dbs' ->
   I2F_EOU I2F_dvalue_bv
@@ -1683,31 +1714,26 @@ Proof.
   destruct (@memory_bytes_to_pointer_slice PInf dbs) as [[p1 k1] |] eqn:E1;
     destruct (@memory_bytes_to_pointer_slice PFin dbs') as [[p2 k2] |] eqn:E2;
     try contradiction.
-  - destruct HS as [HA ->]; constructor; now constructor.
-  - (* neither side is a pointer slice: both sides agree on whether a
-       pointer bit forces [BYTE_Mixed] ... *)
-    cbv zeta.
-    pose proof (I2F_existsb_ptr_bits sz F) as HP.
-    match goal with
-    | |- I2F_EOU _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
-        replace b2 with b1 by exact HP; destruct b1
-    end;
-      [cbn; constructor; now apply I2F_mixed_fallback |].
-    (* ... and otherwise fall through to the integer attempt *)
-    pose proof (I2F_memory_bytes_to_int sz F) as HI.
-    apply I2F_EOUP_no_cut_inv in HI;
-      [| apply (@no_cut_memory_bytes_to_int PInf)
-       | apply (@no_cut_memory_bytes_to_int PFin) ].
-    destruct HI as [(x1 & x2 & -> & -> & <-) | [(-> & ->) | (s1 & s2 & -> & ->)]]; cbn.
-    + constructor; constructor.
-    + constructor; now apply I2F_mixed_fallback.
-    + constructor; now apply I2F_mixed_fallback.
+  - (* both a pointer slice, at the same index: the alignment test agrees *)
+    destruct HS as [HA ->].
+    destruct (pointer_chunk_aligned sz k2); constructor;
+      [now constructor | now apply I2F_memory_bytes_to_bits_value].
+  - (* neither: both read the bits *)
+    constructor; now apply I2F_memory_bytes_to_bits_value.
 Qed.
 
 (** Deserialization at base types: every arm funnels through the shared
       [EOUP] stream of [memory_byte_value]s (equal by [I2F_mbyte]);
       [DTYPE_Iptr] and [DTYPE_Pointer] then run the finite in-range
       analysis. *)
+Lemma I2F_dvalue_bv_all_poison sz (bv : @dvalue_bv PInf sz) (bv' : @dvalue_bv PFin sz) :
+  I2F_dvalue_bv bv bv' -> dvalue_bv_all_poison bv = dvalue_bv_all_poison bv'.
+Proof.
+  intros H; inversion H as [| | bits bits' F]; subst; cbn [dvalue_bv_all_poison]; auto.
+  clear H; induction F; cbn; auto.
+  erewrite I2F_is_poison_bit by eauto; now rewrite IHF.
+Qed.
+
 Lemma I2F_memory_bytes_to_dvalue_base : forall t dbs dbs',
     Forall2 I2F_memory_byte dbs dbs' ->
     I2F_EOU I2F_dvalue_base
@@ -1752,8 +1778,10 @@ Proof.
     erewrite I2F_all_poison_bytes by eauto.
     break_match_goal; [repeat constructor |].
     pose proof (I2F_memory_bytes_to_byte_value sz F) as HB.
-    destruct HB as [a1 a2 HA | s1 s2 | s m | m s]; cbn; constructor.
-    now constructor.
+    destruct HB as [a1 a2 HA | s1 s2 | s m | m s]; cbn; try constructor.
+    (* related byte values are all poison together *)
+    rewrite (I2F_dvalue_bv_all_poison HA).
+    destruct (dvalue_bv_all_poison a2); constructor; [constructor | now constructor].
 Qed.
 
 (* The two models share their [Sizeof] instance, but its uses appear

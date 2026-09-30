@@ -106,8 +106,7 @@ Definition alloc_size_dtyp `{Sizeof} (t : dtyp) : N :=
 (* The alignment of a non-packed struct: the maximum over its fields,
    defaulting to 1.  Written as the same [fold_left] shape that
    [Dtyp_alignment] uses for structs, so that the two agree on the nose
-   (see [preferred_Dtyp_alignment_Struct]); the older [maximumByOpt]
-   formulation agreed only up to a proof about [maximumByOpt]. *)
+   (see [preferred_Dtyp_alignment_Struct]). *)
 Definition max_preferred_dtyp_alignment {S : Sizeof} (dts : list dtyp) : N :=
   List.fold_left (fun acc dt => N.max acc (preferred_alignment (dtyp_alignment dt))) dts 1%N.
 

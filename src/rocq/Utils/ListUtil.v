@@ -507,6 +507,28 @@ Qed.
 
   Definition zip {X Y} (xs : list X) (ys : list Y) := zipWith (fun a b => (a, b)) xs ys.
 
+  Lemma In_take_N : forall {A} n (l : list A) x, In x (take n l) -> In x l.
+  Proof.
+    intros A n l x H; rewrite <- (@take_drop_app _ n l); apply in_or_app; now left.
+  Qed.
+
+  Lemma In_drop_N : forall {A} n (l : list A) x, In x (drop n l) -> In x l.
+  Proof.
+    intros A n l x H; rewrite <- (@take_drop_app _ n l); apply in_or_app; now right.
+  Qed.
+
+  Lemma Forall_take_N : forall {A} (P : A -> Prop) n l, Forall P l -> Forall P (take n l).
+  Proof.
+    intros A P n l H; apply Forall_forall; intros x Hx.
+    eapply Forall_forall; [exact H | eapply In_take_N; exact Hx].
+  Qed.
+
+  Lemma Forall_drop_N : forall {A} (P : A -> Prop) n l, Forall P l -> Forall P (drop n l).
+  Proof.
+    intros A P n l H; apply Forall_forall; intros x Hx.
+    eapply Forall_forall; [exact H | eapply In_drop_N; exact Hx].
+  Qed.
+  
 End Standard.
 
 (** *** Alternate [find] and [filter] where the predicate is replaced by a partial map *)
