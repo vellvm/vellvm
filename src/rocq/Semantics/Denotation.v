@@ -190,7 +190,7 @@ Section Denotation.
                    | DVALUE_Base (DVALUE_I _ i) => unsigned i
                    | _ => 0%Z
                    end in
-          ret (DVALUE_Base (DVALUE_B (freeze_bv z (BYTE_Mixed sz bits))))
+          ret (DVALUE_Base (DVALUE_B (freeze_mixed_bits sz z bits)))
         else DVALUE_Base <$> ret dv
     | _ => DVALUE_Base <$> ret dv
     end.

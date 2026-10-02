@@ -225,14 +225,10 @@ Section DValue.
      [BYTE_Mixed].  It cannot have become a [BYTE_Pointer] chunk: it still
      has pointer bits, but at least one former poison bit is now an integer
      bit. *)
-  Definition freeze_bv {sz} (z : Z) (bv : dvalue_bv sz) : dvalue_bv sz :=
-    match bv with
-    | BYTE_Mixed bits =>
-        let bits' := freeze_bits z 0 bits in
-        if forallb is_int_bit bits' then BYTE_I (repr (int_bits_to_Z bits'))
-        else BYTE_Mixed sz bits'
-    | _ => bv
-    end.
+  Definition freeze_mixed_bits sz (z : Z) (bits : list memory_bit) : dvalue_bv sz :=
+    let bits' := freeze_bits z 0 bits in
+    if forallb is_int_bit bits' then BYTE_I (repr (int_bits_to_Z bits'))
+    else BYTE_Mixed sz bits'.
 
   (** ** Canonical [dvalue_bv]s
 

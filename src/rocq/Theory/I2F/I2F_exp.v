@@ -155,10 +155,10 @@ Arguments freeze_elts {Pa E HD HF HO HU}.
 
 (** ** Per-bit freeze of a byte value
 
-    [freeze_base] freezes a [BYTE_Mixed] bit by bit ([freeze_bv]); the
-    replacement bits come from one [draw] at an integer type.  Related bit
-    lists have the same shape bit for bit, so every test [freeze_bv] makes
-    comes out the same on both sides. *)
+    [freeze_base] freezes a [BYTE_Mixed] bit by bit ([freeze_mixed_bits]);
+    the replacement bits come from one [draw] at an integer type.  Related
+    bit lists have the same shape bit for bit, so every test
+    [freeze_mixed_bits] makes comes out the same on both sides. *)
 Lemma I2F_freeze_bits z : forall bits bits' i,
     Forall2 I2F_memory_bit bits bits' ->
     Forall2 I2F_memory_bit (freeze_bits z i bits) (freeze_bits z i bits').
@@ -202,20 +202,19 @@ Proof.
   inversion HB; subst; reflexivity.
 Qed.
 
-Lemma I2F_freeze_bv sz z1 z2 (bv : @dvalue_bv PInf sz) (bv' : @dvalue_bv PFin sz) :
+Lemma I2F_freeze_mixed_bits sz z1 z2 bits bits' :
   z1 = z2 ->
-  I2F_dvalue_bv bv bv' ->
-  I2F_dvalue_bv (freeze_bv z1 bv) (freeze_bv z2 bv').
+  Forall2 I2F_memory_bit bits bits' ->
+  I2F_dvalue_bv (@freeze_mixed_bits PInf sz z1 bits) (@freeze_mixed_bits PFin sz z2 bits').
 Proof.
-  intros <- H; inversion H as [i | p p' n HA | bits bits' F]; subst;
-    unfold freeze_bv; try (constructor; auto).
+  intros <- F; unfold freeze_mixed_bits.
   pose proof (I2F_freeze_bits z1 0 F) as F'.
   rewrite (I2F_forallb_int_bits F'), (I2F_int_bits_to_Z F').
   destruct (forallb is_int_bit (freeze_bits z1 0 bits')); constructor; auto.
 Qed.
 
-(* keep [freeze_bv] folded under [cbn] so [I2F_freeze_bv] applies *)
-#[local] Arguments freeze_bv : simpl never.
+(* keep [freeze_mixed_bits] folded under [cbn] so [I2F_freeze_mixed_bits] applies *)
+#[local] Arguments freeze_mixed_bits : simpl never.
 
 (** Generic [freeze]/[freeze_base], parameterized over the single event
       they trigger: [draw]. The MCFG and CFG instances then differ only in
@@ -244,7 +243,7 @@ Proof.
   rbind I2F_dvalue; [apply Hdraw |].
   intros r1 r2 HR; apply ruttc_ret.
   do 2 constructor.
-  apply I2F_freeze_bv; [now apply I2F_draw_Z | now constructor].
+  apply I2F_freeze_mixed_bits; [now apply I2F_draw_Z | exact F].
 Qed.
 
 (** The [FailureE] branches of [freeze]: a value/type shape mismatch
