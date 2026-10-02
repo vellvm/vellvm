@@ -720,7 +720,7 @@ global_decl:
     { { g_ident ;
         g_typ ;
         g_constant ;
-        g_exp = Some (gv g_typ) ;
+        g_exp = Some (gv) ;
         g_externally_initialized ;
 	g_alias = false; 
         g_annotations = ((opt_list (ann_linkage_opt l)) @ g_pre @ g_post)
@@ -1113,7 +1113,7 @@ phi:
   | KW_PHI t=typ ps=phi_suffix
     { let (table, md) = ps in
       let f_info = metadata_file_info $startpos $endpos in
-      (Phi (t, List.map (fun (l,v) -> (l, v t)) table), f_info::md) }
+      (Phi (t, table), f_info::md) }
 
 phi_suffix:
   | te=phi_table_entry COMMA ps=phi_suffix
@@ -1247,10 +1247,10 @@ int_pair:
 
  (* TODO: This loses information when metadata is used as an argument *)
 call_arg:
-  | t=non_metadata_type ra=list(param_attr) i=exp { ((t, i t), ra) }
+  | t=non_metadata_type ra=list(param_attr) i=exp { ((t, i), ra) }
   | KW_METADATA mv=metadata_value                 { ((TYPE_Metadata, EXP_Metadata mv), []) } 
   | KW_METADATA t=non_metadata_type ra=list(param_attr) i=exp 
-      { ((TYPE_Metadata, EXP_Metadata(METADATA_Const(t, i t))), ra) }
+      { ((TYPE_Metadata, EXP_Metadata(METADATA_Const(t, i))), ra) }
 
 fn_attr:
   | KW_ALIGNSTACK LPAREN p=INTEGER RPAREN { FNATTR_Alignstack p     }
@@ -1482,23 +1482,23 @@ comma_path_with_instr_metadata(X):
 %inline
 instr_op:
   | op=ibinop t=typ o1=exp COMMA o2=exp
-    { OP_IBinop (op, t, o1 t, o2 t) }
+    { OP_IBinop (op, t, o1, o2) }
 
   | KW_ICMP s=KW_SAMESIGN? op=icmp t=typ o1=exp COMMA o2=exp
-    { OP_ICmp (opt_bool s, op, t, o1 t, o2 t) }
+    { OP_ICmp (opt_bool s, op, t, o1, o2) }
 
   | op=fbinop f=fast_math* t=typ o1=exp COMMA o2=exp
-    { OP_FBinop (op, f, t, o1 t, o2 t) }
+    { OP_FBinop (op, f, t, o1, o2) }
 
     // special case, coerced to fsub
   | KW_FNEG f=fast_math* t=typ o=exp 
-     { OP_Fneg(f, (t,o t)) }
+     { OP_Fneg(f, (t,o)) }
 
   | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp 
-    { OP_FCmp (op, t, o1 t, o2 t) }
+    { OP_FCmp (op, t, o1, o2) }
 
   | c=conversion t1=typ v=exp KW_TO t2=typ
-    { OP_Conversion (c, t1, v t1, t2) }
+    { OP_Conversion (c, t1, v, t2) }
 
   | KW_SELECT if_=texp COMMA then_=texp COMMA else_= texp
     { OP_Select (if_, then_, else_) }
@@ -1518,23 +1518,23 @@ instr_op:
 
 expr_op:
   | op=ibinop LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_IBinop (op, t, o1 t, o2 t) }
+    { OP_IBinop (op, t, o1, o2) }
 
   | KW_ICMP s=KW_SAMESIGN? op=icmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_ICmp (opt_bool s, op, t, o1 t, o2 t) }
+    { OP_ICmp (opt_bool s, op, t, o1, o2) }
 
   | op=fbinop f=fast_math* LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_FBinop (op, f, t, o1 t, o2 t) }
+    { OP_FBinop (op, f, t, o1, o2) }
 
   // special case, coerced to fsub
   | KW_FNEG f=fast_math* t=typ o=exp
-     { OP_Fneg(f, (t, o t)) }
+     { OP_Fneg(f, (t, o)) }
 
   | KW_FCMP op=fcmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_FCmp (op, t, o1 t, o2 t) }
+    { OP_FCmp (op, t, o1, o2) }
 
   | c=conversion LPAREN t1=typ v=exp KW_TO t2=typ RPAREN
-    { OP_Conversion (c, t1, v t1, t2) }
+    { OP_Conversion (c, t1, v, t2) }
 
     (* SAZ: TODO - record the inbounds, nuw, nusw flags, also allow inrange(S,E) *) 
   | KW_GETELEMENTPTR KW_INBOUNDS? KW_NUSW? KW_NUW? LPAREN t=typ COMMA ptr=texp idx=preceded(COMMA, texp)* RPAREN
@@ -1580,41 +1580,41 @@ instr_path:
 
 
 expr_val:
-  | i=INTEGER                                         { fun _ -> EXP_Integer i        }
-  | f=FLOAT                                           { fun _ -> EXP_Float f          }
-  | KW_TRUE                                           { fun _ -> EXP_Bool true        }
-  | KW_FALSE                                          { fun _ -> EXP_Bool false       }
-  | KW_NULL                                           { fun _ -> EXP_Null             } 
+  | i=INTEGER                                         { EXP_Integer i        }
+  | f=FLOAT                                           { EXP_Float f          }
+  | KW_TRUE                                           { EXP_Bool true        }
+  | KW_FALSE                                          { EXP_Bool false       }
+  | KW_NULL                                           { EXP_Null             } 
   (* We still accept `undef`, but the minimal semantics has no dedicated
      undef value: it is parsed into [EXP_Undef] and denotes as [poison]
      (see [denote_exp] in src/rocq/Semantics/Denotation.v). *)
-  | KW_UNDEF                                          { fun _ -> EXP_Undef            }
-  | KW_POISON                                         { fun _ -> EXP_Poison           }
-  | KW_ZEROINITIALIZER                                { fun _ -> EXP_Zero_initializer }
-  | LCURLY l=separated_list(csep, tconst) RCURLY      { fun _ -> EXP_Struct l         }
-  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { fun _ -> EXP_Packed_struct l  }
-  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { fun t -> EXP_Array  l     }
-  | LT l=separated_list(csep, tconst) GT              { fun t -> EXP_Vector l    }
-  | i=ident                                           { fun _ -> EXP_Ident i          }
-  | KW_C cstr=STRING                                  { fun _ -> EXP_Cstring (
+  | KW_UNDEF                                          { EXP_Undef            }
+  | KW_POISON                                         { EXP_Poison           }
+  | KW_ZEROINITIALIZER                                { EXP_Zero_initializer }
+  | LCURLY l=separated_list(csep, tconst) RCURLY      { EXP_Struct l         }
+  | LTLCURLY l=separated_list(csep, tconst) RCURLYGT  { EXP_Packed_struct l  }
+  | LSQUARE l=separated_list(csep, tconst) RSQUARE    { EXP_Array  l     }
+  | LT l=separated_list(csep, tconst) GT              { EXP_Vector l    }
+  | i=ident                                           { EXP_Ident i          }
+  | KW_C cstr=STRING                                  { EXP_Cstring (
 								     cstring_bytes_to_LLVM_i8_array
 								     (unescape (str cstr))) }
   | KW_ASM se=KW_SIDEEFFECT? al=KW_ALIGNSTACK? id=KW_INTELDIALECT? uw=KW_UNWIND? s1=STRING COMMA s2=STRING
-      { fun _ -> EXP_Asm (
-		     (opt_bool se),
-		     (opt_bool al),
-		     (opt_bool id),
-		     (opt_bool uw),
-		     str s1,
-		     str s2)
-		   }
-  | m=metadata_value { fun _ -> EXP_Metadata m }
+      { EXP_Asm (
+	    (opt_bool se),
+	    (opt_bool al),
+	    (opt_bool id),
+	    (opt_bool uw),
+	    str s1,
+	    str s2)
+      }
+  | m=metadata_value { EXP_Metadata m }
 
   (* Note: we could pull the same trick as for parsing vectors to annotate splat with the
      full vector type rather than just the (local) element type.  That might mean that
      Denotation becomes simpler?
   *)
-  | KW_SPLAT LPAREN elt=texp RPAREN                   { fun _ -> EXP_Splat(elt) }
+  | KW_SPLAT LPAREN elt=texp RPAREN                   { EXP_Splat(elt) }
 
 a_num_elts:
   | csep t=texp lm=a_align
@@ -1653,7 +1653,7 @@ tailcall:
   | KW_NOTAIL { ANN_tail Notail }
 
 exp:
-  | eo=expr_op { fun _ -> eo }
+  | eo=expr_op { eo }
   | ev=expr_val { ev }
 
 operand:
@@ -1834,8 +1834,8 @@ atomicrmw_op:
 
 %inline
 clause:
-  | KW_CATCH t=typ v=expr_val { CATCH (t, v t) }
-  | KW_FILTER t=typ v=expr_val{ FILTER (t, v t) }
+  | KW_CATCH t=typ v=expr_val { CATCH (t, v) }
+  | KW_FILTER t=typ v=expr_val{ FILTER (t, v) }
 
 branch_label:
   KW_LABEL o=LOCAL  { lexed_id_to_raw_id o }
@@ -1926,11 +1926,11 @@ ident:
   | l=lident  { ID_Local  l }
 
 call_exp:
-  | t=typ v=exp { (t, v t) }
-  | KW_VOID v=exp { (TYPE_Void, v TYPE_Void) }
+  | t=typ v=exp { (t, v) }
+  | KW_VOID v=exp { (TYPE_Void, v) }
 
-texp:   t=typ v=exp { (t, v t) }
-tconst: t=typ c=exp { (t, c t) }
+texp:   t=typ v=exp { (t, v) }
+tconst: t=typ c=exp { (t, c) }
 
 (* SAZ: Copying this here is a bit unfortunate but works for now.
    It might be better to experiment with eliminating the "inline" keyword
