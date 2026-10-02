@@ -1,10 +1,13 @@
 From Stdlib Require Import
-  String List.
+  String List NArith.
 From ExtLib Require Import
   Structures.Monads.
 From Vellvm.Utils Require Import
   ListUtil Tactics.
 Import MonadNotation.
+
+Import MonadNotation.
+Open Scope monad.
 
 Variant EOU {X : Type} : Type :=
   | raise_error (s : string): EOU
@@ -61,6 +64,7 @@ Definition option_ub {X : Type} (s : string) (x : option X) :=
   | Some v => ret v
   end.
 
+
 (* This function may essentially compute poison, but without a dvalue to embed it into yet.
      We take an adhoc lightweigh way to handle this currently with the following option return type.
      It is also tied to how we treat the behavior of running map_monad to extract a list of bytes:
@@ -101,3 +105,35 @@ Proof. intros A B f x rest H; cbn; rewrite H; reflexivity. Qed.
 Lemma EOU_bind_ret_inv : forall {A B} (m : EOU A) (k : A -> EOU B) v,
     bind m k = ret v -> exists a, m = ret a /\ k a = ret v.
 Proof. intros A B [] k v H; cbn in H; try discriminate; eauto. Qed.
+
+(* [seq_map_monad_acc] (the tail-recursive builder used by [intptr_seq],
+   see [IPtr.v]) agrees with [map_monad] over [Nseq] on [EOU]. Proved
+   directly against [EOU]'s concrete (non-recursive) [bind] by case
+   analysis, rather than generically over an arbitrary [MonadLaws]
+   instance: [bind]'s continuation argument is buried under a binder in
+   the induction, and plain [rewrite]/[setoid_rewrite] on an abstract
+   [Monad]/[MonadLaws] don't get through it cleanly, whereas destructing
+   the concrete [EOU] value trivializes each case (the accumulator swap
+   that would otherwise need its own lemma is just [rev_append]'s
+   defining equation, so [reflexivity] gets it for free here). *)
+Lemma seq_map_monad_acc_go_eq :
+  forall {A} (f : N -> EOU A) (len : nat) (acc : list A) (cur : N),
+    seq_map_monad_acc_go f acc cur len =
+      bs <- map_monad f (Nseq cur len);;
+      ret (rev_append acc bs).
+Proof.
+  induction len as [| k IH]; intros acc cur; cbn.
+  - reflexivity.
+  - destruct (f cur) eqn:Hf; cbn; try reflexivity.
+    rewrite IH.
+    destruct (map_monad f (Nseq (N.succ cur) k)) eqn:Hmap; reflexivity.
+Qed.
+
+Lemma seq_map_monad_acc_eq :
+  forall {A} (f : N -> EOU A) (start : N) (len : nat),
+    seq_map_monad_acc f start len = map_monad f (Nseq start len).
+Proof.
+  intros; unfold seq_map_monad_acc.
+  rewrite seq_map_monad_acc_go_eq.
+  destruct (map_monad f (Nseq start len)); reflexivity.
+Qed.

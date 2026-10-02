@@ -21,11 +21,10 @@ Check out the [Vellvm home page](https://vellvm.github.io/vellvm/) for more info
 
 ## Compilation:
 
-1. Clone the vellvm git repo with the `--recurse-submodule` option
-   - If you forgot to clone recursively, run `git submodule update --init --recursive` to fetch the extra libraries in `lib/`
-3. Install all external dependencies
+1. Clone the vellvm git repo
+2. Install all external dependencies
    - Note: you should be able to install all of the opam libraries by running `make opam` in the `src/` directory.
-4. Run `make vellvm` in the `src/` directory: it will produce the OCaml executable called `vellvm`
+3. Run `make vellvm` in the `src/` directory: it will produce the OCaml executable called `vellvm`
    - Note: running just `make` will _also_ build all of Vellvm's metatheory, which is necessary for proving things, but takes much longer
   
 ## opam, Rocq, and opam dependencies

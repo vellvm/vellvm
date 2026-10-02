@@ -421,8 +421,8 @@ Proof.
     intros; do 2 constructor; auto.
   - (* DTYPE_Array *)
     eapply I2F_EOU_bind; [eassumption|].
-    intros; do 2 constructor.
-    apply Forall2_repeatN; auto.
+    intros; rewrite !repeat_acc_eq; do 2 constructor.
+    apply Forall2_repeat; auto.
 Qed.
 
   (** * Arithmetic bridge: [IPZ] vs [IP64Bit] under [I2F_Iptr]

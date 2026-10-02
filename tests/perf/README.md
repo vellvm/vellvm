@@ -40,16 +40,17 @@ the expected result; update the `ASSERT EQ` accordingly).
 | `iptr-roundtrip.ll` | `ptrtoint`/`inttoptr` round trips and loads through recovered pointers: the ITOP/PTOI + provenance machinery. | loop bound |
 | `undef-pick.ll` | the uvalue side: values kept symbolic (`undef` + select), stored (symbolic byte serialization) and branched on (Pick/concretization). | loop bound |
 | `vector-ops.ll` | vector element access: a loop-carried `<64 x i64>` with one insertelement + one extractelement per iteration. Vectors are dvalue lists, so lane access is a linear walk and each insert rebuilds the vector. (`shufflevector` is unimplemented and untestable.) | loop bound / vector width |
-| `global-init.ll` | startup initialization of a `[16384 x i64] zeroinitializer` global: denoting the aggregate + serializing 128 KiB through the byte-level write path. All startup, ~68 µs/element. CAUTION: at `[32768 x i64]` initialization stack-overflows (non-tail-recursive aggregate path) — this file doubles as a canary for that threshold. | array size |
+| `global-init.ll` | startup initialization of a `[65536 x i64] zeroinitializer` global: denoting the aggregate + serializing 512 KiB through the byte-level write path. Guards a fixed stack-overflow: allocation/write of a large global used to crash around `[32768 x i64]` via five separate non-tail recursions on the same path (`N.recursion` in poison-byte generation, `IntMaps.add_all_index`, `map`/`List.concat` in the allocation-tagging path, and `memS_bind`'s eager `Mput` — the one non-closure-wrapped case in the memory free monad). All five are now accumulator-based/closure-wrapped; scaling above this size is a performance question, not a correctness one (confirmed up to 524288 elements/34s). | array size |
 
 Reference timings (Apple Silicon, July 2026, after switching the
 local/global envs to AVL maps, fixing the quadratic pending-bind
 accumulation in `map_monad_`/`denote_code`, switching `denote_ocfg`'s
 block lookups to a per-definition AVL block map, fixing the
 quadratic bulk-read path with `map_monad_acc` in `read_bytes`/
-`get_consecutive_ptrs`, and deferring source-location string formatting
-to read time — [set_loc] now stores the raw [file_info], worth ~2% on
-instruction-dense tests):
+`get_consecutive_ptrs`, deferring source-location string formatting
+to read time, and fixing a stack-overflow on large global
+allocation/initialization — five non-tail recursions across the
+allocate/write path, including `memS_bind`'s eager `Mput`):
 loop-phi-arith 5.3 s · calls-fib 5.8 s · mem-scan 4.3 s · mem-aggregate
 2.3 s · alloca-churn 1.8 s · iptr-roundtrip 3.1 s · undef-pick 2.8 s ·
 wide-arith 4.3 s · locals-chain 0.24 s · block-jumps 5.7 s ·
@@ -58,7 +59,7 @@ calls-large-fn 2.7 s · calls-many-fns 3.7 s · switch-cases 3.5 s (was
 memcpy-chunk 3.7 s (at 8 KiB;
 was 72 s before the map_monad_acc fix) · memset-chunk 2.3 s ·
 alloca-large 2.6 s · vector-ops 2.1 s ·
-global-init 1.1 s. 
+global-init 0.9 s (at 65536 elements; used to crash at ~32768).
 
 These are for orientation only — always re-measure the baseline on your own machine
 before comparing.

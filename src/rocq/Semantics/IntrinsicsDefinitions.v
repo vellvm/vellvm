@@ -215,7 +215,7 @@ Definition maxnum_32_decl: declaration typ :=
 
 Definition minimum_32_decl: declaration typ :=
   {|
-    dc_name        := Name "minimum.f32";
+    dc_name        := Name "llvm.minimum.f32";
     dc_type        := TYPE_Function (TYPE_FP FP_float) [(TYPE_FP FP_float);(TYPE_FP FP_float)] false;
     dc_param_attrs := ([], [[];[]]);
     dc_attrs       := [];
@@ -386,34 +386,81 @@ Section Intrinsics.
   (* Intrinsics semantic functions -------------------------------------------- *)
 
   #[local] Notation retr x := (ret (inr x)).
+  (* LANGREF: [llvm.fabs] is explicitly *not* a "floating-point math
+     operation": it "acts directly on the underlying bit representation and
+     never changes anything except possibly for the sign bit".  So its result
+     on a NaN is fully determined -- the payload and quiet bit are preserved
+     and the sign is cleared -- with none of the non-determinism that applies
+     to NaN results of genuine math operations.
+
+     [Float.abs] / [Float32.abs] are [Babs] instantiated with [abs_nan], which
+     clears the sign.  Flocq's [b64_abs] / [b32_abs] instead use [unop_nan_pl],
+     which returns the NaN completely unchanged, sign included -- so
+     [llvm.fabs(-NaN)] used to come back negative. *)
+
   (* Absolute value for Float. *)
   Definition llvm_fabs_f32 : pure_base_function :=
     fun args =>
       match args with
-      | [DVALUE_Float d] => retr (DVALUE_Float (b32_abs d))
-      | _ => raise_error "llvm_fabs_f64 got incorrect / ill-typed inputs"
+      | [DVALUE_Float d] => retr (DVALUE_Float (Float32.abs d))
+      | _ => raise_error "llvm_fabs_f32 got incorrect / ill-typed inputs"
       end.
 
   (* Abosulute value for Doubles. *)
   Definition llvm_fabs_f64 : pure_base_function :=
     fun args =>
       match args with
-      | [DVALUE_Double d] => retr (DVALUE_Double (b64_abs d))
+      | [DVALUE_Double d] => retr (DVALUE_Double (Float.abs d))
       | _ => raise_error "llvm_fabs_f64 got incorrect / ill-typed inputs"
       end.
 
+  (* Is a NaN payload quiet?  The quiet bit is the top bit of the significand:
+     bit 51 for binary64, bit 22 for binary32. *)
+  Definition quiet_nan_pl64 (pl : positive) : bool := Pos.testbit pl 51%N.
+  Definition quiet_nan_pl32 (pl : positive) : bool := Pos.testbit pl 22%N.
+
+  (* LANGREF (llvm.maxnum): "If both operands are qNaNs, returns a NaN. If one
+     operand is qNaN and another operand is a number, returns the number. If
+     both operands are numbers, returns the greater of the two arguments. -0.0
+     is considered to be less than +0.0 for this intrinsic."
+
+     Note that a qNaN operand does *not* propagate -- returning the qNaN, as we
+     used to, is simply wrong, not a permitted resolution of NaN
+     non-determinism.
+
+     For a *signaling* NaN operand the LangRef does leave the result
+     non-deterministic: the intrinsic may "return a NaN" or "treat the
+     signaling NaN as a quiet NaN".  We resolve that by returning a NaN, which
+     keeps the sNaN behaviour the tests in tests/llvm-arith/double already pin
+     down.  Once NaN choices become draw events this is the branch point.
+
+     The [Ceq] case is what implements "-0.0 is less than +0.0": for equal
+     non-zero operands either answer is the same value, and for the +0.0/-0.0
+     pair it picks the positive one regardless of argument order. *)
   Definition Float_maxnum (a b: float): float :=
     match a, b with
-    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl64 a b)
+    | B754_nan _ _ _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl64 a b)
+    | B754_nan _ pl _, _ =>
+        if quiet_nan_pl64 pl then b else build_nan _ _ (binop_nan_pl64 a b)
+    | _, B754_nan _ pl _ =>
+        if quiet_nan_pl64 pl then a else build_nan _ _ (binop_nan_pl64 a b)
     | _, _ =>
-      if Float.cmp Clt a b then b else a
+      if Float.cmp Ceq a b
+      then (if Bsign _ _ a then b else a)
+      else (if Float.cmp Clt a b then b else a)
     end.
 
   Definition Float32_maxnum (a b: float32): float32 :=
     match a, b with
-    | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl32 a b)
+    | B754_nan _ _ _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl32 a b)
+    | B754_nan _ pl _, _ =>
+        if quiet_nan_pl32 pl then b else build_nan _ _ (binop_nan_pl32 a b)
+    | _, B754_nan _ pl _ =>
+        if quiet_nan_pl32 pl then a else build_nan _ _ (binop_nan_pl32 a b)
     | _, _ =>
-      if Float32.cmp Clt a b then b else a
+      if Float32.cmp Ceq a b
+      then (if Bsign _ _ a then b else a)
+      else (if Float32.cmp Clt a b then b else a)
     end.
 
   Definition llvm_maxnum_f64 : pure_base_function :=
@@ -430,18 +477,28 @@ Section Intrinsics.
       | _ => raise_error "llvm_maxnum_f32 got incorrect / ill-typed inputs"
       end.
 
+  (* LANGREF (llvm.minimum): "If either operand is a NaN, returns a NaN.
+     Otherwise returns the lesser of the two arguments. -0.0 is considered to
+     be less than +0.0 for this intrinsic."
+
+     Unlike [llvm.maxnum], propagating a NaN operand is the specified
+     behaviour, so only the signed-zero case needed fixing here. *)
   Definition Float_minimum (a b: float): float :=
     match a, b with
     | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl64 a b)
     | _, _ =>
-      if Float.cmp Clt a b then a else b
+      if Float.cmp Ceq a b
+      then (if Bsign _ _ a then a else b)
+      else (if Float.cmp Clt a b then a else b)
     end.
 
   Definition Float32_minimum (a b: float32): float32 :=
     match a, b with
     | B754_nan _ _ _, _ | _, B754_nan _ _ _ => build_nan _ _ (binop_nan_pl32 a b)
     | _, _ =>
-      if Float32.cmp Clt a b then a else b
+      if Float32.cmp Ceq a b
+      then (if Bsign _ _ a then a else b)
+      else (if Float32.cmp Clt a b then a else b)
     end.
 
   Definition llvm_minimum_f64 : pure_base_function :=

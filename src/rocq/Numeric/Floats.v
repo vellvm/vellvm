@@ -38,8 +38,13 @@ Definition is_float_representable_as_float32 (f : binary_float 53 1024) : bool :
   match f with
   | B754_zero _ => true
   | B754_infinity _ => true
-  (* IEEE-754 defines a specific injection, which is all we care about? *)
-  | B754_nan _ _ _ => true
+  (* A NaN is NOT automatically representable: LLVM applies the exactness rule to
+     the payload too.  [m] is the raw 52-bit mantissa field, and narrowing keeps
+     only its high 23 bits, so the low 29 must be zero.  Checked against clang:
+     [float 0x7FF0000020000000] is accepted (payload 2^29) whereas
+     [float 0x7FF0000000000001] is rejected with "floating point constant invalid
+     for type". *)
+  | B754_nan _ m _ => (Z.pos m mod 2^29 =? 0)%Z
   | B754_finite s m e_minus_52 _ =>
       (* Flocq stores the exponents offset by some amount, 52 for float64 *)
       let e := e_minus_52 + 52 in
@@ -65,13 +70,6 @@ Definition is_float_representable_as_float32 (f : binary_float 53 1024) : bool :
       (-149 <=? e)%Z && (e <=? 127)%Z
       && ((Z.pos m mod Z.pow 2 53) mod 2^necessary_mantissa_zero_bits =? 0)%Z
   end.
-
-(** Converts a 64-bit float value to a 32-bit float, or fails if not exactly representable *)
-Definition float_to_float32 (f : float) : option float32 :=
-  if is_float_representable_as_float32 f
-  then Some (Bconv 53 1024 24 128 eq_refl eq_refl
-        (fun f => exist _ (B754_nan 24 128 false 1 eq_refl) eq_refl) mode_NE f)
-  else None.
 
 Lemma integer_representable_n :
   forall n : Z, - 2 ^ 53 <= n <= 2 ^ 53 -> integer_representable 53 1024 n.
@@ -186,6 +184,38 @@ Definition quiet_nan_32 (sp: bool * positive) : {x :float32 | is_nan _ _ x = tru
   exist _ (B754_nan 24 128 s (quiet_nan_32_payload p) (quiet_nan_32_proof p)) (eq_refl true).
 
 Definition default_nan_32 := quiet_nan_32 Archi.default_nan_32.
+
+(** Narrowing a NaN payload without quieting it, for the [float 0x...] literal
+    form.  This is [quiet_nan_32_payload] minus the [Pos.lor] with the quiet bit:
+    LLVM's assembler reads the 16-digit hex form as a *double bit pattern* that
+    must be exactly representable as a float, and the resulting float is the
+    plain bit-level reshaping — sign kept, mantissa field shifted right by 29,
+    quiet bit NOT forced.  Verified against clang:
+    [float 0x7FF0000020000000] yields the *signaling* [0x7F800001], so this is
+    deliberately NOT [Float.to_single], whose [to_single_nan] quiets. *)
+
+Definition narrow_nan_32_payload (p: positive) :=
+  Z.to_pos (P_mod_two_p (Pos.shiftr_nat p 29) 23%nat).
+
+Lemma narrow_nan_32_proof: forall p, nan_pl 24 (narrow_nan_32_payload p) = true.
+Proof. intros; apply normalized_nan; auto; lia. Qed.
+
+Definition narrow_nan_32 (f : float) : {x : float32 | is_nan _ _ x = true} :=
+  match f with
+  | B754_nan s p _ =>
+      exist _ (B754_nan 24 128 s (narrow_nan_32_payload p) (narrow_nan_32_proof p)) (eq_refl true)
+  | _ => default_nan_32
+  end.
+
+(** Converts a 64-bit float value to a 32-bit float, or fails if not exactly
+    representable.  The [is_float_representable_as_float32] guard makes the
+    conversion lossless on every branch it accepts, including the NaN one, where
+    it guarantees that the low 29 payload bits discarded by [narrow_nan_32] are
+    zero. *)
+Definition float_to_float32 (f : float) : option float32 :=
+  if is_float_representable_as_float32 f
+  then Some (Bconv 53 1024 24 128 eq_refl eq_refl narrow_nan_32 mode_NE f)
+  else None.
 
 Local Notation __ := (eq_refl Datatypes.Lt).
 

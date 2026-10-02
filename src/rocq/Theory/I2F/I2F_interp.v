@@ -279,7 +279,7 @@ Proof.
     [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_maxnum_f32 | exact Hargs] | ].
   destruct (RelDec.rel_dec f2 "llvm.maxnum.f64");
     [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_maxnum_f64 | exact Hargs] | ].
-  destruct (RelDec.rel_dec f2 "minimum.f32");
+  destruct (RelDec.rel_dec f2 "llvm.minimum.f32");
     [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_minimum_f32 | exact Hargs] | ].
   destruct (RelDec.rel_dec f2 "llvm.minimum.f64");
     [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_minimum_f64 | exact Hargs] | ].
