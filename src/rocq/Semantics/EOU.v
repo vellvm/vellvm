@@ -4,6 +4,7 @@ From ExtLib Require Import
   Structures.Monads.
 From Vellvm.Utils Require Import
   ListUtil Tactics.
+Import MonadNotation.
 
 Import MonadNotation.
 Open Scope monad.
@@ -63,6 +64,48 @@ Definition option_ub {X : Type} (s : string) (x : option X) :=
   | Some v => ret v
   end.
 
+
+(* This function may essentially compute poison, but without a dvalue to embed it into yet.
+     We take an adhoc lightweigh way to handle this currently with the following option return type.
+     It is also tied to how we treat the behavior of running map_monad to extract a list of bytes:
+     currently we want it to result into a Poison dvalue if any byte resulted in poison.
+     We are likely to follow a finer grained approach soon.
+ *)
+Notation MaybePoison := option.
+Notation Pois := None.
+Notation NoPois := Some.
+Definition EOUP Z := EOU (option Z).
+
+#[global] Instance EOUP_Monad : Monad EOUP :=
+  {| ret _ a := ret (NoPois a) ;
+    bind _ _ c k := 
+      bind (m := EOU) c (fun pov => match pov with
+                                 | Pois => ret Pois
+                                 | NoPois a => k a
+                                 end)
+  |}.
+
+#[local] Open Scope monad_scope.
+
+Definition catch_pois {A} {Z} (z_default:Z) (c : EOUP A) (k : A -> EOU Z) : EOU Z := 
+  x <- (c : EOU _) ;;
+  match x with
+  | Pois => ret z_default
+  | NoPois v => k v
+  end.
+
+Lemma map_monad_cons_EOUP : forall {A B} (f : A -> EOUP B) x xs,
+    map_monad f (x :: xs) = (y <- f x ;; ys <- map_monad f xs ;; ret (y :: ys)).
+Proof. reflexivity. Qed.
+
+Lemma map_monad_EOUP_pois_head : forall {A B} (f : A -> EOUP B) x rest,
+    f x = raise_ret Pois -> map_monad f (x :: rest) = raise_ret Pois.
+Proof. intros A B f x rest H; cbn; rewrite H; reflexivity. Qed.
+
+Lemma EOU_bind_ret_inv : forall {A B} (m : EOU A) (k : A -> EOU B) v,
+    bind m k = ret v -> exists a, m = ret a /\ k a = ret v.
+Proof. intros A B [] k v H; cbn in H; try discriminate; eauto. Qed.
+
 (* [seq_map_monad_acc] (the tail-recursive builder used by [intptr_seq],
    see [IPtr.v]) agrees with [map_monad] over [Nseq] on [EOU]. Proved
    directly against [EOU]'s concrete (non-recursive) [bind] by case
@@ -94,4 +137,3 @@ Proof.
   rewrite seq_map_monad_acc_go_eq.
   destruct (map_monad f (Nseq start len)); reflexivity.
 Qed.
-

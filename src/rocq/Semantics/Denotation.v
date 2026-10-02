@@ -151,6 +151,9 @@ Section Denotation.
                      ret (DVALUE_Base v)
     | DTYPE_Iptr   => v <- coerce_integer_to_int None (denote_int_syntax x) ;;
                      ret (DVALUE_Base v)
+    (* LangRef: byte constants are "strictly equivalent to integer
+       constants", so [bN k] carries the bits of [iN k]. *)
+    | DTYPE_B sz   => ret (DVALUE_Base (@DVALUE_B _ sz (BYTE_I (repr (denote_int_syntax x)))))
     | typ          => raise_error ("bad type for constant int: " ++ show typ)
     end.
 
@@ -175,23 +178,66 @@ Section Denotation.
     | Some _ => raise_error "denote_exp given EXP_Splat with non-vector type"
     end.
 
-  Definition freeze_base {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dv : dvalue_base) : itree E dvalue :=
+  Definition freeze_base {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dt:dtyp) (dv : dvalue_base) : itree E dvalue :=
     match dv with
-    | DVALUE_Poison dt => draw dt
+    | DVALUE_Poison => draw dt
+    (* bytes freeze per bit: draw the replacement bits as an integer of the
+       byte's width (a non-integer answer leaves them all 0) *)
+    | @DVALUE_B _ sz (BYTE_Mixed bits) =>
+        if existsb is_poison_bit bits then
+          x <- draw (DTYPE_I sz) ;;
+          let z := match x with
+                   | DVALUE_Base (DVALUE_I _ i) => unsigned i
+                   | _ => 0%Z
+                   end in
+          ret (DVALUE_Base (DVALUE_B (freeze_mixed_bits sz z bits)))
+        else DVALUE_Base <$> ret dv
     | _ => DVALUE_Base <$> ret dv
     end.
-    
-  Fixpoint freeze {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dv : dvalue) : itree E dvalue :=
-    match dv with
-    | DVALUE_Base v => freeze_base v
-    | DVALUE_Struct p fields => 
-        val <- map_monad freeze fields;;
-        ret (DVALUE_Struct p val)
-    | DVALUE_Array v τ elts => 
-        val <- map_monad freeze elts;;
-        ret (DVALUE_Array v τ val)
-    end.
-     
+
+
+  Definition freeze {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dt:dtyp) (dv:dvalue) : itree E dvalue :=
+    let f := fix freeze_h dv : dtyp -> itree E dvalue :=
+        let freeze_fields : list dvalue -> list dtyp -> list dvalue -> itree E (list dvalue) :=
+          fix loop (dvs:list dvalue) (dts:list dtyp)  (acc : list dvalue) : itree E (list dvalue) :=
+            match dts, dvs with
+            | [], [] => ret (rev_append acc [])
+            | t::ts, v::vs =>
+                v <- freeze_h v t ;;
+                loop vs ts (v :: acc)
+            | _, _ => raise "freeze_fields: mismatched field types and values"
+            end
+        in
+      match dv with
+      | DVALUE_Base v => fun dt => freeze_base dt v
+      | DVALUE_Struct _ fields =>
+          fun dt =>
+          match dt with
+          | DTYPE_Struct p dts =>
+              val <- freeze_fields fields dts [] ;;
+              ret (DVALUE_Struct p val)
+          | _ => raise "freeze: type mismatch non-struct type"
+          end
+      | DVALUE_Array _ elts =>
+          fun dt =>
+            match dt with
+            | DTYPE_Array v sz t =>
+                let freeze_elts : list dvalue -> list dvalue -> itree E (list dvalue) :=
+                  fix loop (dvs:list dvalue) (acc:list dvalue) : itree E (list dvalue) :=
+                    match dvs with
+                    | [] => ret (rev_append acc [])
+                    | v::vs =>
+                        v <- freeze_h v t ;;
+                        loop vs (v::acc)
+                    end
+                in
+                val <- freeze_elts elts [];;
+                ret (DVALUE_Array v val)
+            | _ => raise "freeze: type mismatch non-array type"
+            end
+      end
+    in f dv dt.
+                       
   Definition NONE := DVALUE_Base (DVALUE_None).
   
   Fixpoint denote_exp (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=
@@ -237,20 +283,16 @@ Section Denotation.
 
     | EXP_Cstring es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array false (@DTYPE_I 8) vs)
+      ret (DVALUE_Array false vs)
 
     (* [undef] is treated semantically as [poison] on this branch. *)
     | EXP_Undef =>
         match top with
         | None   => raise ("denote_exp given untyped EXP_Undef")
-        | Some t => freeze (DVALUE_Poison t)
+        | Some t => freeze t (DVALUE_Base DVALUE_Poison)
         end
 
-    | EXP_Poison =>
-        match top with
-        | None   => raise ("denote_exp given untyped EXP_Poison")
-        | Some t => ret (DVALUE_Base (DVALUE_Poison t))
-        end
+    | EXP_Poison => ret (DVALUE_Base DVALUE_Poison)
 
     (* Question: should we do any typechecking for aggregate types here? *)
     (* Option 1: do no typechecking: *)
@@ -264,13 +306,13 @@ Section Denotation.
         vs <- map_monad eval_texp es ;;
         ret (DVALUE_Struct true vs)
 
-    | EXP_Array t es =>
+    | EXP_Array es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array false t vs)
+      ret (DVALUE_Array false vs)
 
-    | EXP_Vector t es =>
+    | EXP_Vector es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array true t vs)
+      ret (DVALUE_Array true vs)
 
     | OP_IBinop iop dt op1 op2 =>
       v1 <- denote_exp (Some dt) op1 ;;
@@ -316,28 +358,28 @@ Section Denotation.
         vec <- denote_exp (Some dt_vec) vecop ;;
         elt <- denote_exp_base (Some dt_elt) eltop ;;
         idx <- denote_exp (Some dt_idx) idx ;;
-        lift (insert_element vec elt idx)
+        lift (insert_element dt_vec vec elt idx)
 
     | OP_ShuffleVector (dt_vec1, vecop1) (dt_vec2, vecop2) (dt_mask, idxmask) =>
         vec1 <- denote_exp (Some dt_vec1) vecop1 ;;
         vec2 <- denote_exp (Some dt_vec2) vecop2 ;;
         idxmask <- denote_exp (Some dt_mask) idxmask;;
-        lift (shuffle_vector vec1 vec2 idxmask)
+        lift (shuffle_vector dt_vec1 vec1 vec2 idxmask)
 
-    | OP_ExtractValue (dt, str) idxs =>
-        str <- denote_exp (Some dt) str ;;
-        lift (extract_value str (List.map denote_int_syntax idxs))
+    | OP_ExtractValue (dt_str, strop) idxs =>
+        str <- denote_exp (Some dt_str) strop ;;
+        lift (extract_value dt_str str (List.map denote_int_syntax idxs))
 
     | OP_InsertValue (dt_str, strop) (dt_elt, eltop) idxs =>
         str <- denote_exp (Some dt_str) strop ;;
         elt <- denote_exp (Some dt_elt) eltop ;;
-        lift (insert_value str elt (List.map denote_int_syntax idxs))
+        lift (insert_value dt_str str elt (List.map denote_int_syntax idxs))
 
     | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
         dcond <- denote_exp (Some dt) cnd ;;
         v1    <- denote_exp (Some dt1) op1 ;;
         v2    <- denote_exp (Some dt2) op2 ;;
-        lift (eval_select dcond v1 v2)
+        lift (eval_select dcond dt1 v1 v2)
 
     | EXP_Metadata md =>
         (* METADATA TODO - it isn't clear what the denotations should be *)
@@ -360,11 +402,11 @@ Section Denotation.
         (* use the type from the splat elt *)
         v <- eval_texp elt ;;
         (* this could be very expensive if the vector is big *)
-        ret (DVALUE_Array true t (List.repeat v (N.to_nat sz)))
+        ret (DVALUE_Array true (List.repeat v (N.to_nat sz)))
           
     | OP_Freeze (dt, e) =>
         dv <- denote_exp (Some dt) e ;;
-        freeze dv
+        freeze dt dv
     end.
   Arguments denote_exp _ _ : simpl nomatch.
 
@@ -407,7 +449,7 @@ Section Denotation.
             (* return a struct with the loaded value and "false" *)
             let ret_v := DVALUE_Struct false [loaded_v; DVALUE_Base (DVALUE_I 1 zero)] in
             lwrite id ret_v
-      | DVALUE_Base (DVALUE_Poison dt) => raiseUB ("comparing poison in atomiccmpxchg.")
+      | DVALUE_Base DVALUE_Poison => raiseUB ("comparing poison in atomiccmpxchg.")
       | _ => raise ("Br got non-bool value")
       end
     else
@@ -549,15 +591,15 @@ Section Denotation.
     | (IId id, INSTR_Load dt (du,ptr) _) =>
       a <- denote_exp' (Some du) ptr;;
       v <- load dt a;;
-      v' <- freeze v;;
-      lwrite id v'
+      (* v' <- freeze dt v;; *)
+      lwrite id v
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
       v <- denote_exp' (Some dt) val ;;
       a <- denote_exp' (Some du) ptr ;;
       match a with
-      | DVALUE_Poison dt => raiseUB (err_loc tt ++ ": Store to poisoned address.")
+      | DVALUE_Poison => raiseUB (err_loc tt ++ ": Store to poisoned address.")
       | _ => store dt a v
       end;;
       ret tt
@@ -684,7 +726,7 @@ Section Denotation.
           ret (inl br1)
         else
           ret (inl br2)
-      | DVALUE_Base (DVALUE_Poison dt) => raiseUB (err_loc tt ++ ": Branching on poison.")
+      | DVALUE_Base DVALUE_Poison => raiseUB (err_loc tt ++ ": Branching on poison.")
       | _ => raise (err_loc tt ++ ": Br got non-bool value")
       end
 
@@ -869,7 +911,14 @@ Section Denotation.
   Definition pop_call_frame {E} `{MemoryE -< E} `{StackE -< E} : itree E unit :=
     stack_pop;;
     mem_pop.
-  
+
+  (* There is an issue with removing type annotations from poison:
+      - we use dtyp_of_dvalue to compute a "type" for the struct that
+        implements var-args
+      - if one of the varargs values is poison, we can't compute a
+        type for it (or even a size)
+      - Note that this will fail for poison and zero-sized arrays/vectors.
+  *)
   (* Push call frame, return varargs address *)
   Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : CFGtop ptr :=
     (* We match the arguments variables to the inputs *)

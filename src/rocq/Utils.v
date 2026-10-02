@@ -16,6 +16,7 @@ From Vellvm Require Export
   Utils.Tactics
   Utils.Assoc
   Utils.ListUtil
+  Utils.ZUtil
   Utils.IntMaps
   Utils.StringUtil
   Utils.BoolUtil

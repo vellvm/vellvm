@@ -51,27 +51,6 @@ Proof.
   intros [z pr] [i pr'] [HI ->]; cbn; red in HI; auto.
 Qed.
 
-Lemma I2F_from_Z : forall z, I2F_EOU I2F_Iptr (@from_Z IPZ z) (@from_Z IP64Bit z).
-Proof.
-  intros z; cbn; unfold from_Z_bits.
-  destruct ((z <=? @Integers.max_unsigned 64) && (z >=? 0))%Z eqn:RANGE.
-  - constructor.
-    red.
-    apply andb_prop in RANGE as [LE GE].
-    apply Z.leb_le in LE; apply Z.geb_le in GE.
-    symmetry; apply Integers.unsigned_repr.
-    unfold Integers.max_unsigned in *; lia.
-  - constructor.
-Qed.
-
-Lemma I2F_int_to_ptr : forall z pr,
-    I2F_EOU I2F_Addr (@int_to_ptr _ _ (@PIV IPZ) z pr) (@int_to_ptr _ _ (@PIV IP64Bit) z pr).
-Proof.
-  intros z pr.
-  eapply I2F_EOU_bind; [apply I2F_from_Z |].
-  intros a1 a2 Ha; constructor; auto.
-Qed.
-
 (** [intptr_seq] traverses the SAME (Params-independent) index list on
     both sides: a single-list [map_monad] compatibility suffices. *)
 Lemma I2F_intptr_seq : forall start size,
@@ -81,6 +60,16 @@ Proof.
   rewrite 2 seq_map_monad_acc_eq.
   apply I2F_EOU_map_monad.
   intros a _; apply I2F_from_Z.
+Qed.
+
+Lemma I2F_ptr_byte_offset : forall p p' ix1 ix2,
+    I2F_Addr p p' ->
+    I2F_Iptr ix1 ix2 ->
+    I2F_EOU I2F_Addr (@ptr_byte_offset PInf p ix1) (@ptr_byte_offset PFin p' ix2).
+Proof.
+  intros p p' ix1 ix2 HA HI.
+  destruct p, p'; destruct HA as [HA ->]; red in HA, HI; subst.
+  apply I2F_int_to_ptr.
 Qed.
 
 Lemma I2F_get_consecutive_ptrs : forall p p',
@@ -95,7 +84,7 @@ Proof.
   intros ixs1 ixs2 HIXS.
   eapply I2F_EOU_map_monad_acc2; eauto.
   intros ix1 ix2 Hix.
-  apply I2F_handle_gep_ptr; auto.
+  apply I2F_ptr_byte_offset; auto.
 Qed.
 
 Lemma I2F_coerce_integer_to_int : forall b z,
@@ -118,53 +107,47 @@ Proof.
   reflexivity.
 Qed.
 
-Lemma I2F_mbyte_MByte : forall dv dv' dt idx,
-    I2F_dvalue dv dv' -> I2F_mbyte (MByte dv dt idx) (MByte dv' dt idx).
-Proof.
-  intros dv dv' dt idx H; red; cbn.
-  now apply I2F_dvalue_extract_byte.
-Qed.
 
-Lemma generate_num_poison_bytes_h_0 {Pa : Params} (dt : dtyp) (start : N) :
-  generate_num_poison_bytes_h start 0 dt = [].
+Lemma generate_num_poison_bytes_h_0 {Pa : Params} (start : N) :
+  generate_num_poison_bytes_h start 0 = [].
 Proof. reflexivity. Qed.
 
-Lemma generate_num_poison_bytes_h_succ {Pa : Params} (dt : dtyp) (start num : N) :
-  generate_num_poison_bytes_h start (N.succ num) dt =
-  MByte (DVALUE_Poison dt) dt start :: generate_num_poison_bytes_h (N.succ start) num dt.
+Lemma generate_num_poison_bytes_h_succ {Pa : Params} (start num : N) :
+  generate_num_poison_bytes_h start (N.succ num) =
+  poison_memory_byte :: generate_num_poison_bytes_h (N.succ start) num .
 Proof.
   unfold generate_num_poison_bytes_h.
   rewrite !seq_map_acc_eq, !N_to_nat_safe_eq, Nnat.N2Nat.inj_succ.
   cbn [Nseq map]; reflexivity.
 Qed.
 
-Lemma I2F_generate_num_poison_bytes_h : forall start num dt,
-    Forall2 I2F_mbyte
-      (@generate_num_poison_bytes_h PInf start num dt)
-      (@generate_num_poison_bytes_h PFin start num dt).
+Lemma I2F_generate_num_poison_bytes_h : forall start num,
+    Forall2 I2F_memory_byte
+      (@generate_num_poison_bytes_h PInf start num)
+      (@generate_num_poison_bytes_h PFin start num).
 Proof.
-  intros start num; revert start; induction num using N.peano_ind; intros start dt.
+  intros start num; revert start; induction num using N.peano_ind; intros start.
   - rewrite 2 generate_num_poison_bytes_h_0; constructor.
   - rewrite 2 generate_num_poison_bytes_h_succ.
     constructor; auto.
-    apply I2F_mbyte_MByte; repeat constructor.
+    repeat constructor.
 Qed.
 
-Lemma I2F_generate_num_poison_bytes : forall num dt,
-    Forall2 I2F_mbyte
-      (@generate_num_poison_bytes PInf num dt)
-      (@generate_num_poison_bytes PFin num dt).
+Lemma I2F_generate_num_poison_bytes : forall num,
+    Forall2 I2F_memory_byte
+      (@generate_num_poison_bytes PInf num)
+      (@generate_num_poison_bytes PFin num).
 Proof.
   intros; apply I2F_generate_num_poison_bytes_h.
 Qed.
 
 Lemma I2F_generate_poison_bytes : forall dt,
-    Forall2 I2F_mbyte
+    Forall2 I2F_memory_byte
       (@generate_poison_bytes PInf dt)
       (@generate_poison_bytes PFin dt).
 Proof.
   intros; unfold generate_poison_bytes.
-  rewrite I2F_sizeof_dtyp.
+  rewrite I2F_store_size_dtyp.
   apply I2F_generate_num_poison_bytes.
 Qed.
 
@@ -179,7 +162,7 @@ Qed.
 Definition I2F_byte (b : @byte PInf) (b' : @byte PFin) : Prop :=
   let '(mb, aid) := b in
   let '(mb', aid') := b' in
-  I2F_mbyte mb mb' /\ aid = aid'.
+  I2F_memory_byte mb mb' /\ aid = aid'.
 
 Definition I2F_memory : @memory PInf -> @memory PFin -> Prop := IM_Refine I2F_byte.
 
@@ -504,7 +487,7 @@ Qed.
 
 Lemma I2F_Read_byte : forall (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p2 : @ptr (@PROV PFin) (@PTR PFin)),
     I2F_Addr p1 p2 ->
-    I2F_memS I2F_State I2F_mbyte (Read_byte p1) (Read_byte p2).
+    I2F_memS I2F_State I2F_memory_byte (Read_byte p1) (Read_byte p2).
 Proof.
   intros [z1 pr1] [z2 pr2] Hp; unfold Read_byte.
   destruct Hp as [HI ->]; red in HI; subst.
@@ -520,7 +503,7 @@ Qed.
 
 Lemma I2F_Write_byte : forall (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p2 : @ptr (@PROV PFin) (@PTR PFin)),
     I2F_Addr p1 p2 ->
-    forall b1 b2, I2F_mbyte b1 b2 ->
+    forall b1 b2, I2F_memory_byte b1 b2 ->
     I2F_memS I2F_State (fun (_ _ : unit) => True) (Write_byte p1 b1) (Write_byte p2 b2).
 Proof.
   intros [z1 pr1] [z2 pr2] Hp b1 b2 Hb; unfold Write_byte.
@@ -551,7 +534,7 @@ Qed.
 
 Lemma I2F_memory_bytes_to_bytes : forall aid
     (bytes1 : list (@memory_byte PInf)) (bytes2 : list (@memory_byte PFin)),
-    Forall2 I2F_mbyte bytes1 bytes2 ->
+    Forall2 I2F_memory_byte bytes1 bytes2 ->
     Forall2 I2F_byte (@memory_bytes_to_bytes PInf aid bytes1) (@memory_bytes_to_bytes PFin aid bytes2).
 Proof.
   intros aid bytes1 bytes2 H; unfold memory_bytes_to_bytes; rewrite !map_acc_eq.
@@ -563,7 +546,7 @@ Lemma I2F_add_block : forall aid (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p2 : @ptr
     I2F_Addr p1 p2 ->
     forall (ptrs1 : list (@ptr (@PROV PInf) (@PTR PInf))) (ptrs2 : list (@ptr (@PROV PFin) (@PTR PFin)))
            (bytes1 : list (@memory_byte PInf)) (bytes2 : list (@memory_byte PFin)),
-      Forall2 I2F_mbyte bytes1 bytes2 ->
+      Forall2 I2F_memory_byte bytes1 bytes2 ->
     I2F_memS I2F_State (fun (_ _ : unit) => True)
       (@add_block PInf aid p1 ptrs1 bytes1) (@add_block PFin aid p2 ptrs2 bytes2).
 Proof.
@@ -604,7 +587,7 @@ Lemma I2F_add_block_to_stack : forall aid (p1 : @ptr (@PROV PInf) (@PTR PInf)) (
     forall (ptrs1 : list (@ptr (@PROV PInf) (@PTR PInf))) (ptrs2 : list (@ptr (@PROV PFin) (@PTR PFin))),
       Forall2 I2F_Addr ptrs1 ptrs2 ->
     forall (bytes1 : list (@memory_byte PInf)) (bytes2 : list (@memory_byte PFin)),
-      Forall2 I2F_mbyte bytes1 bytes2 ->
+      Forall2 I2F_memory_byte bytes1 bytes2 ->
     I2F_memS I2F_State (fun (_ _ : unit) => True)
       (@add_block_to_stack PInf aid p1 ptrs1 bytes1) (@add_block_to_stack PFin aid p2 ptrs2 bytes2).
 Proof.
@@ -618,7 +601,7 @@ Lemma I2F_add_block_to_heap : forall aid (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p
     forall (ptrs1 : list (@ptr (@PROV PInf) (@PTR PInf))) (ptrs2 : list (@ptr (@PROV PFin) (@PTR PFin))),
       Forall2 I2F_Addr ptrs1 ptrs2 ->
     forall (bytes1 : list (@memory_byte PInf)) (bytes2 : list (@memory_byte PFin)),
-      Forall2 I2F_mbyte bytes1 bytes2 ->
+      Forall2 I2F_memory_byte bytes1 bytes2 ->
     I2F_memS I2F_State (fun (_ _ : unit) => True)
       (@add_block_to_heap PInf aid p1 ptrs1 bytes1) (@add_block_to_heap PFin aid p2 ptrs2 bytes2).
 Proof.
@@ -629,14 +612,14 @@ Qed.
 
 Lemma I2F_Allocate_bytes_with_pr : forall
     (init_bytes1 : list (@memory_byte PInf)) (init_bytes2 : list (@memory_byte PFin)),
-    Forall2 I2F_mbyte init_bytes1 init_bytes2 ->
+    Forall2 I2F_memory_byte init_bytes1 init_bytes2 ->
     forall align pr,
     I2F_memS I2F_State I2F_Addr
       (@Allocate_bytes_with_pr PInf init_bytes1 align pr)
       (@Allocate_bytes_with_pr PFin init_bytes2 align pr).
 Proof.
   intros init_bytes1 init_bytes2 Hbytes align pr; unfold Allocate_bytes_with_pr.
-  rewrite !N_length_eq, (Forall2_length_N Hbytes).
+  rewrite (Forall2_length_N Hbytes).
   eapply I2F_memS_bind; [apply I2F_get_free_block |].
   intros [ptr1 ptrs1] [ptr2 ptrs2] [Hptr Hptrs]; cbn in Hptr, Hptrs.
   eapply I2F_memS_bind; [apply I2F_add_block_to_stack; auto |].
@@ -645,14 +628,14 @@ Qed.
 
 Lemma I2F_Malloc_bytes_with_pr : forall
     (init_bytes1 : list (@memory_byte PInf)) (init_bytes2 : list (@memory_byte PFin)),
-    Forall2 I2F_mbyte init_bytes1 init_bytes2 ->
+    Forall2 I2F_memory_byte init_bytes1 init_bytes2 ->
     forall align pr,
     I2F_memS I2F_State I2F_Addr
       (@Malloc_bytes_with_pr PInf init_bytes1 align pr)
       (@Malloc_bytes_with_pr PFin init_bytes2 align pr).
 Proof.
   intros init_bytes1 init_bytes2 Hbytes align pr; unfold Malloc_bytes_with_pr.
-  rewrite !N_length_eq, (Forall2_length_N Hbytes).
+  rewrite (Forall2_length_N Hbytes).
   eapply I2F_memS_bind; [apply I2F_get_free_block |].
   intros [ptr1 ptrs1] [ptr2 ptrs2] [Hptr Hptrs]; cbn in Hptr, Hptrs.
   eapply I2F_memS_bind; [apply I2F_add_block_to_heap; auto |].
@@ -721,7 +704,7 @@ Qed.
 
 Lemma I2F_read_bytes : forall (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p2 : @ptr (@PROV PFin) (@PTR PFin)),
     I2F_Addr p1 p2 -> forall size,
-    I2F_memS I2F_State (Forall2 I2F_mbyte) (read_bytes p1 size) (read_bytes p2 size).
+    I2F_memS I2F_State (Forall2 I2F_memory_byte) (read_bytes p1 size) (read_bytes p2 size).
 Proof.
   intros p1 p2 Hp size; unfold read_bytes.
   eapply I2F_memS_bind; [apply I2F_memS_lift, I2F_get_consecutive_ptrs; auto |].
@@ -745,11 +728,11 @@ Qed.
 Lemma I2F_write_bytes : forall (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p2 : @ptr (@PROV PFin) (@PTR PFin)),
     I2F_Addr p1 p2 ->
     forall (bytes1 : list (@memory_byte PInf)) (bytes2 : list (@memory_byte PFin)),
-      Forall2 I2F_mbyte bytes1 bytes2 ->
+      Forall2 I2F_memory_byte bytes1 bytes2 ->
     I2F_memS I2F_State (fun (_ _ : unit) => True) (write_bytes p1 bytes1) (write_bytes p2 bytes2).
 Proof.
   intros p1 p2 Hp bytes1 bytes2 Hbytes; unfold write_bytes.
-  rewrite !N_length_eq, (Forall2_length_N Hbytes).
+  rewrite (Forall2_length_N Hbytes).
   eapply I2F_memS_bind; [apply I2F_memS_lift, I2F_get_consecutive_ptrs; auto |].
   intros ptrs1 ptrs2 Hptrs.
   rewrite !zip_acc_eq.
@@ -761,16 +744,18 @@ Qed.
 Lemma I2F_write_dvalue : forall (p1 : @ptr (@PROV PInf) (@PTR PInf)) (p2 : @ptr (@PROV PFin) (@PTR PFin)),
     I2F_Addr p1 p2 ->
     forall dt v1 v2, I2F_dvalue v1 v2 ->
-    I2F_memS I2F_State (fun (_ _ : unit) => True) (write_dvalue dt p1 v1) (write_dvalue dt p2 v2).
+    I2F_memS I2F_State (fun (_ _ : unit) => True) (write_dvalue p1 dt v1) (write_dvalue p2 dt v2).
 Proof.
   intros p1 p2 Hp dt v1 v2 Hv; unfold write_dvalue.
+  eapply I2F_memS_bind with (RX:=Forall2 I2F_memory_byte).
+  apply I2F_memS_lift.
+  apply I2F_memory_dvalue_to_memory_bytes; auto.
   apply I2F_write_bytes; auto.
-  apply I2F_dvalue_to_memory_bytes; auto.
 Qed.
 
 Lemma I2F_allocate_bytes : forall
     (init_bytes1 : list (@memory_byte PInf)) (init_bytes2 : list (@memory_byte PFin)),
-    Forall2 I2F_mbyte init_bytes1 init_bytes2 ->
+    Forall2 I2F_memory_byte init_bytes1 init_bytes2 ->
     forall align,
     I2F_memS I2F_State I2F_Addr
       (@allocate_bytes PInf _ init_bytes1 align) (@allocate_bytes PFin _ init_bytes2 align).
@@ -814,17 +799,27 @@ Proof.
   destruct conv.
   - eapply I2F_memS_bind; [apply I2F_assert_inttoptr_types_ok |].
     intros _ _ _.
-    apply I2F_memS_lift.
-    rewrite (I2F_dvalue_base_int_unsigned Hv).
-    eapply I2F_EOU_bind; [apply I2F_int_to_ptr |].
-    intros a1 a2 Ha; repeat constructor; auto.
-  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ]; [ | constructor .. ].
+    pose proof Hv as Hv'; destruct Hv'; cbv beta iota;
+      apply I2F_memS_lift;
+      first [ (* poison maps to poison *) solve [repeat constructor]
+            | rewrite (I2F_dvalue_base_int_unsigned Hv);
+              eapply I2F_EOU_bind; [apply I2F_int_to_ptr |];
+              intros a1 a2 Ha; repeat constructor; auto ].
+  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ];
+      [ | constructor | constructor | constructor | constructor
+        | (* poison maps to poison *)
+          destruct t_to; first [apply I2F_memS_lift; repeat constructor | constructor]
+        | constructor | constructor ].
     destruct HI as [HI ->]; red in HI; subst.
     destruct t_to;
       [ apply I2F_memS_lift; apply I2F_coerce_integer_to_int
       | apply I2F_memS_lift; apply I2F_coerce_integer_to_int
       | constructor .. ].
-  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ]; [ | constructor .. ].
+  - destruct Hv as [[z1 pr1] [z2 pr2] HI | | | | | | | ];
+      [ | constructor | constructor | constructor | constructor
+        | (* poison maps to poison *)
+          destruct t_to; first [apply I2F_memS_lift; repeat constructor | constructor]
+        | constructor | constructor ].
     destruct HI as [HI ->]; red in HI; subst.
     destruct t_to;
       [ apply I2F_memS_lift; apply I2F_coerce_integer_to_int
@@ -839,14 +834,14 @@ Lemma I2F_convert_impure : forall conv t_from t_to v1 v2,
       (@convert_impure PInf _ conv t_from v1 t_to) (@convert_impure PFin _ conv t_from v2 t_to).
 Proof.
   intros conv t_from t_to v1 v2 Hv; unfold convert_impure.
-  destruct Hv as [b1 b2 Hb | p s1 s2 Hs | v τ s1 s2 Hs].
+  destruct Hv as [b1 b2 Hb | p s1 s2 Hs | v s1 s2 Hs].
   - destruct (get_base_conversion_type t_from t_to) as [[tf' tt']|]; cbn; [| apply I2F_Merr].
     eapply I2F_memS_bind; [apply I2F_convert_impure_base; auto |].
     intros b1' b2' Hb'; apply I2F_Mret; constructor; auto.
   - cbn; apply I2F_Merr.
-  - destruct v; cbn; [| apply I2F_Merr ..].
-    destruct τ as [ | | vector sz τ]; cbn; [ apply I2F_Merr | apply I2F_Merr | ].
-    destruct vector; cbn; [ | apply I2F_Merr ].
+  - (* The vector element type is no longer carried by the value; the
+       array flag alone decides, exactly as in [I2F_convert_pure]. *)
+    destruct v; cbn; [| apply I2F_Merr ..].
     destruct (get_vector_conversion_type t_from t_to) as [[tf' tt']|]; cbn; [| apply I2F_Merr].
     eapply I2F_memS_bind.
     { apply I2F_memS_lift, I2F_EOU_map_monad2 with (RA := I2F_dvalue); auto.
@@ -888,7 +883,7 @@ Proof.
       repeat constructor; auto.
   - (* Load *)
     destruct H as [Ht Ha]; subst.
-    destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1 τ1 s1 s2 Hs].
+    destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1 s1 s2 Hs].
     + destruct Hb as [p1 p2 Hp | | | | | | | ]; [ | apply I2F_Mub_l ..].
       eapply I2F_memS_mono; [ | apply I2F_read_dvalue; auto].
       intros; simp I2FA_Memory; auto.
@@ -896,7 +891,7 @@ Proof.
     + apply I2F_Mub_l.
   - (* Store *)
     destruct H as [Ht [Ha Hv]]; subst.
-    destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1' τ1 s1 s2 Hs].
+    destruct Ha as [b1 b2 Hb | p1 s1 s2 Hs | v1' s1 s2 Hs].
     + destruct Hb as [p1 p2 Hp | | | | | | | ]; [ | apply I2F_Mub_l ..].
       eapply I2F_memS_mono; [ | apply I2F_write_dvalue; auto].
       intros; simp I2FA_Memory; auto.
@@ -939,12 +934,12 @@ Proof.
   destruct (Z.ltb len 0); [constructor |].
   apply I2F_write_bytes; auto.
   apply Forall2_repeatN.
-  apply I2F_mbyte_MByte; repeat constructor.
+  repeat constructor.
 Qed.
 
 Lemma I2F_malloc_bytes : forall
     (init_bytes1 : list (@memory_byte PInf)) (init_bytes2 : list (@memory_byte PFin)),
-    Forall2 I2F_mbyte init_bytes1 init_bytes2 ->
+    Forall2 I2F_memory_byte init_bytes1 init_bytes2 ->
     forall align,
     I2F_memS I2F_State I2F_Addr (malloc_bytes init_bytes1 align) (malloc_bytes init_bytes2 align).
 Proof.

@@ -106,7 +106,7 @@ Section Overlap.
    *)
   Definition overlaps_dtyp (a1 : ptr) (τ1 : dtyp) (a2 : ptr) (τ2 : dtyp)
     : bool :=
-    overlaps a1 (sizeof_dtyp τ1) a2 (sizeof_dtyp τ2).
+    overlaps a1 (store_size_dtyp τ1) a2 (store_size_dtyp τ2).
 
   (** Make sure that two regions of memory do not overlap *)
   Definition no_overlap (a1 : ptr) (sz1 : N) (a2 : ptr) (sz2 : N) : bool

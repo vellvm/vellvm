@@ -48,15 +48,18 @@ Lemma I2F_draw_CFG : forall dt,
     I2F_refine_CFG I2F_dvalue (draw dt) (draw dt).
 Proof. intros; unfold I2F_refine_CFG, draw; rstep. Qed.
 
-Lemma I2F_freeze_base' a b :
+Lemma I2F_freeze_base' dt a b :
   I2F_dvalue_base a b ->
-  I2F_refine_CFG I2F_dvalue (freeze_base a) (freeze_base b).
+  I2F_refine_CFG I2F_dvalue (freeze_base dt a) (freeze_base dt b).
 Proof. intros H; unfold I2F_refine_CFG; now apply (I2F_freeze_base_gen I2F_draw_CFG). Qed.
 
-Lemma I2F_freeze' a b :
+Lemma I2F_freeze' dt a b :
   I2F_dvalue a b ->
-  I2F_refine_CFG I2F_dvalue (freeze a) (freeze b).
-Proof. intros H; unfold I2F_refine_CFG; now apply (I2F_freeze_gen I2F_draw_CFG). Qed.
+  I2F_refine_CFG I2F_dvalue (freeze dt a) (freeze dt b).
+Proof.
+  intros H; unfold I2F_refine_CFG;
+    now apply (I2F_freeze_gen I2F_draw_CFG I2FE_CFG_Throw).
+Qed.
 
 Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R2) :
   I2F_EOU RR m1 m2 ->
@@ -151,7 +154,7 @@ Lemma I2F_denote_instr :
       destruct ptr.
       bind_exp.
       erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
-      erbind; [apply I2F_freeze'; auto | intros]...
+      auto... (* [apply I2F_freeze'; auto | intros]...*)
     - destruct val,ptr, x; cbn...
       bind_exp.
       bind_exp.
@@ -243,12 +246,7 @@ Qed.
 Hint Constructors I2F_dvalue : core.
 Hint Unfold TT : core.
 
-Lemma I2F_dvalue_is_poison : forall v1 v2,
-    I2F_dvalue v1 v2 ->
-    @dvalue_is_poison PInf v1 = @dvalue_is_poison PFin v2.
-Proof.
-  intros * H; destruct H; [destruct H |..]; auto.
-Qed.
+(* [I2F_dvalue_is_poison] now lives in I2F_exp.v, which needs it earlier. *)
 
 (** [select_switch] computes in the parameter-free [EOU block_id]: on
     related selectors and switch tables the two sides are literally
@@ -421,7 +419,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   intros.
   erbind; [apply I2F_refine_lift', I2F_combine_lists_varargs; auto | intros].
   destruct r1, r2; inv H0; cbn in * |-.
-  erbind; [eapply I2F_refine_lift', I2F_EOU_map_monad2 with (RB := Logic.eq); eauto | intros ?? HEQ; apply Forall2_eq in HEQ; subst].
+  erbind; [eapply I2F_refine_lift', I2F_EOU_map_monad2 with (RB := Logic.eq); eauto | intros ?? HEQ; apply ListUtil.Forall2_eq in HEQ; subst].
   apply I2F_dtyp_of_dvalue.
   rbind TT...
   intros _ _ _.

@@ -100,6 +100,7 @@ Program Fixpoint typ_to_dtyp_base_option (env : list (ident * typ)) (t : typ) {m
     | Some (_, t) => typ_to_dtyp_base_option (remove_key Ident.eq_dec id env) t
     end
   | TYPE_I sz => Some (DTYPE_I sz)
+  | TYPE_B sz => Some (DTYPE_B sz)                     
   | TYPE_Iptr => Some (DTYPE_Iptr)
   | TYPE_Pointer t' => Some DTYPE_Pointer
   | TYPE_Label => Some DTYPE_Label
@@ -132,6 +133,7 @@ Lemma typ_to_dtyp_base_option_equation  : forall env t,
     | Some (_, t) => typ_to_dtyp_base_option (remove_key Ident.eq_dec id env) t
     end
   | TYPE_I sz => Some (DTYPE_I sz)
+  | TYPE_B sz => Some (DTYPE_B sz)                     
   | TYPE_Iptr => Some (DTYPE_Iptr)
   | TYPE_Pointer t' => Some DTYPE_Pointer
   | TYPE_Label => Some DTYPE_Label
@@ -191,6 +193,7 @@ Program Fixpoint typ_to_dtyp (env : list (ident * typ)) (t : typ) {measure (List
       (* These cases cannot happen *)
       | TYPE_Function ret args varargs =>  DTYPE_Void
       | TYPE_I sz =>  DTYPE_Void
+      | TYPE_B sz =>  DTYPE_Void                       
       | TYPE_Iptr =>  DTYPE_Void
       | TYPE_Pointer t' =>  DTYPE_Void
       | TYPE_Label =>  DTYPE_Void
@@ -245,6 +248,7 @@ Lemma typ_to_dtyp_equation  : forall env t,
       (* These cases cannot happen *)
       | TYPE_Function ret args varargs =>  DTYPE_Void
       | TYPE_I sz =>  DTYPE_Void
+      | TYPE_B sz =>  DTYPE_Void                       
       | TYPE_Iptr =>  DTYPE_Void
       | TYPE_Pointer t' =>  DTYPE_Void
       | TYPE_Label =>  DTYPE_Void

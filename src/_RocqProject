@@ -16,6 +16,7 @@
 ./rocq/Utils/ParserHelper.v
 ./rocq/Utils/Tactics.v
 ./rocq/Utils/ListUtil.v
+./rocq/Utils/ZUtil.v
 ./rocq/Utils/StringUtil.v
 ./rocq/Utils/BoolUtil.v
 ./rocq/Utils/OptionUtil.v
@@ -84,6 +85,7 @@
 ./rocq/Semantics.v
 
 ./rocq/Utils/rutt_cutoff.v
+./rocq/Theory/MemoryBytesFacts.v
 ./rocq/Theory/I2F/Refinement.v
 ./rocq/Theory/I2F/I2F_exp.v
 ./rocq/Theory/I2F/I2F_denotation.v

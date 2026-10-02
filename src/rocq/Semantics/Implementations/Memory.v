@@ -34,12 +34,21 @@ From Vellvm.Semantics Require Import
   Params
   LLVMEvents
   Interfaces.Memory
-  Operations.
+  MemoryBytes
+  Operations.Conversion.
 From Stdlib Require Import FunctionalExtensionality.
 Import Logic.
 
+
 Section MemoryModel.
   Context {Pa : Params} {MMP : @MemoryModelPrimitives Pa}.
+
+  Definition ptr_byte_offset (a : ptr) (ix : iptr) : EOU ptr :=
+    let ptr := ptr_to_int a in
+    let prov := ptr_provenance a in
+    let byte_size := alloc_size_dtyp (DTYPE_B 8) in
+    let addr := (ptr + (Z.of_N (byte_size) * (to_Z ix)))%Z in
+    int_to_ptr addr prov.
 
   (* We would like a better representation than a list *)
   (* [map_monad_acc] rather than [map_monad]: the list is as long as the
@@ -47,7 +56,7 @@ Section MemoryModel.
   Definition get_consecutive_ptrs (p : ptr) (size : N) : EOU (list ptr) :=
     ixs <- intptr_seq 0 size;;
     map_monad_acc
-      (fun ix => handle_gep_ptr (DTYPE_I 8) p [DVALUE_Base (DVALUE_Iptr ix)])
+      (ptr_byte_offset p)
       ixs.
 
   (** Reading dvalues *)
@@ -60,35 +69,34 @@ Section MemoryModel.
     map_monad_acc read_byte ptrs.
   
   Definition read_dvalue (dt : dtyp) (p : ptr) : memM dvalue :=
-    bytes <- read_bytes p (sizeof_dtyp dt);;
+    bytes <- read_bytes p (store_size_dtyp dt);;
     lift (memory_bytes_to_dvalue bytes dt).
 
   (** Writing dvalues *)
-  (* [N_length] rather than [N.length]: the latter's [1 + length l] is
-     non-tail, recursing as deep as [bytes] — a problem for large writes
-     (see perf/global-init.ll). *)
   Definition write_bytes (p : ptr) (bytes : list memory_byte) : memM unit :=
-    ptrs <- lift (get_consecutive_ptrs p (N_length bytes));;
+    ptrs <- lift (get_consecutive_ptrs p (N.length bytes));;
     let ptr_bytes := zip_acc ptrs bytes in
     (* Actually perform writes *)
     loop_monad (fun '(ptr, byte) => write_byte ptr byte) ptr_bytes.
 
-  Definition write_dvalue (dt : dtyp) (p : ptr) (v : dvalue) : memM unit :=
-    write_bytes p (dvalue_to_memory_bytes v dt).
+  (* TODO: not sure about sub-byte-sized values and bits / poison / padding *)
+  Definition write_dvalue (p : ptr) (dt:dtyp) (v : dvalue) : memM unit :=
+    bytes <- lift (dvalue_to_memory_bytes dt v None) ;;
+    write_bytes p bytes.
 
   (* [seq_map_acc]/[N_to_nat_safe] rather than [N.recursion]: the latter's
      doubling composition is non-tail (same disease as [Pos.to_nat] — see
      perf/global-init.ll), so filling a large fresh allocation's poison
      bytes this way blew the native stack. *)
   Definition generate_num_poison_bytes_h
-    (start_ix : N) (num : N) (dt : dtyp) : list memory_byte :=
-    seq_map_acc (fun x => MByte (DVALUE_Poison dt) dt x) start_ix (N_to_nat_safe num).
+    (start_ix : N) (num : N) : list memory_byte :=
+    seq_map_acc (fun _ => poison_memory_byte) start_ix (N_to_nat_safe num).
 
-  Definition generate_num_poison_bytes (num : N) (dt : dtyp) : list memory_byte :=
-    generate_num_poison_bytes_h 0 num dt.
+  Definition generate_num_poison_bytes (num : N) : list memory_byte :=
+    generate_num_poison_bytes_h 0 num.
 
   Definition generate_poison_bytes (dt : dtyp) : list memory_byte :=
-    generate_num_poison_bytes (sizeof_dtyp dt) dt.
+    generate_num_poison_bytes (store_size_dtyp dt).
 
   (** Allocating dtyps *)
   Definition allocate_bytes (init_bytes : list memory_byte) (align : N) : memM ptr :=
@@ -119,13 +127,17 @@ Section MemoryModel.
     match conv with
     | Inttoptr =>
         assert_inttoptr_types_ok t_from t_to ;;
-        lift (DVALUE_Pointer <$> (int_to_ptr (dvalue_base_int_unsigned dv) wildcard_prov))
+        match dv with
+        | DVALUE_Poison => lift (ret DVALUE_Poison)
+        | _ => lift (DVALUE_Pointer <$> (int_to_ptr (dvalue_base_int_unsigned dv) wildcard_prov))
+        end
                          
     | Ptrtoint | Ptrtoaddr =>
     (* In this memory model there is no difference because we don't (yet) "leak" any state by these casts *)                      
        match dv, t_to with
         | DVALUE_Pointer ptr, DTYPE_I sz => lift (coerce_integer_to_int (Some sz) (ptr_to_int ptr))
         | DVALUE_Pointer ptr, DTYPE_Iptr => lift (coerce_integer_to_int None (ptr_to_int ptr))
+        | DVALUE_Poison, (DTYPE_I _ | DTYPE_Iptr) => lift (ret DVALUE_Poison)
         | _, _ => mub "Invalid PTOI conversion"
        end
 
@@ -143,12 +155,12 @@ Section MemoryModel.
             merr "convert_impure: type mismatch"
         end
           
-    | (DVALUE_Array true (DTYPE_Array true sz t) elts1) =>
+    | (DVALUE_Array true elts1) =>
         match get_vector_conversion_type t_from t_to with
         | Some (t_from', t_to') =>
               elts1' <- lift (map_monad dvalue_to_dvalue_base elts1) ;;
               val <- map_monad (fun v => convert_impure_base conv t_from' v t_to') elts1' ;;
-              ret (DVALUE_Array true (DTYPE_Array true sz t_to') (List.map DVALUE_Base val))
+              ret (DVALUE_Array true (List.map DVALUE_Base val))
 
         | None =>
             merr "convert_impure: type or vector size mismatch"
@@ -162,9 +174,15 @@ Section MemoryModel.
       | MemPush => mempush
       | MemPop => mempop
       | Alloca t n align =>
+          (* SAZ: double check the alignment when an alignment is specified, that is a _minimal_
+             guarantee.  If the "natural" alignment of the type is larger, that might be used
+             instead.  We need to figure out whether `allocate_dtyp` is responsible for that
+             or whether to put that logic here.  Currently it seems that no place
+             properly handles that.
+           *)
           let align :=
             match align with
-            | None => 8%N
+            | None => 8%N  (* TODO: This should probably depend on some configuration *)
             | Some align => align
             end in
           ptr <- allocate_dtyp t n align;;
@@ -173,12 +191,12 @@ Section MemoryModel.
           match a with
           | DVALUE_Base (DVALUE_Pointer a) =>
               read_dvalue t a
-          | _ => mub "Loading from something that isn't an ptress."
+          | _ => mub "Loading from something that isn't an address."
           end
       | Store t a v =>
           match a with
           | DVALUE_Base (DVALUE_Pointer a) =>
-              write_dvalue t a v
+              write_dvalue a t v
           | _ => mub "Writing something to somewhere that isn't an address."
           end
       | Conv ct t_from v t_to =>
@@ -214,7 +232,7 @@ Section MemoryModel.
     then
       mub "memset given negative length."
     else
-      let byte := MByte (DVALUE_I 8 val) (DTYPE_I 8) 0 in
+      let byte := BYTE_I val in
       write_bytes dst (repeatN (Z.to_N len) byte).
   
   Definition handle_memcpy (args : list dvalue_base) : memM unit :=
@@ -252,9 +270,9 @@ Section MemoryModel.
   Definition handle_malloc (args : list dvalue_base) (align : N) : memM ptr :=
     match args with
     | [DVALUE_I bitwidth sz] =>
-        malloc_bytes (generate_num_poison_bytes (Z.to_N (unsigned sz)) (DTYPE_I 8)) align
+        malloc_bytes (generate_num_poison_bytes (Z.to_N (unsigned sz))) align
     | [DVALUE_Iptr sz] =>
-        malloc_bytes (generate_num_poison_bytes (Z.to_N (to_unsigned sz)) (DTYPE_I 8)) align
+        malloc_bytes (generate_num_poison_bytes (Z.to_N (to_unsigned sz))) align
     | _ => merr "Malloc: invalid arguments."
     end.
 
@@ -381,7 +399,7 @@ Section Implementation.
     (aid : allocationId) (bytes : list memory_byte) : list byte :=
     map_acc (fun b => (b, aid)) bytes.
 
-  (* Register a concrete ptress in a frame *)
+  (* Register a concrete address in a frame *)
   Definition add_to_frame (m : memory_stack) (k : ptr) : memory_stack :=
     let '(mkMemoryStack m s h) := m in
     match s with
@@ -550,18 +568,16 @@ Section Implementation.
     ptrs <- lift (get_consecutive_ptrs ptr size);;
     ret (ptr,ptrs).
 
-  (* [N_length] rather than [N.length] — see [write_bytes]. *)
   Definition Allocate_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM ptr :=
-    let size := N_length init_bytes in
+    let size := N.length init_bytes in
     let aid := provenance_to_allocation_id pr in
     '(ptr, ptrs) <- get_free_block size align pr;;
     add_block_to_stack aid ptr ptrs init_bytes;;
     ret ptr.
 
   (** Heap allocation *)
-  (* [N_length] rather than [N.length] — see [write_bytes]. *)
   Definition Malloc_bytes_with_pr (init_bytes : list memory_byte) (align : N) (pr : provenance) : memM ptr :=
-    let size := N_length init_bytes in
+    let size := N.length init_bytes in
     let aid := provenance_to_allocation_id pr in
     '(ptr, ptrs) <- get_free_block size align pr;;
     add_block_to_heap aid ptr ptrs init_bytes;;

@@ -18,32 +18,59 @@ Set Contextual Implicit.
 Module N.
   (* Standard library things in [N] rather than [nat] *)
 
-  Fixpoint length {A} (l : list A) : N :=
-    match l with
-    | [] => 0
-    | _ :: l => 1 + length l
-    end.
+  Fixpoint length_h {A} (l : list A) acc : N :=
+      match l with
+      | [] => acc
+      | _ :: l => length_h l (1+acc)%N
+      end.
+  
+  Definition length {A} (l : list A) : N :=
+    length_h l 0.
 
-  (* Tail-safe analogue of [length] *)
-  Fixpoint length_acc {A} (l : list A) (acc : N) : N :=
-    match l with
-    | [] => acc
-    | _ :: l => length_acc l (1 + acc)
-    end.
+
+  (* Given i and n, calls f n times accumulating the answer:
+       f (i+(n-1)) :: .. :: f (i+1) :: f i :: acc 
+     So, e.g., rev_loop_acc id 4 0 acc = 3::2::1::0::acc 
+   *)
+  Definition rev_loop_acc {A} (f : N -> A) (n : N) : N -> list A -> list A :=
+    N.recursion
+      (fun i acc => acc)
+      (fun _ rec i acc => rec (1+i)%N ((f i)::acc))
+      n.
 End N.
 
-Definition N_length {A} (l : list A) : N := N.length_acc l 0.
-
-Lemma N_length_acc_eq {A} : forall (l : list A) acc,
-    N.length_acc l acc = (acc + N.length l)%N.
+(** [rev_loop_acc] is built from [N.recursion], which does not reduce on
+    [N.succ]; this unfolding equation makes it usable by induction. *)
+Lemma rev_loop_acc_succ {A} (f : N -> A) n :
+  N.rev_loop_acc f (N.succ n) = (fun i acc => N.rev_loop_acc f n (1+i)%N (f i :: acc)).
 Proof.
-  induction l as [| x l IH]; intros acc; cbn [N.length_acc N.length]; [lia |].
-  rewrite IH; lia.
+  unfold N.rev_loop_acc.
+  apply (@N.recursion_succ (N -> list A -> list A) Logic.eq); auto.
+  repeat intro; subst; auto.
 Qed.
 
-Lemma N_length_eq {A} (l : list A) : N_length l = N.length l.
-Proof. unfold N_length; rewrite N_length_acc_eq; lia. Qed.
+Lemma repeat_app_cons {A} (x : A) k acc :
+  List.repeat x k ++ x :: acc = x :: (List.repeat x k ++ acc).
+Proof. induction k; cbn; [reflexivity | now rewrite IHk]. Qed.
 
+(** A constant [rev_loop_acc] just prepends that many copies. *)
+Lemma rev_loop_acc_const {A} (x : A) n : forall i acc,
+    N.rev_loop_acc (fun _ => x) n i acc = List.repeat x (N.to_nat n) ++ acc.
+Proof.
+  induction n using N.peano_ind; intros i acc; [reflexivity |].
+  rewrite rev_loop_acc_succ, IHn, Nnat.N2Nat.inj_succ; cbn [List.repeat app].
+  apply repeat_app_cons.
+Qed.
+
+(** It appends exactly [n] elements. *)
+Lemma rev_loop_acc_length {A} (f : N -> A) :
+  forall n i acc, length (N.rev_loop_acc f n i acc) = (N.to_nat n + length acc)%nat.
+Proof.
+  intros n; induction n using N.peano_ind; intros i acc; [reflexivity |].
+  rewrite rev_loop_acc_succ; cbn.
+  rewrite IHn; cbn; lia.
+Qed.
+  
 (* Tail-safe analogue of [List.concat] *)
 Fixpoint concat_acc_go {A} (ls : list (list A)) (acc : list A) : list A :=
   match ls with
@@ -186,17 +213,11 @@ Section Standard.
         auto.
   Qed.
 
-  Definition option_pick_large {A} (leq : A -> A -> bool) (a b : option A) : option A
-    := match a, b with
-       | Some x, Some y =>
-           if leq x y then b else a
-       | Some a, _      => Some a
-       | _, Some b      => Some b
-       | None, None     => None
-       end.
-
   Definition maximumByOpt {A} (leq : A -> A -> bool) (l : list A) : option A :=
-    fold_left (option_pick_large leq) (map Some l) None.
+    match l with
+    | [] => None
+    | x::xs => Some (fold_left (fun a b => if leq a b then b else a) xs x)
+    end.
 
   Definition rev_tail_rec {A} (xs : list A)
     := fold_left (fun acc x => x :: acc) xs [].
@@ -382,6 +403,211 @@ Section Standard.
          n.
 
   
+  Lemma repeat_snoc : forall {A} (x : A) k,
+      List.repeat x k ++ [x] = x :: List.repeat x k.
+  Proof. intros A x; induction k; cbn; [reflexivity | now rewrite IHk]. Qed.
+
+  Lemma rev_repeat : forall {A} (x : A) k,
+      rev (List.repeat x k) = List.repeat x k.
+  Proof. intros A x; induction k; cbn; [reflexivity | now rewrite IHk, repeat_snoc]. Qed.
+
+  (** ** [take] / [drop] toolkit
+
+      Enough to reason about a reader that consumes a prefix of a buffer and
+      leaves the rest alone. *)
+
+  Lemma take_nil : forall {A} (l : list A), take 0 l = [].
+  Proof. intros A [| x xs]; reflexivity. Qed.
+
+  Lemma drop_nil : forall {A} (l : list A), drop 0 l = l.
+  Proof. intros A [| x xs]; reflexivity. Qed.
+
+  Local Ltac take_step :=
+    cbn [take drop Datatypes.length]; cbn [Datatypes.length] in *;
+    rewrite ?N.pred_sub, ?Nnat.Nat2N.inj_succ in *.
+
+  Lemma take_length_le : forall {A} (l : list A) n,
+      (N.of_nat (length (take n l)) <= n)%N.
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros n; take_step; [lia |].
+    destruct (N.eqb_spec 0 n); subst; take_step; [lia |].
+    specialize (IH (n - 1)%N); lia.
+  Qed.
+
+  Lemma take_length_exact : forall {A} (l : list A) n,
+      (n <= N.of_nat (length l))%N -> N.of_nat (length (take n l)) = n.
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros n H; take_step; [lia |].
+    destruct (N.eqb_spec 0 n); subst; take_step; [reflexivity |].
+    rewrite IH by lia; lia.
+  Qed.
+
+  (* a [take] that covers the whole list is the identity *)
+  Lemma take_all : forall {A} (l : list A) n,
+      (N.of_nat (length l) <= n)%N -> take n l = l.
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros n H; take_step; [reflexivity |].
+    destruct (N.eqb_spec 0 n); [lia |].
+    rewrite IH by lia; reflexivity.
+  Qed.
+
+  Lemma drop_all : forall {A} (l : list A) n,
+      (N.of_nat (length l) <= n)%N -> drop n l = [].
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros n H; take_step; [reflexivity |].
+    destruct (N.eqb_spec 0 n); [lia |].
+    rewrite IH by lia; reflexivity.
+  Qed.
+
+  (* a prefix read is unaffected by whatever follows *)
+  Lemma take_app_le : forall {A} (l r : list A) n,
+      (n <= N.of_nat (length l))%N -> take n (l ++ r) = take n l.
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros r n H; cbn [app]; take_step.
+    - replace n with 0%N by lia; apply take_nil.
+    - destruct (N.eqb_spec 0 n); [reflexivity |].
+      rewrite IH by lia; reflexivity.
+  Qed.
+
+  Lemma drop_app_le : forall {A} (l r : list A) n,
+      (n <= N.of_nat (length l))%N -> drop n (l ++ r) = drop n l ++ r.
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros r n H; cbn [app]; take_step.
+    - replace n with 0%N by lia; rewrite drop_nil; reflexivity.
+    - destruct (N.eqb_spec 0 n); [reflexivity |].
+      rewrite IH by lia; reflexivity.
+  Qed.
+
+  (* splitting exactly at an append *)
+  Lemma take_app_exact : forall {A} (l r : list A) n,
+      N.of_nat (length l) = n -> take n (l ++ r) = l.
+  Proof.
+    intros A l r n H; rewrite take_app_le by lia; apply take_all; lia.
+  Qed.
+
+  Lemma drop_app_exact : forall {A} (l r : list A) n,
+      N.of_nat (length l) = n -> drop n (l ++ r) = r.
+  Proof.
+    intros A l r n H; rewrite drop_app_le by lia.
+    rewrite drop_all by lia; reflexivity.
+  Qed.
+
+(** [rev_loop_acc] builds its block backwards: it is exactly the reverse of
+    the forward list [f i, f (i+1), ...], sitting on top of the accumulator.
+    This is what lets a proof about the writer -- which accumulates in
+    reverse -- talk to the reader, which consumes forwards. *)
+Lemma rev_loop_acc_app {A} (f : N -> A) n : forall i acc,
+    N.rev_loop_acc f n i acc = rev (List.map f (Nseq i (N.to_nat n))) ++ acc.
+Proof.
+  induction n using N.peano_ind; intros i acc; [reflexivity |].
+  rewrite rev_loop_acc_succ, IHn, Nnat.N2Nat.inj_succ.
+  cbn [Nseq List.map rev].
+  rewrite <- app_assoc; cbn [app].
+  f_equal.
+  (* the tail starts at [1 + i]; [Nseq] steps with [N.succ] *)
+  replace (N.succ i) with (1 + i)%N by lia; reflexivity.
+Qed.
+
+  Lemma Nseq_length : forall len start, length (Nseq start len) = len.
+  Proof. induction len; intros start; cbn; [reflexivity | now rewrite IHlen]. Qed.
+
+  Lemma In_Nseq : forall k s i, In i (Nseq s k) -> (s <= i < s + N.of_nat k)%N.
+  Proof.
+    induction k as [| k IH]; intros s i H; cbn in H; [contradiction |].
+    destruct H as [<- | H]; [lia |].
+    specialize (IH _ _ H); lia.
+  Qed.
+
+  Lemma Nseq_snoc : forall n s, Nseq s (S n) = Nseq s n ++ [(s + N.of_nat n)%N].
+  Proof.
+    induction n as [| n IH]; intros s.
+    - cbn; repeat f_equal; lia.
+    - change (Nseq s (S (S n))) with (s :: Nseq (N.succ s) (S n)).
+      rewrite IH.
+      change (Nseq s (S n)) with (s :: Nseq (N.succ s) n).
+      replace (s + N.of_nat (S n))%N with (N.succ s + N.of_nat n)%N by lia.
+      rewrite <- app_comm_cons; reflexivity.
+  Qed.
+
+  Lemma map_const_Nseq : forall {A} (x : A) k s,
+      List.map (fun _ => x) (Nseq s k) = List.repeat x k.
+  Proof.
+    intros A x; induction k; intros s; cbn; [reflexivity | now rewrite IHk].
+  Qed.
+
+  Lemma take_drop_app : forall {A} n (l : list A), take n l ++ drop n l = l.
+  Proof.
+    intros A n l; revert n; induction l as [| x xs IH]; intros n; cbn [take drop];
+      [reflexivity |].
+    destruct (N.eqb_spec 0 n); [reflexivity |].
+    cbn [app]; f_equal; apply IH.
+  Qed.
+
+  Lemma drop_drop : forall {A} m n (l : list A), drop m (drop n l) = drop (n + m) l.
+  Proof.
+    intros A m n l; revert m n; induction l as [| x xs IH]; intros m n;
+      cbn [drop]; [destruct (N.eqb_spec 0 (n + m)); reflexivity |].
+    destruct (N.eqb_spec 0 n).
+    - subst; rewrite N.add_0_l; reflexivity.
+    - destruct (N.eqb_spec 0 (n + m)); [lia |].
+      rewrite IH; f_equal; rewrite !N.pred_sub; lia.
+  Qed.
+
+  Lemma length_drop_N : forall {A} (l : list A) n,
+      N.of_nat (List.length (drop n l)) = (N.of_nat (List.length l) - n)%N.
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros n; cbn [drop Datatypes.length];
+      [cbn; lia |].
+    destruct (N.eqb_spec 0 n).
+    - subst; cbn [Datatypes.length]; lia.
+    - rewrite IH, N.pred_sub; cbn [Datatypes.length]; lia.
+  Qed.
+
+
+  Lemma take_take_le : forall {A} (l : list A) m k,
+      (m <= k)%N -> take m (take k l) = take m l.
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros m k H; cbn [take]; [reflexivity |].
+    destruct (N.eqb_spec 0 k) as [Ek |].
+    - subst k; assert (m = 0%N) by lia; subst m; cbn [take]; reflexivity.
+    - cbn [take]; destruct (N.eqb_spec 0 m) as [Em |]; [reflexivity |].
+      f_equal; apply IH; rewrite !N.pred_sub; lia.
+  Qed.
+
+  Lemma drop_take : forall {A} (l : list A) n i,
+      drop i (take n l) = take (n - i) (drop i l).
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros n i; cbn [take drop].
+    - destruct (N.eqb_spec 0 i); cbn [take drop]; destruct (n - i)%N; reflexivity.
+    - destruct (N.eqb_spec 0 n) as [En |].
+      + subst n; cbn [drop].
+        destruct (N.eqb_spec 0 i); cbn [take]; [reflexivity |].
+        replace (0 - i)%N with 0%N by lia; cbn [take].
+        destruct (drop (N.pred i) xs); reflexivity.
+      + cbn [drop]; destruct (N.eqb_spec 0 i) as [Ei |].
+        * subst i; cbn [take drop]; rewrite N.sub_0_r.
+          destruct (N.eqb_spec 0 n); [lia | reflexivity].
+        * rewrite IH; f_equal; rewrite !N.pred_sub; lia.
+  Qed.
+
+  Lemma forallb_take_pres : forall {A} (f : A -> bool) l n,
+      forallb f l = true -> forallb f (take n l) = true.
+  Proof.
+    intros A f l; induction l as [| x xs IH]; intros n H; cbn [take]; [reflexivity |].
+    cbn [forallb] in H; apply andb_true_iff in H as [Hx Hr].
+    destruct (N.eqb 0 n); [reflexivity |].
+    cbn [forallb]; rewrite Hx; cbn [andb]; apply IH; exact Hr.
+  Qed.
+
+  Lemma forallb_drop_pres : forall {A} (f : A -> bool) l n,
+      forallb f l = true -> forallb f (drop n l) = true.
+  Proof.
+    intros A f l; induction l as [| x xs IH]; intros n H; cbn [drop]; [reflexivity |].
+    cbn [forallb] in H; apply andb_true_iff in H as [Hx Hr].
+    destruct (N.eqb 0 n); [cbn [forallb]; rewrite Hx, Hr; reflexivity |].
+    apply IH; exact Hr.
+  Qed.
+
   Lemma drop_length_le :
     forall {A} (xs : list A) n,
       (length (drop n xs) <= length xs)%nat.
@@ -410,6 +636,25 @@ Section Standard.
     lia.
   Qed.
 
+  Lemma existsb_concat_map : forall {A B} (f : B -> bool) (g : A -> list B) l x,
+      existsb f (List.concat (List.map g l)) = false -> In x l -> existsb f (g x) = false.
+  Proof.
+    intros A B f g l x H Hin; induction l as [| y l IH]; [destruct Hin |].
+    cbn [List.map List.concat] in H; rewrite existsb_app in H.
+    apply orb_false_iff in H as [H1 H2].
+    destruct Hin as [-> | Hin]; auto.
+  Qed.
+
+  Lemma forallb_concat_map : forall {A B} (f : B -> bool) (g : A -> list B) l x,
+      forallb f (List.concat (List.map g l)) = true -> In x l -> forallb f (g x) = true.
+  Proof.
+    intros A B f g l x H Hin; induction l as [| y l IH]; [destruct Hin |].
+    cbn [List.map List.concat] in H; rewrite forallb_app in H.
+    apply andb_true_iff in H as [H1 H2].
+    destruct Hin as [-> | Hin]; auto.
+  Qed.
+
+  
   Function split_every_pos {A} (n : positive) (xs : list A) { measure length xs }: list (list A)
     := match xs with
        | [] => []
@@ -438,6 +683,99 @@ Section Standard.
 
   Definition zip {X Y} (xs : list X) (ys : list Y) := zipWith (fun a b => (a, b)) xs ys.
 
+  Lemma In_take_N : forall {A} n (l : list A) x, In x (take n l) -> In x l.
+  Proof.
+    intros A n l x H; rewrite <- (@take_drop_app _ n l); apply in_or_app; now left.
+  Qed.
+
+  Lemma In_drop_N : forall {A} n (l : list A) x, In x (drop n l) -> In x l.
+  Proof.
+    intros A n l x H; rewrite <- (@take_drop_app _ n l); apply in_or_app; now right.
+  Qed.
+
+  Lemma Forall_take_N : forall {A} (P : A -> Prop) n l, Forall P l -> Forall P (take n l).
+  Proof.
+    intros A P n l H; apply Forall_forall; intros x Hx.
+    eapply Forall_forall; [exact H | eapply In_take_N; exact Hx].
+  Qed.
+
+  Lemma Forall_drop_N : forall {A} (P : A -> Prop) n l, Forall P l -> Forall P (drop n l).
+  Proof.
+    intros A P n l H; apply Forall_forall; intros x Hx.
+    eapply Forall_forall; [exact H | eapply In_drop_N; exact Hx].
+  Qed.
+  
+
+  Lemma take_repeat_cons : forall {A} (x : A) n k,
+      (0 < n)%N -> (0 < k)%nat -> exists r, take n (List.repeat x k) = x :: r.
+  Proof.
+    intros A x n [| k'] Hn Hk; [lia |].
+    cbn [List.repeat take].
+    destruct (N.eqb_spec 0 n); [lia |].
+    eexists; reflexivity.
+  Qed.
+
+  Lemma In_rev_loop_acc : forall {A} (f : N -> A) n i acc b,
+      In b (N.rev_loop_acc f n i acc) -> In b acc \/ exists j, b = f j.
+  Proof.
+    intros A f n i acc b H.
+    rewrite rev_loop_acc_app in H.
+    apply in_app_or in H as [H | H]; [| now left].
+    apply in_rev, in_map_iff in H as (j & <- & _); eauto.
+  Qed.
+
+  Lemma map_Nseq_shift : forall {A} (f : N -> A) n a s,
+      List.map (fun i => f (s + i)%N) (Nseq a n) = List.map f (Nseq (s + a)%N n).
+  Proof.
+    intros A f; induction n as [| n IH]; intros a s; cbn [Nseq List.map];
+      [reflexivity |].
+    f_equal.
+    rewrite (IH (N.succ a) s).
+    do 2 f_equal; lia.
+  Qed.
+
+  Lemma map_Nseq_nth : forall {A} (l : list A) d s,
+      List.map (fun i => nth (N.to_nat (i - s)) l d) (Nseq s (List.length l)) = l.
+  Proof.
+    intros A l d; induction l as [| x l IH]; intros s; [reflexivity |].
+    cbn [List.length Nseq List.map].
+    replace (N.to_nat (s - s)) with 0%nat by lia; cbn [nth]; f_equal.
+    rewrite <- (IH (N.succ s)) at 2.
+    apply map_ext_in; intros i Hi; apply In_Nseq in Hi.
+    replace (N.to_nat (i - s)) with (S (N.to_nat (i - N.succ s))) by lia.
+    reflexivity.
+  Qed.
+
+  Lemma fold_left_add_right : forall {A} (f : A -> N) l a,
+      fold_left (fun acc dt => (acc + f dt)%N) l a
+      = (a + fold_right (fun dt acc => (f dt + acc)%N) 0%N l)%N.
+  Proof.
+    intros A f; induction l as [| t l IH]; intros a; cbn [fold_left fold_right]; [lia |].
+    rewrite IH; lia.
+  Qed.
+
+  Lemma length_take {A B} (l : list A) (l' : list B) n :
+    length l = length l' -> length (take n l) = length (take n l').
+  Proof.
+    revert l' n.
+    induction l; intros.
+    - destruct l'.  reflexivity.
+      inversion H.
+    - destruct l'.  inversion H.
+      cbn. destruct n; auto.
+      cbn. erewrite IHl; eauto.
+  Qed.    
+
+  Lemma length_drop {A B} (l : list A) (l' : list B) n :
+    length l = length l' -> length (drop n l) = length (drop n l').
+  Proof.
+    revert l' n.
+    induction l; intros.
+    - destruct l'.  reflexivity.
+      inversion H.
+    - destruct l'.  inversion H.
+      cbn. destruct n; auto.
+  Qed.
   (* Tail-safe analogue of [zip] *)
   Fixpoint zip_acc_go {X Y} (acc : list (X * Y)) (xs : list X) (ys : list Y) : list (X * Y) :=
     match xs, ys with
@@ -682,11 +1020,18 @@ Section Forall2.
     destruct FK; cbn; auto.
   Qed.
 
+  Lemma Forall2_length_N_h {A B} (R : A -> B -> Prop) :
+    forall l1 l2 acc, Forall2 R l1 l2 -> N.length_h l1 acc = N.length_h l2 acc.
+  Proof.
+    intros l1 l2 acc F; revert acc; induction F; intros; auto.
+    cbn. now rewrite IHF.
+  Qed.    
+  
   Lemma Forall2_length_N {A B} (R : A -> B -> Prop) :
     forall l1 l2, Forall2 R l1 l2 -> N.length l1 = N.length l2.
   Proof.
-    intros l1 l2 F; induction F; cbn; auto.
-    now rewrite IHF.
+    intros. unfold N.length.
+    eapply Forall2_length_N_h; eauto.
   Qed.
 
   Lemma Forall2_map2 {A B1 B2} (R : B1 -> B2 -> Prop) (f : A -> B1) (g : A -> B2) :
@@ -730,6 +1075,13 @@ Section Forall2.
     intros * HR; induction HR; subst; cbn; auto.
   Qed.
 
+
+  Lemma eq_Forall2 {A} (l : list A) :
+    Forall2 eq l l.
+  Proof.
+    induction l; auto.
+  Qed.
+  
   (* [filter] under agreeing predicates preserves [Forall2]-relatedness. *)
   Lemma Forall2_filter {A B} (R : A -> B -> Prop) (p1 : A -> bool) (p2 : B -> bool)
     (Hp : forall a b, R a b -> p1 a = p2 b) :
@@ -819,6 +1171,41 @@ Section Forall2.
     forall l1 l2, Forall2 R l1 l2 -> Forall2 R' (map f l1) (map g l2).
   Proof.
     intros HRR l1 l2 F; induction F; cbn; constructor; auto.
+  Qed.
+
+  (** Both loops reverse their accumulator onto the result, so the
+    accumulator invariant is just [Forall2]-compatibility of
+    [rev_append]. *)
+  Lemma Forall2_rev_append {A B} (R : A -> B -> Prop) :
+    forall l1 l2, Forall2 R l1 l2 ->
+             forall m1 m2, Forall2 R m1 m2 ->
+                      Forall2 R (rev_append l1 m1) (rev_append l2 m2).
+  Proof. induction 1; cbn; auto. Qed.
+  
+
+  Lemma Forall2_nth_Nseq : forall {A B} (R : A -> B -> Prop) (f : N -> B) d l s,
+      (forall i, (i < List.length l)%nat -> R (nth i l d) (f (s + N.of_nat i)%N)) ->
+      Forall2 R l (List.map f (Nseq s (List.length l))).
+  Proof.
+    intros A B R f d; induction l as [| x l IH]; intros s H; cbn [List.length Nseq List.map];
+      [constructor |].
+    constructor.
+    - specialize (H 0%nat ltac:(cbn; lia)); cbn [nth] in H.
+      rewrite N.add_0_r in H; exact H.
+    - apply IH; intros i Hi.
+      specialize (H (S i) ltac:(cbn; lia)); cbn [nth] in H.
+      replace (N.succ s + N.of_nat i)%N with (s + N.of_nat (S i))%N by lia; exact H.
+  Qed.
+
+  Lemma Forall2_rev_loop_acc {A B} (R : A -> B -> Prop) (f : N -> A) (g : N -> B)
+    (HR : forall i, R (f i) (g i)) :
+    forall n i acc acc', Forall2 R acc acc' ->
+      Forall2 R (N.rev_loop_acc f n i acc) (N.rev_loop_acc g n i acc').
+  Proof.
+    intros n; induction n using N.peano_ind; intros i acc acc' HA.
+    - cbn; auto.
+    - rewrite !rev_loop_acc_succ; cbn.
+      apply IHn; constructor; auto.
   Qed.
 
 End Forall2.

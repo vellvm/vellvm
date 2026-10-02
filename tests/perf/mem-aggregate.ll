@@ -48,8 +48,14 @@ exit:
   ret i64 %acc
 }
 
+@fmt = private unnamed_addr constant [22 x i8] c"churn(5000)   = %lld\0A\00"
+
+declare i32 @printf(ptr, ...)
+
+
 define i64 @main(i64 %argc, i8** %argv) {
   %r = call i64 @churn(i64 5000)
+  %ignored = call i32 (ptr, ...) @printf(ptr @fmt, i64 %r)  
   ret i64 %r
 }
 

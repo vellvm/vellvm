@@ -97,7 +97,8 @@ Scheme Equality for floating_point_variant.
 
 Unset Elimination Schemes.
 Inductive typ : Set :=
-| TYPE_I (sz:positive)
+| TYPE_I (sz:positive)         (* int type of sz bits *)
+| TYPE_B (sz:positive)         (* byte type of sz bits *)
 | TYPE_Iptr
 | TYPE_Pointer (t: option typ)
 | TYPE_Void
@@ -199,6 +200,7 @@ Variant param_attr : Set :=
 | PARAMATTR_Dead_on_unwind      
 | PARAMATTR_Range (t : typ) (a b : int_syntax)
 | PARAMATTR_Initializes (l : list (int_syntax * int_syntax))
+| PARAMATTR_Captures (p : (list string) * (list string))
 .
 
 Variant frame_pointer_val : Set :=
@@ -450,8 +452,8 @@ Inductive exp : Set :=
 | EXP_Poison
 | EXP_Struct          (fields: list (T * exp))
 | EXP_Packed_struct   (fields: list (T * exp))
-| EXP_Array           (t:T) (elts: list (T * exp))
-| EXP_Vector          (t:T) (elts: list (T * exp))
+| EXP_Array           (elts: list (T * exp))
+| EXP_Vector          (elts: list (T * exp))
 | OP_IBinop           (iop:ibinop) (t:T) (v1:exp) (v2:exp)
 | OP_ICmp             (samesign:bool) (cmp:icmp)   (t:T) (v1:exp) (v2:exp)
 | OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp) (v2:exp)

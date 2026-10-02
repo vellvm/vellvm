@@ -214,6 +214,11 @@
   ("alignstack"                   , KW_ALIGNSTACK);
   ("allocalign"                   , KW_ALLOCALIGN);
   ("allocptr"                     , KW_ALLOCPTR);
+  ("captures"                     , KW_CAPTURES);
+  ("address"                      , KW_ADDRESS);
+  ("address_is_null"              , KW_ADDRESS_IS_NULL);
+  ("provenance"                   , KW_PROVENANCE);
+  ("read_provenance"              , KW_READ_PROVENANCE);
 
 (* Function Attributes *)
   ("allockind"                    , KW_ALLOCKIND);
@@ -595,6 +600,7 @@ rule token = parse
 
   (* types *)
   | 'i' (digit+ as i) { I (coq_P_of_int (int_of_string i)) }
+  | 'b' (digit+ as i) { B (coq_P_of_int (int_of_string i)) }  
   | '*' { STAR }
 
   (* labels *)
