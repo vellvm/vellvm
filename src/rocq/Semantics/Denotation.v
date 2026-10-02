@@ -196,37 +196,6 @@ Section Denotation.
     end.
 
 
-  (*
-  Fixpoint freeze {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dt:dtyp) (dv:dvalue) : itree E dvalue :=
-    match dv with
-    | DVALUE_Base v => freeze_base dt v
-    | DVALUE_Struct _ fields =>
-        let freeze_fields : list dtyp -> list dvalue -> list dvalue -> itree E (list dvalue) :=
-          fix loop (dts:list dtyp) (dvs:list dvalue) (acc : list dvalue) : itree E (list dvalue) :=
-            match dts, dvs with
-            | [], [] => ret (rev_append acc [])
-            | t::ts, v::vs =>
-                v <- freeze t v ;;
-                loop ts vs (v :: acc)
-            | _, _ => raise "freeze_fields: mismatched field types and values"
-            end
-        in
-        match dt with
-        | DTYPE_Struct p dts =>
-            val <- freeze_fields dts fields [] ;;
-            ret (DVALUE_Struct p val)
-        | _ => raise "freeze: type mismatch non-struct type"
-        end
-    | DVALUE_Array _ elts =>
-        match dt with
-        | DTYPE_Array v sz t =>
-            val <- map_monad (freeze t) elts;;
-            ret (DVALUE_Array v val)
-        | _ => raise "freeze: type mismatch non-array type"
-        end
-    end.
-  *)
-
   Definition freeze {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dt:dtyp) (dv:dvalue) : itree E dvalue :=
     let f := fix freeze_h dv : dtyp -> itree E dvalue :=
         let freeze_fields : list dvalue -> list dtyp -> list dvalue -> itree E (list dvalue) :=
@@ -268,7 +237,6 @@ Section Denotation.
             end
       end
     in f dv dt.
-
                        
   Definition NONE := DVALUE_Base (DVALUE_None).
   
