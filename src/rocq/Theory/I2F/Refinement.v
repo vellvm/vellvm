@@ -255,7 +255,9 @@ Section Refinement.
     I2FE_Memory _ _ := False.
 
   Equations I2FE_Draw : prerel (@DrawE PInf) (@DrawE PFin) :=
-    I2FE_Draw (@Draw PInf τ1) (@Draw PFin τ2) := τ1 = τ2.
+    I2FE_Draw (@Draw PInf τ1) (@Draw PFin τ2) := τ1 = τ2 ;
+    I2FE_Draw (@DrawBool PInf) (@DrawBool PFin) := True ;
+    I2FE_Draw _ _ := False.
 
   Equations I2FE_Exc : prerel (@LLVMExcE PInf) (@LLVMExcE PFin) :=
     I2FE_Exc (@LLVMExc PInf exc1) (@LLVMExc PFin exc2) := I2F_dvalue exc1 exc2.
@@ -331,7 +333,9 @@ Section Refinement.
     I2FA_Memory _ _ _ _ := False.
 
   Equations I2FA_Draw : postrel (@DrawE PInf) (@DrawE PFin) :=
-    I2FA_Draw (@Draw PInf τ1) dv1 (@Draw PFin τ2) dv2 := I2F_dvalue dv1 dv2.
+    I2FA_Draw (@Draw PInf τ1) dv1 (@Draw PFin τ2) dv2 := I2F_dvalue dv1 dv2 ;
+    I2FA_Draw (@DrawBool PInf) x (@DrawBool PFin) y := x = y ;
+    I2FA_Draw _ _ _ _ := False.
 
   (* The abortive events answer in [void]: their answer relations are
      vacuous ([False] bodies), and so are the associated continuation

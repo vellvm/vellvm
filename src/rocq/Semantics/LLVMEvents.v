@@ -97,11 +97,10 @@ Section withParams.
   Definition store    {E} `{MemoryE -< E} t a v                : itree E _ := trigger (Store t a v).
   Definition conv  {E} `{MemoryE -< E} cv t_from v t_to     : itree E _ := trigger (Conv cv t_from v t_to).
   
-  (* An event resolving the non-determinism induced by undef. The argument _P_
-   is intended to be a predicate over the set of dvalues _u_ can take such that
-   if it is not satisfied, the only possible execution is to raise _UB_. *)
+  (* Events resolving the non-determinism induced by freezing poison. *)
   Variant DrawE : Type -> Type :=
-    | Draw (dt : dtyp) : DrawE dvalue.
+    | Draw (dt : dtyp) : DrawE dvalue
+    | DrawBool : DrawE bool.
   Definition draw {E} `{DrawE -< E} dt : itree E _ := trigger (Draw dt).
 
     (* Generic calls, refined by [denote_mcfg] *)

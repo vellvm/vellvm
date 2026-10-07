@@ -585,11 +585,17 @@ Lemma I2F_fused_draw :
         (fused_draw e1 s1) (fused_draw e2 s2).
 Proof.
   intros T1 T2 e1 e2 H s1 s2 Hs.
-  destruct e1 as [τ1]; destruct e2 as [τ2].
+  destruct e1 as [τ1|]; destruct e2 as [τ2|].
   simp I2FE_Draw in H; subst.
   unfold fused_draw, handle_draw, I2F_refine_MCFGbot.
   erbind; [apply I2F_refine_lift_bot, I2F_default_dvalue_of_dtyp |].
   intros r1 r2 Hr; apply ruttc_ret; auto.
+  inversion H.
+  inversion H.
+  unfold fused_draw, handle_draw.
+  
+  erbind. unfold ret, Monad_itree. eapply @ruttc_ret with (RR := (Logic.eq)); auto.
+  intros; subst. eapply ruttc_ret; auto. constructor; [auto|constructor].
 Qed.
 
 
