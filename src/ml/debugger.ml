@@ -54,13 +54,58 @@ let debug_raw_step m =
      Either.Left x
   | res -> res)
 
+(**
+Takes in two lists, and returns a triple:
+- pairs of elements with matching indices from l1 and l2
+- either
+  - elements of l1 that have no matching index in l2 (when l1 is longer than l2)
+  - elements of l2 that have no matching index in l1 (when l2 is longer than l1)
+  - or None if the lists had the same length
+*)
+let group_matching_indices l1 l2 =
+  let rec aux l1 l2 acc =
+    match (l1, l2) with
+    | ([], []) -> (acc, None)
+    | ([], _) -> (acc, Some (Either.Right l2))
+    | (_, []) -> (acc, Some (Either.Left l1))
+    | (h1::t1, h2::t2) -> aux t1 t2 ((h1, h2)::acc)
+  in aux l1 l2 []
+
+let new_stack_vars s1 s2 =
+  let (common, rest) = group_matching_indices s1 s2 in
+  let vars_from_new_frames =
+    match rest with
+    | None -> []
+    | Some (Either.Left _) -> []
+    | Some (Either.Right r) -> List.concat (List.map (fun c -> List.rev (RawIdMaps.RM.elements (c : Stack.stack_frame).stack_vars)) r)
+  in
+  let vars_from_last_common_frame =
+    match List.rev common with
+    | [] -> []
+    | (c1, c2)::_ ->
+      let sv1 = RawIdMaps.RM.elements (c1 : Stack.stack_frame).stack_vars in
+      let sv2 = RawIdMaps.RM.elements (c2 : Stack.stack_frame).stack_vars in
+      List.filter
+        (fun (k, v) ->
+          match List.find_opt (fun (k', _) -> k == k') sv1 with
+          | None -> true (* new key*)
+          | Some (_, v') -> v != v' (* updated value *))
+        sv2
+  in List.append vars_from_last_common_frame vars_from_new_frames
+
 (* Step will step into function calls *)
 let rec step m =
+  let before_stack = (Stack.local_stack_object Interpreter.params).local_stack_get () in
   (match debug_raw_step m with
   | Either.Left x ->
      if !current_line = "" || !current_line = !last_line
      then step x
-     else Either.Left x
+     else 
+      let after_stack = (Stack.local_stack_object Interpreter.params).local_stack_get () in
+      List.iter
+        (fun (k, v) -> Printf.printf "%s -> %s\n" (Camlcoq.camlstring_of_coqstring (ShowAST.show_raw_id k)) (string_of_dvalue v))
+        (new_stack_vars before_stack after_stack);
+      Either.Left x
   | res -> res)
 
 (* Next will skip over function calls *)
