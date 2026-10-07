@@ -206,30 +206,6 @@ Section DValue.
     | _ :: rest => Z.shiftl (int_bits_to_Z rest) 1
     end.
 
-  (** ** Freezing a byte value
-
-      LangRef ('freeze'): "Values of the byte type are frozen on a per-bit
-      basis."  Poison bit [i] becomes bit [i] of the arbitrary-but-fixed
-      integer [z]; integer and pointer bits are left alone, provenance
-      included. *)
-  Fixpoint freeze_bits (z : Z) (i : N) (bits : list memory_bit) : list memory_bit :=
-    match bits with
-    | [] => []
-    | Bit_psn :: rest =>
-        Bit_bit (repr (if Z.testbit z (Z.of_N i) then 1 else 0)) :: freeze_bits z (1 + i) rest
-    | b :: rest => b :: freeze_bits z (1 + i) rest
-    end.
-
-  (* The frozen bits, re-canonicalised: once the poison is gone the byte is
-     a [BYTE_I] if every bit is an integer bit, and otherwise stays a
-     [BYTE_Mixed].  It cannot have become a [BYTE_Pointer] chunk: it still
-     has pointer bits, but at least one former poison bit is now an integer
-     bit. *)
-  Definition freeze_mixed_bits sz (z : Z) (bits : list memory_bit) : dvalue_bv sz :=
-    let bits' := freeze_bits z 0 bits in
-    if forallb is_int_bit bits' then BYTE_I (repr (int_bits_to_Z bits'))
-    else BYTE_Mixed sz bits'.
-
   (** ** Canonical [dvalue_bv]s
 
       Each bit pattern has exactly one canonical representation, the one

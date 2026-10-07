@@ -178,66 +178,6 @@ Section Denotation.
     | Some _ => raise_error "denote_exp given EXP_Splat with non-vector type"
     end.
 
-  Definition freeze_base {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dt:dtyp) (dv : dvalue_base) : itree E dvalue :=
-    match dv with
-    | DVALUE_Poison => draw dt
-    (* bytes freeze per bit: draw the replacement bits as an integer of the
-       byte's width (a non-integer answer leaves them all 0) *)
-    | @DVALUE_B _ sz (BYTE_Mixed bits) =>
-        if existsb is_poison_bit bits then
-          x <- draw (DTYPE_I sz) ;;
-          let z := match x with
-                   | DVALUE_Base (DVALUE_I _ i) => unsigned i
-                   | _ => 0%Z
-                   end in
-          ret (DVALUE_Base (DVALUE_B (freeze_mixed_bits sz z bits)))
-        else DVALUE_Base <$> ret dv
-    | _ => DVALUE_Base <$> ret dv
-    end.
-
-
-  Definition freeze {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dt:dtyp) (dv:dvalue) : itree E dvalue :=
-    let f := fix freeze_h dv : dtyp -> itree E dvalue :=
-        let freeze_fields : list dvalue -> list dtyp -> list dvalue -> itree E (list dvalue) :=
-          fix loop (dvs:list dvalue) (dts:list dtyp)  (acc : list dvalue) : itree E (list dvalue) :=
-            match dts, dvs with
-            | [], [] => ret (rev_append acc [])
-            | t::ts, v::vs =>
-                v <- freeze_h v t ;;
-                loop vs ts (v :: acc)
-            | _, _ => raise "freeze_fields: mismatched field types and values"
-            end
-        in
-      match dv with
-      | DVALUE_Base v => fun dt => freeze_base dt v
-      | DVALUE_Struct _ fields =>
-          fun dt =>
-          match dt with
-          | DTYPE_Struct p dts =>
-              val <- freeze_fields fields dts [] ;;
-              ret (DVALUE_Struct p val)
-          | _ => raise "freeze: type mismatch non-struct type"
-          end
-      | DVALUE_Array _ elts =>
-          fun dt =>
-            match dt with
-            | DTYPE_Array v sz t =>
-                let freeze_elts : list dvalue -> list dvalue -> itree E (list dvalue) :=
-                  fix loop (dvs:list dvalue) (acc:list dvalue) : itree E (list dvalue) :=
-                    match dvs with
-                    | [] => ret (rev_append acc [])
-                    | v::vs =>
-                        v <- freeze_h v t ;;
-                        loop vs (v::acc)
-                    end
-                in
-                val <- freeze_elts elts [];;
-                ret (DVALUE_Array v val)
-            | _ => raise "freeze: type mismatch non-array type"
-            end
-      end
-    in f dv dt.
-                       
   Definition NONE := DVALUE_Base (DVALUE_None).
   
   Fixpoint denote_exp (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=

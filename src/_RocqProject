@@ -64,6 +64,7 @@
 ./rocq/Semantics/Operations/Select.v
 ./rocq/Semantics/Operations/Compare.v
 ./rocq/Semantics/Operations/Conversion.v
+./rocq/Semantics/Operations/Freeze.v
 ./rocq/Semantics/Operations.v
 ./rocq/Semantics/IntrinsicsDefinitions.v
 ./rocq/Semantics/Denotation.v

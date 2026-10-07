@@ -4,4 +4,5 @@ From Vellvm Require Export
   Select
   Compare
   Conversion
+  Freeze
   MemoryBytes.
