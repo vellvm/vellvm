@@ -82,7 +82,7 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
       DVALUE_Struct (false, List.map texp_to_dvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts ->
       DVALUE_Struct (true, List.map texp_to_dvalue elts)
-  | TYPE_Array (_, _), EXP_Array elts ->
+  | TYPE_Array (sz, t), EXP_Array elts ->
      DVALUE_Array (false, List.map texp_to_dvalue elts)
   | TYPE_Vector _, EXP_Vector elts ->
      DVALUE_Array (true, List.map texp_to_dvalue elts)
@@ -296,7 +296,7 @@ let make_test_h run name ll_ast t : (string * Assert.assertion) option =
           let dv_str = Interpreter.string_of_dvalue dv in
           let err_str = Printf.sprintf "%s but got %s" expected_str dv_str in
           failwith err_str
-       | Error (UndefinedBehavior _) -> ()
+       | Error (UndefinedBehavior ans) -> ()
        | Error e -> failwith (Result.string_of_exit_condition e)
      in
      Some (expected_str, result)

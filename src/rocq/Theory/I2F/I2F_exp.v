@@ -156,10 +156,18 @@ Arguments freeze_elts {Pa E HD HF HO HU}.
 (** ** Per-bit freeze of a byte value
 
     [freeze_base] freezes a [BYTE_Mixed] bit by bit ([freeze_mixed_bits]);
-    each poison bit is replaced by the answer to one [DrawBool] event.
-    Related bit lists have the same shape bit for bit, so both sides
-    trigger the same [DrawBool]s, and every test [freeze_mixed_bits] makes
-    on the frozen bits comes out the same on both sides. *)
+    the replacement bits come from one [draw] at an integer type.  Related
+    bit lists have the same shape bit for bit, so every test
+    [freeze_mixed_bits] makes comes out the same on both sides. *)
+Lemma I2F_freeze_bits z : forall bits bits' i,
+    Forall2 I2F_memory_bit bits bits' ->
+    Forall2 I2F_memory_bit (freeze_bits z i bits) (freeze_bits z i bits').
+Proof.
+  intros bits bits' i F; revert i.
+  induction F as [| b b' bs bs' Hb F IH]; intros i; cbn [freeze_bits]; [constructor |].
+  inversion Hb; subst; constructor; auto; constructor; auto.
+Qed.
+
 Lemma I2F_existsb_poison_bits bits bits' :
   Forall2 I2F_memory_bit bits bits' ->
   existsb is_poison_bit bits = existsb is_poison_bit bits'.
@@ -184,57 +192,39 @@ Proof.
   inversion Hb; subst; cbn; now rewrite IH.
 Qed.
 
-Section FreezeBits.
-  Context {E1 E2}
-    `{@DrawE PInf -< E1} `{FailureE -< E1} `{OOME -< E1} `{UBE -< E1}
-    `{@DrawE PFin -< E2} `{FailureE -< E2} `{OOME -< E2} `{UBE -< E2}
-    {Rcutl : pred1 E1} {Rcutr : pred1 E2}
-    {REv : prerel E1 E2} {RAns : postrel E1 E2}
-    (HdrawB : ruttc Rcutl Rcutr REv RAns Logic.eq
-                (trigger (@DrawBool PInf) : itree E1 bool)
-                (trigger (@DrawBool PFin) : itree E2 bool)).
+(* related draws at an integer type supply the same replacement bits *)
+Lemma I2F_draw_Z (r1 : @dvalue PInf) (r2 : @dvalue PFin) :
+  I2F_dvalue r1 r2 ->
+  match r1 with DVALUE_Base (DVALUE_I _ i) => unsigned i | _ => 0%Z end
+  = match r2 with DVALUE_Base (DVALUE_I _ i) => unsigned i | _ => 0%Z end.
+Proof.
+  intros HR; inversion HR as [b1 b2 HB | |]; subst; try reflexivity.
+  inversion HB; subst; reflexivity.
+Qed.
 
-  Lemma I2F_freeze_bit b b' :
-    I2F_memory_bit b b' ->
-    ruttc Rcutl Rcutr REv RAns I2F_memory_bit (freeze_bit b) (freeze_bit b').
-  Proof.
-    intros Hb; inversion Hb; subst; cbn; try (apply ruttc_ret; now constructor).
-    rbind (@Logic.eq bool); [exact HdrawB |].
-    intros x ? <-; apply ruttc_ret; constructor.
-  Qed.
-
-  Lemma I2F_freeze_mixed_bits sz bits bits' :
-    Forall2 I2F_memory_bit bits bits' ->
-    ruttc Rcutl Rcutr REv RAns I2F_dvalue_bv
-      (@freeze_mixed_bits PInf E1 _ _ _ _ sz bits)
-      (@freeze_mixed_bits PFin E2 _ _ _ _ sz bits').
-  Proof.
-    intros F; unfold freeze_mixed_bits.
-    rbind (Forall2 I2F_memory_bit).
-    - apply ruttc_map_monad_gen.
-      eapply Forall2_impl; [| exact F]; apply I2F_freeze_bit.
-    - intros r1 r2 F'.
-      rewrite (I2F_forallb_int_bits F'), (I2F_int_bits_to_Z F').
-      destruct (forallb is_int_bit r2); apply ruttc_ret; constructor; auto.
-  Qed.
-End FreezeBits.
+Lemma I2F_freeze_mixed_bits sz z1 z2 bits bits' :
+  z1 = z2 ->
+  Forall2 I2F_memory_bit bits bits' ->
+  I2F_dvalue_bv (@freeze_mixed_bits PInf sz z1 bits) (@freeze_mixed_bits PFin sz z2 bits').
+Proof.
+  intros <- F; unfold freeze_mixed_bits.
+  pose proof (I2F_freeze_bits z1 0 F) as F'.
+  rewrite (I2F_forallb_int_bits F'), (I2F_int_bits_to_Z F').
+  destruct (forallb is_int_bit (freeze_bits z1 0 bits')); constructor; auto.
+Qed.
 
 (* keep [freeze_mixed_bits] folded under [cbn] so [I2F_freeze_mixed_bits] applies *)
 #[local] Arguments freeze_mixed_bits : simpl never.
 
-(** Generic [freeze]/[freeze_base], parameterized over the events they
-      trigger: [draw] and [DrawBool]. The MCFG and CFG instances then differ
-      only in the refinements fed in ([I2F_draw_MCFG] / [I2F_drawB_MCFG] and
-      [I2F_draw_CFG] / [I2F_drawB_CFG]). *)
+(** Generic [freeze]/[freeze_base], parameterized over the single event
+      they trigger: [draw]. The MCFG and CFG instances then differ only in
+      the [draw]-refinement fed in ([I2F_draw_MCFG] / [I2F_draw_CFG]). *)
 Lemma I2F_freeze_base_gen {E1 E2}
   `{@DrawE PInf -< E1} `{FailureE -< E1} `{OOME -< E1} `{UBE -< E1}
   `{@DrawE PFin -< E2} `{FailureE -< E2} `{OOME -< E2} `{UBE -< E2}
   {Rcutl : pred1 E1} {Rcutr : pred1 E2}
   {REv : prerel E1 E2} {RAns : postrel E1 E2}
   (Hdraw : forall dt, ruttc Rcutl Rcutr REv RAns I2F_dvalue (draw dt) (draw dt))
-  (HdrawB : ruttc Rcutl Rcutr REv RAns Logic.eq
-              (trigger (@DrawBool PInf) : itree E1 bool)
-              (trigger (@DrawBool PFin) : itree E2 bool))
   (dt:dtyp) (a : @dvalue_base PInf) (b : @dvalue_base PFin) :
   I2F_dvalue_base a b ->
   ruttc Rcutl Rcutr REv RAns I2F_dvalue (freeze_base dt a) (freeze_base dt b).
@@ -243,15 +233,17 @@ Proof.
     try solve [ apply ruttc_ret; auto
               | apply refine_dvalue_base_map_gen; apply ruttc_ret; auto
               | apply Hdraw ].
-  (* [DVALUE_B]: only a [BYTE_Mixed] with poison bits triggers [DrawBool]s *)
+  (* [DVALUE_B]: only a [BYTE_Mixed] with poison bits draws *)
   destruct HBV as [i | p p' n HA | bits bits' F];
     try solve [ apply refine_dvalue_base_map_gen; apply ruttc_ret;
                 repeat constructor; auto ].
   rewrite (I2F_existsb_poison_bits F).
   destruct (existsb is_poison_bit bits');
     [| apply refine_dvalue_base_map_gen; apply ruttc_ret; repeat constructor; auto ].
-  rbind I2F_dvalue_bv; [now apply I2F_freeze_mixed_bits |].
-  intros ?? HR; apply ruttc_ret; now do 2 constructor.
+  rbind I2F_dvalue; [apply Hdraw |].
+  intros r1 r2 HR; apply ruttc_ret.
+  do 2 constructor.
+  apply I2F_freeze_mixed_bits; [now apply I2F_draw_Z | exact F].
 Qed.
 
 (** The [FailureE] branches of [freeze]: a value/type shape mismatch
@@ -335,9 +327,6 @@ Lemma I2F_freeze_gen {E1 E2}
   {Rcutl : pred1 E1} {Rcutr : pred1 E2}
   {REv : prerel E1 E2} {RAns : postrel E1 E2}
   (Hdraw : forall dt, ruttc Rcutl Rcutr REv RAns I2F_dvalue (draw dt) (draw dt))
-  (HdrawB : ruttc Rcutl Rcutr REv RAns Logic.eq
-              (trigger (@DrawBool PInf) : itree E1 bool)
-              (trigger (@DrawBool PFin) : itree E2 bool))
   (HThrow : forall u1 u2 : unit,
       REv void void (subevent _ (Throw u1)) (subevent _ (Throw u2)))
   (dt:dtyp) (a : @dvalue PInf) (b : @dvalue PFin) :
@@ -346,7 +335,7 @@ Lemma I2F_freeze_gen {E1 E2}
 Proof.
   intros HDV; revert dt.
   induction HDV as [b1 b2 HB | p s1 s2 HF IH | v s1 s2 HF IH]; intros dt.
-  - rewrite 2 freeze_Base_eq; now apply (I2F_freeze_base_gen Hdraw HdrawB).
+  - rewrite 2 freeze_Base_eq; now apply (I2F_freeze_base_gen Hdraw).
   - rewrite 2 freeze_Struct_eq.
     destruct dt; try now apply I2F_raise_gen.
     rbind (Forall2 I2F_dvalue).
@@ -359,27 +348,23 @@ Proof.
     + intros ?? HR; apply ruttc_ret; now constructor.
 Qed.
 
-(** [draw] and [DrawBool] refined by themselves at the MCFG signature ---
-      the event-triggering steps of [freeze]/[freeze_base]. *)
+(** [draw] refined by itself at the MCFG signature --- the sole
+      event-triggering step of [freeze]/[freeze_base]. *)
 Lemma I2F_draw_MCFG : forall dt,
     I2F_refine_MCFG I2F_dvalue (draw dt) (draw dt).
 Proof. intros; unfold I2F_refine_MCFG, draw; rstep. Qed.
 
-Lemma I2F_drawB_MCFG :
-    I2F_refine_MCFG Logic.eq (trigger (@DrawBool PInf)) (trigger (@DrawBool PFin)).
-Proof. unfold I2F_refine_MCFG; rstep. Qed.
-
 Lemma I2F_freeze_base dt a b :
   I2F_dvalue_base a b ->
   I2F_refine (freeze_base dt a) (freeze_base dt b).
-Proof. intros H; unfold I2F_refine, I2F_refine_MCFG; now apply (I2F_freeze_base_gen I2F_draw_MCFG I2F_drawB_MCFG). Qed.
+Proof. intros H; unfold I2F_refine, I2F_refine_MCFG; now apply (I2F_freeze_base_gen I2F_draw_MCFG). Qed.
 
 Lemma I2F_freeze dt a b :
   I2F_dvalue a b ->
   I2F_refine (freeze dt a) (freeze dt b).
 Proof.
   intros H; unfold I2F_refine, I2F_refine_MCFG;
-    now apply (I2F_freeze_gen I2F_draw_MCFG I2F_drawB_MCFG I2FE_MCFG_Throw).
+    now apply (I2F_freeze_gen I2F_draw_MCFG I2FE_MCFG_Throw).
 Qed.
 
 (** The pure content of the [EXP_Integer] case, and the one place where

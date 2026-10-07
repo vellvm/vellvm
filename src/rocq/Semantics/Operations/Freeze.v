@@ -18,7 +18,7 @@ Open Scope N_scope.
 
     Semantics of the [freeze] instruction: poison is replaced by an
     arbitrary-but-fixed value obtained from a [draw] event, and byte values
-    are frozen bit by bit, each poison bit by a [DrawBool] event. *)
+    are frozen bit by bit. *)
 
 Section Freeze.
   Context {Pa : Params}.
@@ -26,15 +26,15 @@ Section Freeze.
   (** ** Freezing a byte value
 
       LangRef ('freeze'): "Values of the byte type are frozen on a per-bit
-      basis."  A poison bit becomes an arbitrary-but-fixed integer bit,
-      chosen by a [DrawBool] event; integer and pointer bits are left
-      alone, provenance included. *)
-  Definition freeze_bit {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (b:memory_bit) : itree E memory_bit :=
-    match b with
-    | Bit_psn =>
-        x <- trigger DrawBool ;;
-        ret (Bit_bit (repr (if (x:bool) then 1 else 0)))
-    | b => ret b
+      basis."  Poison bit [i] becomes bit [i] of the arbitrary-but-fixed
+      integer [z]; integer and pointer bits are left alone, provenance
+      included. *)
+  Fixpoint freeze_bits (z : Z) (i : N) (bits : list memory_bit) : list memory_bit :=
+    match bits with
+    | [] => []
+    | Bit_psn :: rest =>
+        Bit_bit (repr (if Z.testbit z (Z.of_N i) then 1 else 0)) :: freeze_bits z (1 + i) rest
+    | b :: rest => b :: freeze_bits z (1 + i) rest
     end.
 
   (* The frozen bits, re-canonicalised: once the poison is gone the byte is
@@ -42,24 +42,30 @@ Section Freeze.
      [BYTE_Mixed].  It cannot have become a [BYTE_Pointer] chunk: it still
      has pointer bits, but at least one former poison bit is now an integer
      bit. *)
-  Definition freeze_mixed_bits {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} sz (bits : list memory_bit) : itree E (dvalue_bv sz) :=
-    bits' <- map_monad freeze_bit bits ;;
-    if forallb is_int_bit bits' then ret (BYTE_I (repr (int_bits_to_Z bits')))
-    else ret (BYTE_Mixed sz bits').
+  Definition freeze_mixed_bits sz (z : Z) (bits : list memory_bit) : dvalue_bv sz :=
+    let bits' := freeze_bits z 0 bits in
+    if forallb is_int_bit bits' then BYTE_I (repr (int_bits_to_Z bits'))
+    else BYTE_Mixed sz bits'.
 
   (** ** Freezing a [dvalue] *)
 
   Definition freeze_base {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dt:dtyp) (dv : dvalue_base) : itree E dvalue :=
     match dv with
     | DVALUE_Poison => draw dt
-    (* bytes freeze per bit *)
+    (* bytes freeze per bit: draw the replacement bits as an integer of the
+       byte's width (a non-integer answer leaves them all 0) *)
     | @DVALUE_B _ sz (BYTE_Mixed bits) =>
         if existsb is_poison_bit bits then
-          dv <- freeze_mixed_bits sz bits ;;
-          ret (DVALUE_Base (DVALUE_B dv))
+          x <- draw (DTYPE_I sz) ;;
+          let z := match x with
+                   | DVALUE_Base (DVALUE_I _ i) => unsigned i
+                   | _ => 0%Z
+                   end in
+          ret (DVALUE_Base (DVALUE_B (freeze_mixed_bits sz z bits)))
         else DVALUE_Base <$> ret dv
     | _ => DVALUE_Base <$> ret dv
     end.
+
 
   Definition freeze {E} `{DrawE -< E} `{FailureE -< E} `{OOME -< E} `{UBE -< E} (dt:dtyp) (dv:dvalue) : itree E dvalue :=
     let f := fix freeze_h dv : dtyp -> itree E dvalue :=
