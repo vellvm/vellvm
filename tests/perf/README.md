@@ -40,6 +40,7 @@ the expected result; update the `ASSERT EQ` accordingly).
 | `iptr-roundtrip.ll` | `ptrtoint`/`inttoptr` round trips and loads through recovered pointers: the ITOP/PTOI + provenance machinery. | loop bound |
 | `undef-pick.ll` | the uvalue side: values kept symbolic (`undef` + select), stored (symbolic byte serialization) and branched on (Pick/concretization). | loop bound |
 | `vector-ops.ll` | vector element access: a loop-carried `<64 x i64>` with one insertelement + one extractelement per iteration. Vectors are dvalue lists, so lane access is a linear walk and each insert rebuilds the vector. (`shufflevector` is unimplemented and untestable.) | loop bound / vector width |
+| `freeze_bit.ll` | per-bit `freeze` of a byte value: a `b512` with one defined byte (504 poison bits) loaded once and frozen 20000 times; the result is converted only after the loop, so the body is just the freeze. Each freeze is one `Draw` at `i512` plus a pass over the bits (`freeze_mixed_bits`), ~0.2 ms here. A one-`DrawBool`-per-poison-bit variant (branch `freeze-drawbool`) was ~3–4× slower, and quadratic in the poison-bit count while its bit loop used `map_monad`. | poison-bit count (width) / loop bound |
 | `global-init.ll` | startup initialization of a `[65536 x i64] zeroinitializer` global: denoting the aggregate + serializing 512 KiB through the byte-level write path. Guards a fixed stack-overflow: allocation/write of a large global used to crash around `[32768 x i64]` via five separate non-tail recursions on the same path (`N.recursion` in poison-byte generation, `IntMaps.add_all_index`, `map`/`List.concat` in the allocation-tagging path, and `memS_bind`'s eager `Mput` — the one non-closure-wrapped case in the memory free monad). All five are now accumulator-based/closure-wrapped; scaling above this size is a performance question, not a correctness one (confirmed up to 524288 elements/34s). | array size |
 
 Reference timings (Apple Silicon, July 2026, after switching the
@@ -59,7 +60,8 @@ calls-large-fn 2.7 s · calls-many-fns 3.7 s · switch-cases 3.5 s (was
 memcpy-chunk 3.7 s (at 8 KiB;
 was 72 s before the map_monad_acc fix) · memset-chunk 2.3 s ·
 alloca-large 2.6 s · vector-ops 2.1 s ·
-global-init 0.9 s (at 65536 elements; used to crash at ~32768).
+global-init 0.9 s (at 65536 elements; used to crash at ~32768) ·
+freeze_bit 4.2 s (October 2026).
 
 These are for orientation only — always re-measure the baseline on your own machine
 before comparing.
