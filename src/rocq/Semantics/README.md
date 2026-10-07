@@ -14,7 +14,7 @@ concrete instances live in `Implementations/`.
 - `VellvmFloats.v`           `VFloat` typeclass interface for the floating-point operations
 - `DynamicValues.v`          dynamic values (`dvalue`) computed by programs, and the operations over them
 - `LLVMEvents.v`             inventory of the LLVM events (`GlobalE`, `LocalE`, `StackE`, `MemoryE`, `DrawE`, calls, intrinsics, exceptions, UB, OOM, failure, debug) and the event signatures (`CFGEtop`, `MCFGEtop`, ...) used at each interpretation level
-- `MemoryBytes.v`            byte-level manipulation of integers (extraction/concatenation of bytes)
+- `MemoryBytes.v`            the byte-level serializer (`dvalue_to_memory_bytes`) and deserializer (`memory_bytes_to_dvalue`) that loads, stores and `bitcast` go through; their theory is in `../Theory/MemoryBytesFacts.v`
 
 ## Parameters of the semantics
 
@@ -34,7 +34,7 @@ concrete instances live in `Implementations/`.
 
 ## Denotation
 
-- `Operations/`              semantics of the individual operations: `Gep.v`, `Select.v`, `Compare.v`, `Conversion.v` (re-exported by `Operations.v`)
+- `Operations/`              semantics of the individual operations: `Gep.v`, `Select.v`, `Compare.v`, `Conversion.v`, `Freeze.v` (re-exported by `Operations.v`)
 - `IntrinsicsDefinitions.v`  declarations and semantics of the supported LLVM intrinsics
 - `Denotation.v`             representation function: VIR syntax to uninterpreted interaction trees
 - `Libraries.v`              denotation of natively supported library functions (`putchar`, `puts`, ...) linked against programs

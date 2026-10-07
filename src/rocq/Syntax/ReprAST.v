@@ -138,6 +138,7 @@ Section ReprInstances.
   Fixpoint repr_typ (t : typ) : string :=
     match t with
     | TYPE_I sz                 => "(TYPE_I " ++ repr sz ++ ")"
+    | TYPE_B sz                 => "(TYPE_B " ++ repr sz ++ ")"
     | TYPE_Iptr                 => "TYPE_Iptr"
     | TYPE_Pointer (Some t)     => "(TYPE_Pointer (Some " ++ repr_typ t ++ "))"
     | TYPE_Pointer None         => "(TYPE_Pointer None)"
@@ -445,8 +446,8 @@ Section ReprInstances.
     | EXP_Poison => "EXP_Poison"
     | EXP_Struct fields => "(EXP_Struct [" ++ (contents id (List.map texp fields)) ++ "])"
     | EXP_Packed_struct fields => "(EXP_Packed_struct [" ++ (contents id (List.map texp fields)) ++ "])"
-    | EXP_Array t fields => "(EXP_Array (" ++ repr t ++ ")" ++ " [" ++ (contents id (List.map texp fields)) ++ "])"
-    | EXP_Vector t fields => "(EXP_vector (" ++ repr t ++ ")" ++ " [" ++ (contents id (List.map texp fields)) ++ "])"
+    | EXP_Array fields => "(EXP_Array [" ++ (contents id (List.map texp fields)) ++ "])"
+    | EXP_Vector fields => "(EXP_vector [" ++ (contents id (List.map texp fields)) ++ "])"
     | OP_IBinop iop t v1 v2 =>
       "(OP_IBinop " ++ repr iop ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_ICmp s cmp t v1 v2 =>
@@ -568,6 +569,7 @@ Section ReprInstances.
     | PARAMATTR_Dead_on_unwind => "PARAMATTR_Dead_on_unwind"
     | PARAMATTR_Range t a b => "(PARAMATTR_Range " ++ repr t ++ " " ++ repr a ++ " " ++ repr b ++ ")"
     | PARAMATTR_Initializes l => "(PARAMATTR_Initializes " ++ repr l ++ ")"
+    | PARAMATTR_Captures p => "(PARAMATTR_Captures " ++ repr p ++ ")"
     end.
 
   #[global]

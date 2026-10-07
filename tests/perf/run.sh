@@ -16,7 +16,9 @@ printf '%-22s %10s  %s\n' "test" "seconds" "assertions"
 for f in "$here"/*.ll; do
   name="$(basename "$f")"
   start=$(python3 -c 'import time; print(time.monotonic())')
-  out="$(cd "$src" && ./vellvm -test-file "$f" 2>&1)"
+  # -L must precede -test-file: the -test* options stop argument processing.
+  # libll supplies printf and friends, which some tests call.
+  out="$(cd "$src" && ./vellvm -L libll -test-file "$f" 2>&1)"
   end=$(python3 -c 'import time; print(time.monotonic())')
   secs=$(python3 -c "print(f'{$end - $start:.2f}')")
   passed="$(printf '%s\n' "$out" | grep -E '^Passed:' || echo 'no result')"

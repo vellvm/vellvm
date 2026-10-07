@@ -14,9 +14,9 @@ Section Compare.
        | DVALUE_I sz1 i1, DVALUE_I sz2 i2 =>
            _
        | DVALUE_Iptr i1, DVALUE_Iptr i2 => eval_int_icmp samesign icmp i1 i2
-       | DVALUE_Poison t1, DVALUE_Poison t2 => ret (DVALUE_Poison t1)
-       | DVALUE_Poison t, _ => if is_DVALUE_IX v2 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
-       | _, DVALUE_Poison t => if is_DVALUE_IX v1 then ret (DVALUE_Poison t) else raise_error "ill_typed-iop"
+       | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
+       | DVALUE_Poison, _ => if is_DVALUE_IX v2 then ret DVALUE_Poison else raise_error "ill_typed-iop"
+       | _, DVALUE_Poison => if is_DVALUE_IX v1 then ret DVALUE_Poison else raise_error "ill_typed-iop"
        | DVALUE_Pointer a1, DVALUE_Pointer a2 =>
            let i1 := ptr_to_int a1 in
            let i2 := ptr_to_int a2 in
@@ -31,14 +31,14 @@ Section Compare.
 
   Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOU dvalue :=
     match v1, v2 with
-    | (DVALUE_Array true t elts1), (DVALUE_Array true _ elts2) =>
+    | (DVALUE_Array true elts1), (DVALUE_Array true elts2) =>
         let n := N.length elts1 in
         let m := N.length elts2 in
         if (n =? m)%N  then
           elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
           elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
           val <- vec_loop (eval_icmp_base samesign icmp) (List.combine elts1' elts2') ;;
-          ret (DVALUE_Array true (DTYPE_Array true n (DTYPE_I 1)) (List.map DVALUE_Base val))
+          ret (DVALUE_Array true (List.map DVALUE_Base val))
         else
           raise_ub "icmp of different-length vectors"
     | DVALUE_Base v1, DVALUE_Base v2 => DVALUE_Base <$> (eval_icmp_base samesign icmp v1 v2)

@@ -131,7 +131,7 @@ Section Convert.
             then ret (DVALUE_I sz_to (repr (unsigned i1)))
             else raise_error "i-to-i ill-typed Trunc"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_I sz_to =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Trunc"
@@ -144,7 +144,7 @@ Section Convert.
             then ret (DVALUE_I sz_to (repr (unsigned i1)))
             else raise_error "i-to-i ill-typed Zext"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_I sz_to =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Zext"
@@ -157,7 +157,7 @@ Section Convert.
             then ret (DVALUE_I sz_to (repr (signed i1)))
             else raise_error "i-to-i ill-typed Sext"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_I sz_to =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_I sz_to =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Sext"
@@ -175,7 +175,7 @@ Section Convert.
             then ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
             else raise_error "i-to-double ill-typed Uitofp"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_FP _ =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Uitofp"
@@ -193,7 +193,7 @@ Section Convert.
             then ret (DVALUE_Double (Float.of_long (repr (signed i1))))
             else raise_error "i-to-double ill-typed Sitofp"
 
-        | DTYPE_I sz_t, DVALUE_Poison t, DTYPE_FP _ =>
+        | DTYPE_I sz_t, DVALUE_Poison, DTYPE_FP _ =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Sitofp"
@@ -216,7 +216,7 @@ Section Convert.
             | Some z => ret (DVALUE_I sz_t (repr z))
             end
               
-        | DTYPE_FP _, DVALUE_Poison t, DTYPE_I _ =>
+        | DTYPE_FP _, DVALUE_Poison, DTYPE_I _ =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Fptoui"
@@ -239,7 +239,7 @@ Section Convert.
             | Some z => ret (DVALUE_I sz_t (repr z))
             end
               
-        | DTYPE_FP _, DVALUE_Poison t, DTYPE_I _ =>
+        | DTYPE_FP _, DVALUE_Poison, DTYPE_I _ =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Fptosi"
@@ -251,7 +251,7 @@ Section Convert.
         | DTYPE_FP FP_float, DVALUE_Float f, DTYPE_FP FP_double  =>
             ret (DVALUE_Double (float_to_double f))
 
-        | DTYPE_FP FP_float, DVALUE_Poison t, DTYPE_FP FP_double =>
+        | DTYPE_FP FP_float, DVALUE_Poison, DTYPE_FP FP_double =>
             ret (dvp t2)
            
         | _, _, _ => raise_error "ill-typed Fpext"
@@ -267,7 +267,7 @@ Section Convert.
         | DTYPE_FP FP_double, DVALUE_Double f, DTYPE_FP FP_float =>
             ret (DVALUE_Float (double_to_float f))
 
-        | DTYPE_FP FP_double, DVALUE_Poison t, DTYPE_FP FP_float =>
+        | DTYPE_FP FP_double, DVALUE_Poison, DTYPE_FP FP_float =>
             ret (dvp t2)
 
         | _, _, _ => raise_error "ill-typed Fptrunc"
@@ -306,12 +306,12 @@ Section Convert.
             raise_error "convert_pure: type mismatch"
         end
           
-    | (DVALUE_Array true (DTYPE_Array true sz t) elts1) =>
+    | (DVALUE_Array true elts1) =>
         match get_vector_conversion_type t_from t_to with
         | Some (t_from', t_to') =>
               elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
               val <- map_monad (fun v => convert_pure_base conv t_from' v t_to') elts1' ;;
-              ret (DVALUE_Array true (DTYPE_Array true sz t_to') (List.map DVALUE_Base val))
+              ret (DVALUE_Array true (List.map DVALUE_Base val))
 
         | None =>
             raise_error "convert_pure: type or vector size mismatch"
@@ -329,8 +329,10 @@ Section Convert.
         then ret dv
         else if bit_sizeof_dtyp t_from =? bit_sizeof_dtyp t_to
              then
-               let bytes := dvalue_to_memory_bytes dv t_from in
-               EOU_to_itree (memory_bytes_to_dvalue bytes t_to)
+               EOU_to_itree (
+                   bytes <- dvalue_to_memory_bytes t_from dv None ;;
+                   memory_bytes_to_dvalue bytes t_to
+                 )
              else raise "unequal bitsize in cast"
     | CONV_Pure ct =>
         EOU_to_itree (convert_pure ct t_from dv t_to)

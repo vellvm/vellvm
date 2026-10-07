@@ -158,6 +158,7 @@ Section ShowInstances.
   Fixpoint dshow_typ (t : typ) : DString  :=
     match t with
     | TYPE_I sz                 => sd "i" @@ sd (show sz)
+    | TYPE_B sz                 => sd "b" @@ sd (show sz)                                     
     | TYPE_Iptr                 => sd "iptr"
     | TYPE_Pointer (Some t)     => dshow_typ t @@ sd "*"
     | TYPE_Pointer None         => sd "ptr"
@@ -302,6 +303,14 @@ Section ShowInstances.
   Definition dshow_pair_list {A} `{Show A} (l:list (A*A)) : DString :=
     dconcat (sd ", ") (List.map (fun x => sd (show x)) l).
 
+  Definition dshow_capture (p : ((list string) * (list string))) : DString :=
+    match p with
+    | ([], []) => sd "none"
+    | (l, []) => (dconcat (sd ", ") (List.map sd l))
+    | (l, r) => (dconcat (sd ", ") (List.map sd l)) @@ (sd " ret:") @@
+                 (dconcat (sd ", ") (List.map sd r))
+    end.
+  
   Definition show_param_attr (p : param_attr) : DString :=
     match p with
     | PARAMATTR_Zeroext => sd "zeroext"
@@ -340,6 +349,7 @@ Section ShowInstances.
                                           @@ sd (show a) @@ sd ", " 
                                           @@ sd (show b) @@ sd ")"
     | PARAMATTR_Initializes l => sd "initializes(" @@ (dshow_pair_list l) @@ sd ")"
+    | PARAMATTR_Captures l => sd "captures(" @@ (dshow_capture l) @@ sd ")"                                   
     end.
 
   #[global] Instance dshowParamAttr : DShow param_attr
@@ -731,10 +741,10 @@ Section ShowInstances.
     | EXP_Packed_struct fields =>
         sd "<{" @@ comma_sep fields @@ sd "}>"
 
-    | EXP_Array t elts =>
+    | EXP_Array elts =>
         sd "[" @@ comma_sep elts @@ sd "]"
 
-    | EXP_Vector t elts =>
+    | EXP_Vector elts =>
         sd "<" @@ comma_sep elts @@ sd ">"
 
     | OP_IBinop iop t v1 v2 =>

@@ -44,6 +44,7 @@ Definition Dtyp_base_alignment (dt : dtyp_base) : alignment :=
                   else Build_alignment 4 8
   end.  
 
+(* Default alignment matching LLVMs defaults *)
 Definition max_alignment (a b : alignment) : alignment :=
   Build_alignment
     (N.max (abi_alignment a) (abi_alignment b))
@@ -67,12 +68,11 @@ Fixpoint Dtyp_alignment (dt : dtyp) : alignment :=
   | DTYPE_Array v sz t => Dtyp_alignment t
   end.
 
+(* Same shape as [Dtyp_alignment]'s struct fold, and as the [Sizeof]-generic
+   [Interfaces.Sizeof.max_preferred_dtyp_alignment]; the three then agree
+   definitionally at [SizeofV]. *)
 Definition max_preferred_dtyp_alignment (dts : list dtyp) : N :=
-  match maximumByOpt (fun dt1 dt2 => preferred_alignment (Dtyp_alignment dt1) <? preferred_alignment (Dtyp_alignment dt2))%N dts with
-  | Some dt =>
-      preferred_alignment (Dtyp_alignment dt)
-  | None => 1
-  end.
+  fold_left (fun acc dt => N.max acc (preferred_alignment (Dtyp_alignment dt))) dts 1%N.
 
 Definition round_up_to_eight (n : N) : N :=
   if N.eqb 0 n
@@ -125,7 +125,7 @@ Fixpoint Bit_sizeof_dtyp (ty : dtyp) : N :=
 Definition Sizeof_dtyp_base (ty:dtyp_base) : N :=
   match ty with
   | DTYPE_Void         => 0
-  | DTYPE_I sz         => N.max 1 (N.div (Npos sz) 8)
+  | DTYPE_I sz         => N.div (round_up_to_eight (Npos sz)) 8
   | DTYPE_Iptr         => N.of_nat ptr_size
   | DTYPE_Pointer      => N.of_nat ptr_size
   | DTYPE_FP fp        => byte_sizeof_floating_point_variant fp
@@ -134,36 +134,99 @@ Definition Sizeof_dtyp_base (ty:dtyp_base) : N :=
   | DTYPE_Metadata     => 0
   | DTYPE_X86_mmx      => 8 (* TODO: Unsupported *)
   | DTYPE_Opaque       => 0 (* TODO: Unsupported *)
-  | DTYPE_B sz         => N.max 1 (N.div (Npos sz) 8)
+  | DTYPE_B sz         => N.div (round_up_to_eight (Npos sz)) 8
   end.
+
                            
-Fixpoint Sizeof_dtyp (ty:dtyp) : N :=
+(* The store size.  At each recursive position the *alloc* size is what a
+   layout advances by, so [pad_to_align (Dtyp_alignment t) (Store_size_dtyp t)]
+   is inlined here -- that is exactly [alloc_size_dtyp t] once [SizeofV] is in
+   scope, which [Store_size_alloc_size] below records. *)
+Fixpoint Store_size_dtyp (ty:dtyp) : N :=
+  let Alloc_size_dtyp t := pad_to_align (Dtyp_alignment t) (Store_size_dtyp t) in
   match ty with
   | DTYPE_Base t => Sizeof_dtyp_base t
   | DTYPE_Struct true l =>
-      fold_left (fun acc x => (acc + Sizeof_dtyp x)%N) l 0%N
+      (* packed: no offset alignment and no tail padding, but fields still
+         advance by their alloc size (cf. LLVM's StructLayout) *)
+      fold_left (fun acc x => (acc + Alloc_size_dtyp x)%N) l 0%N
   | DTYPE_Struct false l =>
-      let sz := fold_left (fun acc x => pad_to_align (Dtyp_alignment x) acc + (Sizeof_dtyp x)%N) l 0%N in
+      let sz := fold_left (fun acc x => pad_to_align (Dtyp_alignment x) acc + (Alloc_size_dtyp x)%N) l 0%N in
       let max_align := max_preferred_dtyp_alignment l in
       pad_to max_align sz
   | DTYPE_Array false sz ty' =>
-      sz * (Sizeof_dtyp ty')
+      sz * (Alloc_size_dtyp ty')
   | DTYPE_Array true sz ty' =>
-  (* TODO: Vector sizeof currently invalid for sub-bytesize / non-byte aligned elements. Changing this involves changing serialization. *)
-      sz * (Sizeof_dtyp ty')
+      (* vectors are bit-packed: elements are contiguous *)
+      sz * (Store_size_dtyp ty')
   end.
 
 Instance SizeofV : Sizeof :=
   {|
     bit_sizeof_dtyp := Bit_sizeof_dtyp ;
-    sizeof_dtyp := Sizeof_dtyp ;
+    store_size_dtyp := Store_size_dtyp ;
     dtyp_alignment := Dtyp_alignment
   |}.
 
-Instance SizeofTheoryV : @SizeofTheory SizeofV.
+(* [alloc_size_dtyp] at [SizeofV] is the [Alloc_size_dtyp] inlined above. *)
+Lemma Store_size_alloc_size : forall t,
+    @alloc_size_dtyp SizeofV t = pad_to_align (Dtyp_alignment t) (Store_size_dtyp t).
+Proof. reflexivity. Qed.
+
+Lemma struct_fields_extent_V : forall packed l,
+    @struct_fields_extent SizeofV packed l =
+      fold_left (fun acc x =>
+                   N.add (if packed then acc else pad_to_align (Dtyp_alignment x) acc)
+                         (pad_to_align (Dtyp_alignment x) (Store_size_dtyp x))) l 0%N.
+Proof. reflexivity. Qed.
+
+(* The preferred alignment of a non-packed struct is the running max over its
+   fields -- which is exactly how [max_preferred_dtyp_alignment] is defined.
+   Both sides are a [fold_left]; only the accumulator type differs, so the
+   induction just has to commute [preferred_alignment] with the fold. *)
+Lemma preferred_Dtyp_alignment_Struct : forall dts,
+    preferred_alignment (Dtyp_alignment (DTYPE_Struct false dts))
+    = max_preferred_dtyp_alignment dts.
 Proof.
-  constructor; eauto.
-  lia.
-  intros. destruct v; auto.
+  intros dts; cbn [Dtyp_alignment]; unfold max_preferred_dtyp_alignment.
+  assert (H : forall ds acc n, preferred_alignment acc = n ->
+             preferred_alignment
+               (fold_left (fun a f => max_alignment a (Dtyp_alignment f)) ds acc)
+             = fold_left (fun a dt => N.max a (preferred_alignment (Dtyp_alignment dt))) ds n).
+  { intros ds; induction ds as [| d ds' IH]; intros acc n Heq; cbn; auto.
+    apply IH; cbn; now rewrite Heq. }
+  now apply H.
 Qed.
 
+(* [round_up_to_eight n / 8] is ceiling division by 8, which is how the
+   interface states a base type's byte count. *)
+Lemma round_up_to_eight_div : forall n,
+    (0 < n)%N -> (round_up_to_eight n / 8 = (n + 7) / 8)%N.
+Proof.
+  intros n H; unfold round_up_to_eight.
+  destruct (N.eqb_spec 0 n); [lia |].
+  rewrite N.div_mul by lia.
+  replace (n + 7)%N with ((n - 1) + 1 * 8)%N by lia.
+  rewrite N.div_add by lia; reflexivity.
+Qed.
+
+Instance SizeofTheoryV : @SizeofTheory SizeofV.
+Proof.
+  (* the size laws hold by computation: [struct_fields_extent] and
+     [alloc_size_dtyp] at [SizeofV] are exactly the forms inlined in
+     [Store_size_dtyp] *)
+  constructor; try reflexivity.
+  - lia.
+  - (* [DTYPE_I sz] occupies ceil(sz/8) bytes *)
+    intros sz; cbn [store_size_dtyp SizeofV Store_size_dtyp Sizeof_dtyp_base].
+    apply round_up_to_eight_div; lia.
+  - (* likewise [DTYPE_B sz] *)
+    intros sz; cbn [store_size_dtyp SizeofV Store_size_dtyp Sizeof_dtyp_base].
+    apply round_up_to_eight_div; lia.
+  - (* a non-packed struct is self-aligned: its store size already ends in
+       [pad_to (max_preferred_dtyp_alignment dts) _] *)
+    intros dts.
+    unfold alloc_size_dtyp, pad_to_align; cbn [dtyp_alignment SizeofV].
+    rewrite preferred_Dtyp_alignment_Struct.
+    cbn [store_size_dtyp SizeofV Store_size_dtyp]; apply pad_to_idem.
+Qed.

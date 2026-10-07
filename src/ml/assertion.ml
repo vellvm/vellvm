@@ -18,6 +18,7 @@ type test =
   | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.dvalue list
   | SuccessTest of function_id * DV.dvalue list
   | FailsTest of function_id * DV.dvalue list
+  | UBTest of int * function_id * DV.dvalue list
 
 
 (* Directly converts a piece of syntax to a dtyp without going through
@@ -81,13 +82,11 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
       DVALUE_Struct (false, List.map texp_to_dvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts ->
       DVALUE_Struct (true, List.map texp_to_dvalue elts)
-  | TYPE_Array _, EXP_Array (t, elts) ->
-     let dt = typ_to_dtyp t in
-     DVALUE_Array (false, dt, (List.map texp_to_dvalue elts))
-  | TYPE_Vector _, EXP_Vector (t, elts) ->
-     let dt = typ_to_dtyp t in
-     DVALUE_Array (true, dt, (List.map texp_to_dvalue elts))
-  | _, EXP_Poison -> (DVALUE_Base (DVALUE_Poison (typ_to_dtyp typ)))
+  | TYPE_Array (sz, t), EXP_Array elts ->
+     DVALUE_Array (false, List.map texp_to_dvalue elts)
+  | TYPE_Vector _, EXP_Vector elts ->
+     DVALUE_Array (true, List.map texp_to_dvalue elts)
+  | _, EXP_Poison -> (DVALUE_Base DVALUE_Poison)
   | _, _ ->
       failwith
         (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
@@ -117,6 +116,7 @@ let rec parse_assertion (line : string) : test list =
       [ parse_eq_assertion line
       ; parse_succeeds_assertion line
       ; parse_fails_assertion line
+      ; parse_ub_assertion line
       ]
     in
     List.flatten assertions
@@ -184,6 +184,26 @@ and parse_fails_assertion (line : string) : test list =
     let fn, args = instr_to_call_data r in
     [FailsTest (fn, args)]
 
+and parse_ub_assertion (line : string) : test list =
+  (* ws* "ASSERT" ws+ "UB" ws+ N+ ws* ':' ws*  (anything+ as r) *)
+  let regex = "^[ \t]*;[ \t]*ASSERT[ \t]+UB[ \t]+\\([0-9]+\\)[ \t]*:[ \t]*\\(.*\\)" in
+  if not (Str.string_match (Str.regexp regex) line 0) then
+    (* let _ = print_endline ("no match: " ^ line) in *)
+    []
+  else
+    let line_no_str = Str.matched_group 1 line in
+    (* let _ = Printf.printf "UB test line: %s\n" line_no_str in *)
+    let rhs = Str.matched_group 2 line in
+    (* let _ = print_endline ("rhs: " ^ rhs) in *)
+    let r =
+      try Llvm_lexer.parse_test_call (Lexing.from_string rhs)
+      with _ -> failwith (Printf.sprintf "ill-formed assert UB: %s" rhs)
+    in
+    (* let _ = print_endline "parsed rhs" in *)
+    let fn, args = instr_to_call_data r in
+    [UBTest (int_of_string line_no_str, fn, args)]
+  
+
 (* Semantics of ASSERT EQ ty expected = call @f(args):
 
    If expected is `poison` then the call should result in poison.
@@ -215,7 +235,7 @@ let dvalue_eq_assertion name (ty:DynamicTypes.dtyp) (expected : DV.dvalue) (got 
       (Interpreter.string_of_dvalue result) (Interpreter.string_of_dvalue expected) 
   in
   begin match expected with
-  | DVALUE_Base (DV.DVALUE_Poison _) -> compare_dvalues_exn expected result msg
+  | DVALUE_Base DV.DVALUE_Poison -> compare_dvalues_exn expected result msg
   | _ ->
      (* Use the semantic "cmp eq" for these types *)
      begin match ty with
@@ -266,6 +286,20 @@ let make_test_h run name ll_ast t : (string * Assert.assertion) option =
      in
      let t_void = typ_to_dtyp (LLVMAst.TYPE_Void) in
      Some (str, (fun () -> ignore (run_to_value t_void entry args ll_ast ())))
+
+  | UBTest (expected_line_no, entry, args) ->
+     let expected_str = Printf.sprintf "UB expected on line %d" expected_line_no in
+     let t_void = typ_to_dtyp (LLVMAst.TYPE_Void) in     
+     let result () =
+       match run t_void entry args ll_ast with
+       | Ok dv ->
+          let dv_str = Interpreter.string_of_dvalue dv in
+          let err_str = Printf.sprintf "%s but got %s" expected_str dv_str in
+          failwith err_str
+       | Error (UndefinedBehavior ans) -> ()
+       | Error e -> failwith (Result.string_of_exit_condition e)
+     in
+     Some (expected_str, result)
 
   | FailsTest (entry, args) ->
       let str =
