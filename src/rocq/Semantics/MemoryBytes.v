@@ -177,15 +177,8 @@ Section MemoryByte.
     end.
 
   
-  (* Computes the memory byte at index [idx] of the dvalue_base.
-     Only valid if 0 <= [idx] < size_of_dv_base dvalue_base.
-
-     TODO: 
-     If the size of the dv in bits is not a multiple of 8, i.e. is such that
-        n = [(bit_size dv) mod 8 <> 0]
-     Then the last memory_byte should be of the form
-        BYTE_Mixed [Bit_bit x1, .. , Bit_bit xn, Bit_psn, .. Bit_psn]
-     where 
+  (* Accumulates the memory_byte representation of [dv] at the store size of
+     the dynamic type [dt].  Returns the new offset and list of memory_bytes.
    *)
   Definition acc_memory_bytes_of_dvalue_base (dt:dtyp_base)
     (dv:dvalue_base) (offset : N) (acc : list memory_byte)
@@ -212,26 +205,6 @@ Section MemoryByte.
          it is used to decide when to accumulate padding
      [pad_to] gives an (option) target that determines the amount of padding
          added to the end of the dvalue.
-
-
-
-            (* Handle padding at the end of the structure *)
-            let padding :=
-              match pad with
-              | Some max_pad
-                => Sizeof.pad_amount max_pad offset
-              | None =>
-                  0%N
-              end
-            in
-            if N.ltb  padding
-            then
-              (* Indexing into padding bytes *)
-              (* TODO: currently we pad with poison bytes. *)
-              ret poison_memory_byte
-            else
-              raise_error "No fields left for byte-indexing..."
-
    *)
   Fixpoint acc_dvalue_to_memory_bytes_h
     (dt:dtyp)
