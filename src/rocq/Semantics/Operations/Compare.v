@@ -8,6 +8,14 @@ From Vellvm Require Import
 Section Compare.
   Context {Pa : Params}.
 
+  (* The scalar operands [icmp] accepts (LangRef: "integer or pointer
+     typed"): comparing poison with any of them yields poison. *)
+  Definition is_icmp_operand (d : dvalue_base) : bool :=
+    match d with
+    | DVALUE_I _ _ | DVALUE_Iptr _ | DVALUE_Pointer _ => true
+    | _ => false
+    end.
+
   Definition eval_icmp_base (samesign:bool) (icmp : icmp) (v1 v2 : dvalue_base) : EOU dvalue_base.
     refine
       (match v1, v2 with
@@ -15,8 +23,8 @@ Section Compare.
            _
        | DVALUE_Iptr i1, DVALUE_Iptr i2 => eval_int_icmp samesign icmp i1 i2
        | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
-       | DVALUE_Poison, _ => if is_DVALUE_IX v2 then ret DVALUE_Poison else raise_error "ill_typed-iop"
-       | _, DVALUE_Poison => if is_DVALUE_IX v1 then ret DVALUE_Poison else raise_error "ill_typed-iop"
+       | DVALUE_Poison, _ => if is_icmp_operand v2 then ret DVALUE_Poison else raise_error "ill_typed-iop"
+       | _, DVALUE_Poison => if is_icmp_operand v1 then ret DVALUE_Poison else raise_error "ill_typed-iop"
        | DVALUE_Pointer a1, DVALUE_Pointer a2 =>
            let i1 := ptr_to_int a1 in
            let i2 := ptr_to_int a2 in
