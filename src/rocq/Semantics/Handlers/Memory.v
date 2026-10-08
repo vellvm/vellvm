@@ -54,7 +54,10 @@ Section withParams.
   Definition next_key_with_alignment {A} (m : IntMap A) (align : N) : Z :=
     match IM_greatest_key m with
     | Some k => Z.of_N (pad_to align (1 + Z.to_N k))
-    | None => 0
+    (* Never allocate at address 0: that is null's address, and no allocated
+       object (function, global, alloca, heap block) may compare equal to
+       null. *)
+    | None => Z.of_N (pad_to align 1)
     end.
 
   Fixpoint memM_interp
