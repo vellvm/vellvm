@@ -38,7 +38,6 @@ the expected result; update the `ASSERT EQ` accordingly).
 | `alloca-churn.ll` | allocation: one `alloca` per iteration ⇒ fresh-address generation, provenance, frame-stack growth; detects degradation as live allocations accumulate. | loop bound |
 | `alloca-large.ll` | large-object allocation + frame teardown: 200 calls each alloca'ing 4 KiB. Allocation writes one undef byte per address and registers every byte's pointer in the frame; the return frees them one AVL delete at a time (~13 ms/call). | buffer size / call count |
 | `iptr-roundtrip.ll` | `ptrtoint`/`inttoptr` round trips and loads through recovered pointers: the ITOP/PTOI + provenance machinery. | loop bound |
-| `undef-pick.ll` | the uvalue side: values kept symbolic (`undef` + select), stored (symbolic byte serialization) and branched on (Pick/concretization). | loop bound |
 | `vector-ops.ll` | vector element access: a loop-carried `<64 x i64>` with one insertelement + one extractelement per iteration. Vectors are dvalue lists, so lane access is a linear walk and each insert rebuilds the vector. (`shufflevector` is unimplemented and untestable.) | loop bound / vector width |
 | `freeze_bit.ll` | per-bit `freeze` of a byte value: a `b512` with one defined byte (504 poison bits) loaded once and frozen 20000 times; the result is converted only after the loop, so the body is just the freeze. Each freeze is one `Draw` at `i512` plus a pass over the bits (`freeze_mixed_bits`), ~0.2 ms here. A one-`DrawBool`-per-poison-bit variant (branch `freeze-drawbool`) was ~3–4× slower, and quadratic in the poison-bit count while its bit loop used `map_monad`. | poison-bit count (width) / loop bound |
 | `global-init.ll` | startup initialization of a `[65536 x i64] zeroinitializer` global: denoting the aggregate + serializing 512 KiB through the byte-level write path. Guards a fixed stack-overflow: allocation/write of a large global used to crash around `[32768 x i64]` via five separate non-tail recursions on the same path (`N.recursion` in poison-byte generation, `IntMaps.add_all_index`, `map`/`List.concat` in the allocation-tagging path, and `memS_bind`'s eager `Mput` — the one non-closure-wrapped case in the memory free monad). All five are now accumulator-based/closure-wrapped; scaling above this size is a performance question, not a correctness one (confirmed up to 524288 elements/34s). | array size |
@@ -53,7 +52,7 @@ to read time, and fixing a stack-overflow on large global
 allocation/initialization — five non-tail recursions across the
 allocate/write path, including `memS_bind`'s eager `Mput`):
 loop-phi-arith 5.3 s · calls-fib 5.8 s · mem-scan 4.3 s · mem-aggregate
-2.3 s · alloca-churn 1.8 s · iptr-roundtrip 3.1 s · undef-pick 2.8 s ·
+2.3 s · alloca-churn 1.8 s · iptr-roundtrip 3.1 s ·
 wide-arith 4.3 s · locals-chain 0.24 s · block-jumps 5.7 s ·
 calls-large-fn 2.7 s · calls-many-fns 3.7 s · switch-cases 3.5 s (was
 4.7 s before moving case elaboration into one lifted EOU computation) ·
