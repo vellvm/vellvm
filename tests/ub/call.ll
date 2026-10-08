@@ -47,13 +47,23 @@ define i32 @call_undef() {
 
 ; ASSERT UB 44: call i32 @call_undef()
 
+; A null *address* is enough, whatever the provenance: `inttoptr i64 0` is the
+; null pointer in address space 0.
+define i32 @call_inttoptr_null() {
+  %f = inttoptr i64 0 to ptr
+  %r = call i32 %f()                              ; <- UB @call_inttoptr_null
+  ret i32 %r
+}
+
+; ASSERT UB 54: call i32 @call_inttoptr_null()
+
 ; Calling a pointer to data rather than to a function.
 define i32 @call_data_pointer() {
   %r = call i32 @data()                           ; <- UB @call_data_pointer
   ret i32 %r
 }
 
-; ASSERT UB 52: call i32 @call_data_pointer()
+; ASSERT UB 62: call i32 @call_data_pointer()
 
 ; Calling-convention mismatch: fastcc callee called with the default (ccc).
 define i32 @call_cc_mismatch() {
@@ -61,7 +71,7 @@ define i32 @call_cc_mismatch() {
   ret i32 %r
 }
 
-; ASSERT UB 60: call i32 @call_cc_mismatch()
+; ASSERT UB 70: call i32 @call_cc_mismatch()
 
 ; ... and the other way round.
 define i32 @call_cc_mismatch2() {
@@ -69,7 +79,7 @@ define i32 @call_cc_mismatch2() {
   ret i32 %r
 }
 
-; ASSERT UB 68: call i32 @call_cc_mismatch2()
+; ASSERT UB 78: call i32 @call_cc_mismatch2()
 
 define i32 @call_cc_ok() {
   %r = call fastcc i32 @fast_callee()
@@ -106,26 +116,32 @@ define i32 @ub_case_3() {
   ret i32 %r
 }
 
-; case 4 (line 56): ASSERT UB 52: call i32 @call_data_pointer()
+; case 4 (line 58): ASSERT UB 54: call i32 @call_inttoptr_null()
 define i32 @ub_case_4() {
+  %r = call i32 @call_inttoptr_null()
+  ret i32 %r
+}
+
+; case 5 (line 66): ASSERT UB 62: call i32 @call_data_pointer()
+define i32 @ub_case_5() {
   %r = call i32 @call_data_pointer()
   ret i32 %r
 }
 
-; case 5 (line 64): ASSERT UB 60: call i32 @call_cc_mismatch()
-define i32 @ub_case_5() {
+; case 6 (line 74): ASSERT UB 70: call i32 @call_cc_mismatch()
+define i32 @ub_case_6() {
   %r = call i32 @call_cc_mismatch()
   ret i32 %r
 }
 
-; case 6 (line 72): ASSERT UB 68: call i32 @call_cc_mismatch2()
-define i32 @ub_case_6() {
+; case 7 (line 82): ASSERT UB 78: call i32 @call_cc_mismatch2()
+define i32 @ub_case_7() {
   %r = call i32 @call_cc_mismatch2()
   ret i32 %r
 }
 
-; case 7 (line 79): ASSERT EQ: i32 8 = call i32 @call_cc_ok()
-define i32 @ub_case_7() {
+; case 8 (line 89): ASSERT EQ: i32 8 = call i32 @call_cc_ok()
+define i32 @ub_case_8() {
   %r = call i32 @call_cc_ok()
   ret i32 %r
 }
@@ -156,6 +172,7 @@ dispatch:
     i32 5, label %case5
     i32 6, label %case6
     i32 7, label %case7
+    i32 8, label %case8
   ]
 case0:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 0)
@@ -219,6 +236,14 @@ case7:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 7)
   %c7_0 = sext i32 %c7_r to i64
   call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c7_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case8:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 8)
+  %c8_r = call i32 @ub_case_8()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 8)
+  %c8_0 = sext i32 %c8_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c8_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 bad:

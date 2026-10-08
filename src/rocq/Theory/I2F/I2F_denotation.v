@@ -536,26 +536,13 @@ Qed.
 (** Pointwise lifting of [I2F_function_denotation] to function contexts,
     extensionally over [lookup] (in the style of [IntMaps.Equiv]): the two
     maps have the same domain, and denotations found at a common key are
-    related. [lookup_defn] keys the map by [ptr_to_int], which coincides
+    related. [denote_mcfg] keys the map by [ptr_to_int], which coincides
     on [I2F_Addr]-related addresses, so related lookups share their key. *)
 Definition I2F_ctx
   (ctx1 : IntMap (@function_denotation PInf))
   (ctx2 : IntMap (@function_denotation PFin)) : Prop :=
   forall k, option_rel I2F_function_denotation (lookup k ctx1) (lookup k ctx2).
 
-(** Related function values look up related denotations: [ptr_to_int]
-    coincides on related addresses, and no other shape is a key. *)
-Lemma I2F_lookup_defn f1 f2 ctx1 ctx2 :
-  I2F_dvalue f1 f2 ->
-  I2F_ctx ctx1 ctx2 ->
-  option_rel I2F_function_denotation
-    (lookup_defn f1 ctx1) (lookup_defn f2 ctx2).
-Proof.
-  intros HF HC; inv HF; [inv H | |]; cbn; try constructor.
-  destruct p, p'; destruct H0 as [HI ->]; red in HI; subst.
-  apply HC.
-Qed.
-    
 Lemma I2F_denote_mcfg :
   forall t ctx1 ctx2 f1 f2 args1 args2,
     I2F_dvalue f1 f2 ->
@@ -586,9 +573,17 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     { intros * HA; exact (I2FA_CFG_sum HA). }
     { intros ? ? HS; cbn; simp I2FA_Call; exact HS. }
     cbn.
-    pose proof (I2F_lookup_defn HFv Hctx) as HL.
-    destruct (lookup_defn fv1 ctx1) eqn:L1, (lookup_defn fv2 ctx2) eqn:L2;
-      inv HL.
+    (* Dispatch on the related function values: poison is UB on the
+       infinite side, a non-pointer is a failure on both sides, and a
+       pointer is checked against null and then looked up. *)
+    pose proof HFv as HFv'.
+    inv HFv; [inv H | |]; cbn.
+    all: try now (rstep; cbnn; try (easy); eauto).
+    (* the pointer case: related addresses share their [ptr_to_int] key *)
+    destruct p as [z1 pr1], p' as [z2 pr2]; destruct H0 as [HI ->]; red in HI; subst; cbn.
+    destruct (unsigned z2 =? 0)%Z; [now (rstep; cbnn; try (easy); eauto) |].
+    specialize (Hctx (unsigned z2)).
+    destruct (lookup (unsigned z2) ctx1), (lookup (unsigned z2) ctx2); inv Hctx.
     - (* internal call: the related denotations found in the contexts *)
       match goal with
       | HFD : I2F_function_denotation _ _ |- _ => now apply HFD

@@ -898,14 +898,6 @@ Section Denotation.
          interpret, we therefore cast external calls into an isomorphic family of events
          that life in the "right" injection of the [_CFGtop_INTERNAL] effect
    *)
-
-  Definition lookup_defn (dv : dvalue) (m : IntMap function_denotation) : option function_denotation
-    := match dv with
-       | DVALUE_Base (DVALUE_Pointer addr) =>
-           lookup (ptr_to_int addr) m
-       | _ => None
-       end.
-
   Definition denote_mcfg
     (fundefs : IntMap function_denotation) (dt : dtyp)
     (f_value : dvalue) (args : list dvalue) : MCFGtop (dvalue + dvalue) :=
@@ -913,12 +905,22 @@ Section Denotation.
       (fun T call =>
          match call with
          | Call dt fv args =>
-             match lookup_defn fv fundefs with
-             | Some f_den => (* If the call is internal *)
-                 (* [f_den] already produces [exc + dvalue] (see [denote_function]),
-                    so the callee's unwind crosses the [mrec] knot as this value. *)
-                 f_den args
-             | None => inr <$> external_call dt fv args
+             match fv with
+             | DVALUE_Base DVALUE_Poison => raiseUB "call via poison function pointer"
+             | DVALUE_Base (DVALUE_Pointer addr) =>
+                 (* Null is associated with no object, so it is not a function.
+                    Compare addresses only, as for free(null). *)
+                 if (ptr_to_int addr =? ptr_to_int null)%Z
+                 then raiseUB "call via null function pointer"
+                 else
+                 match lookup (ptr_to_int addr) fundefs with
+                 | Some f_den => (* If the call is internal *)
+                     (* [f_den] already produces [exc + dvalue] (see [denote_function]),
+                        so the callee's unwind crosses the [mrec] knot as this value. *)
+                     f_den args
+                 | None => inr <$> external_call dt fv args
+                 end
+             | _ => raise "function call to non-pointer value"
              end
          end) _ (Call dt f_value args).
   
