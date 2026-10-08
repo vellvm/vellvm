@@ -955,20 +955,25 @@ Lemma I2F_handle_memcpy : forall (args1 : list (@dvalue_base PInf)) (args2 : lis
 Proof.
   intros args1 args2 Hargs; unfold handle_memcpy.
   destruct Hargs as [ | dst1 dst2 l1 l2 Hdst Hargs]; [apply I2F_Merr |].
-  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | src1 src2 l1' l2' Hsrc Hargs]; [apply I2F_Merr |].
-  destruct Hsrc as [psrc1 psrc2 Hpsrc | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | sz1 sz2 l1'' l2'' Hsz Hargs]; [apply I2F_Merr |].
-  destruct Hsz as [ | szv i1 | ip1 ip2 Hip | | | | | ]; try apply I2F_Merr.
-  - destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
-    destruct Hvol as [ | szv2 vv1 | | | | | | ]; try apply I2F_Merr.
-    destruct Hargs; [ | apply I2F_Merr].
-    apply I2F_memcpy; auto.
-  - destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
-    destruct Hvol as [ | szv2 vv1 | | | | | | ]; try apply I2F_Merr.
-    destruct Hargs; [ | apply I2F_Merr].
-    red in Hip; subst; cbn.
-    apply I2F_memcpy; auto.
+  destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
+  destruct Hvol as [ | szv2 vv1 | | | | | | ]; try apply I2F_Merr.
+  destruct Hargs; [ | apply I2F_Merr].
+  (* The length: the same [N] on both sides, UB for poison, or an error. *)
+  eapply I2F_memS_bind with (RX := fun (n1 n2 : BinNums.N) => n1 = n2).
+  { destruct Hsz as [ | szv i1 | ip1 ip2 Hip | | | | | ]; try apply I2F_Merr.
+    - constructor; reflexivity.
+    - red in Hip; subst; cbn; constructor; reflexivity.
+    - apply I2F_Mub_l. }
+  intros size ? <-.
+  (* The pointers: poison with a nonzero length is UB on the infinite
+     side, and with length 0 a no-op on both. *)
+  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | ];
+    destruct Hsrc as [psrc1 psrc2 Hpsrc | | | | | | | ];
+    try apply I2F_Merr;
+    try (destruct (size =? 0)%N; [constructor; auto | apply I2F_Mub_l]).
+  apply I2F_memcpy; auto.
 Qed.
 
 Lemma I2F_handle_memset : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),

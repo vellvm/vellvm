@@ -237,16 +237,27 @@ Section MemoryModel.
   
   Definition handle_memcpy (args : list dvalue_base) : memM unit :=
     match args with
-    | DVALUE_Pointer dst ::
-        DVALUE_Pointer src ::
-        DVALUE_I sz size ::
-        DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-        memcpy src dst (Z.to_N (unsigned size)) (equ volatile VellvmIntegers.one)
-    | DVALUE_Pointer dst ::
-        DVALUE_Pointer src ::
-        DVALUE_Iptr size ::
-        DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-        memcpy src dst (Z.to_N (to_Z size)) (equ volatile VellvmIntegers.one)
+    | dst :: src :: len :: DVALUE_I _ volatile :: [] (* volatile ignored *) =>
+        size <- match len with
+               | DVALUE_I _ size => ret (Z.to_N (unsigned size))
+               | DVALUE_Iptr size => ret (Z.to_N (to_Z size))
+               (* LangRef: "If <len> is not a well-defined value, the
+                  behavior is undefined." *)
+               | DVALUE_Poison => mub "memcpy with poison length."
+               | _ => merr "Unsupported arguments to memcpy."
+               end;;
+        match dst, src with
+        | DVALUE_Pointer dst, DVALUE_Pointer src =>
+            memcpy src dst size (equ volatile VellvmIntegers.one)
+        | DVALUE_Poison, (DVALUE_Pointer _ | DVALUE_Poison)
+        | DVALUE_Pointer _, DVALUE_Poison =>
+            (* LangRef: "If <len> is 0, it is no-op ...  If <len> is not
+               zero, both <dest> and <src> should be well-defined, otherwise
+               the behavior is undefined." *)
+            if (size =? 0)%N then ret tt
+            else mub "memcpy with a poison source or destination and nonzero length."
+        | _, _ => merr "Unsupported arguments to memcpy."
+        end
     | _ => merr "Unsupported arguments to memcpy."
     end.
   

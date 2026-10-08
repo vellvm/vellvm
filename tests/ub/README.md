@@ -76,22 +76,24 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **176/297**
+As of 2026-10-08, `make interp` on `ub-tests` gives **186/300**
 assertions passing, and the three files that don't parse report as failures. The
-15 failing controls are all accounted for below: the poison-only attribute and
+14 failing controls are all accounted for below: the poison-only attribute and
 metadata cases, `initializes` read-before-write, lifetime, memmove, and the
-memcpy/memset poison cases. Gaps by category:
+memset poison cases. Gaps by category:
 
 **Already handled.** Division and remainder, including `INT_MIN / -1` and
 `INT_MIN srem -1`; branching or
 switching on poison or `undef`; `unreachable`; null, poison, out-of-bounds, dangling,
 freed, and wrong-provenance loads, stores, and atomics; all of `provenance.ll`;
-memcpy overlap and out of bounds; double free, freeing non-heap memory, and
+calls through poison, `undef`, or null (including `inttoptr 0`) function
+pointers; memcpy overlap, out of bounds, poison length, and poison pointers
+with a nonzero length (a no-op with length 0); double free, freeing non-heap memory, and
 `free(poison)` (`free(null)` is a no-op, whatever the null pointer's provenance).
 
 **Missing UB (Vellvm returns a value instead):**
 - (`undef` now behaves exactly like poison. The remaining `undef` cases, the
-  `alloca` count, the memcpy/memset length, and a `noundef` return, fail for
+  `alloca` count, the memset length, and a `noundef` return, fail for
   the same reasons as their poison counterparts listed here.)
 - `alloca i32, i32 poison` is not UB *at the alloca*. The assertion passes only
   because the following store fails (the reported location is the store).
@@ -112,11 +114,11 @@ memcpy overlap and out of bounds; double free, freeing non-heap memory, and
 
 **Wrong kind of error (fails instead of UB):**
 - `indirectbr`: "Unsupport itree terminator".
-- Poison callee, and memcpy/memset with poison pointers or length: `Failed`.
-  Null or data-pointer callees become an uninterpreted external call.
+- memset with poison pointers or length: `Failed`.
+- Calls through data pointers become an uninterpreted external call.
 
 **UB where LLVM has none:**
-- memcpy/memset with length 0 and poison pointers fails. So does memset with a
+- memset with length 0 and poison pointers fails. So does memset with a
   poison fill *value*, which should just store poison bytes.
 - (Not asserted) Vellvm raises UB when `cmpxchg` compares against poison. The
   LangRef doesn't list that case.
