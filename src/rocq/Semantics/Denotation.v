@@ -642,7 +642,7 @@ Section Denotation.
 
     (* Call *)
     (* TODO: technically operand bundles can affect semantics *)
-    | (pt, INSTR_Call (dt, f) args _ _) =>
+    | (pt, INSTR_Call (dt, f) args anns _) =>
         vs <- denote_call_args args (err_loc tt ++ ": Call argument violates noundef.") ;;
         returned_value <-
           match intrinsic_exp f with
@@ -662,6 +662,10 @@ Section Denotation.
               end
           end
         ;;
+        (* the call site's return-value attributes *)
+        returned_value <- apply_value_attrs (ann_ret_attributes anns)
+                            (err_loc tt ++ ": Call return value violates noundef.")
+                            returned_value ;;
         match pt with
         | IVoid _ =>
             ret tt
@@ -798,6 +802,10 @@ Section Denotation.
           stack_raise exn ;;
           ret (inl unwind_label)
       | inr returned_value =>
+          (* the invoke's return-value attributes *)
+          returned_value <- apply_value_attrs (ann_ret_attributes anns)
+                              (err_loc tt ++ ": Invoke return value violates noundef.")
+                              returned_value ;;
           match iid with
           | IVoid _ => ret tt
           | IId id  => lwrite id returned_value

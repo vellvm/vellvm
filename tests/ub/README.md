@@ -76,7 +76,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **226/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **228/301**
 assertions passing, and the three files that don't parse report as failures. The
 7 failing controls are all accounted for below: the poison-only load-metadata
 cases, `initializes` read-before-write, lifetime, and memmove. Gaps by category:
@@ -105,11 +105,11 @@ memset with a poison fill value (stores poison); double free, freeing non-heap m
 - `getelementptr` `inbounds`/`nuw`/`nusw` never produce poison.
 - Value attributes (`noundef`, `nonnull`, `align`, `range`, and the
   nonnull/noundef part of `dereferenceable`) are enforced on call-site
-  arguments, and on the arguments and return value of a *defined* callee (on
-  entry and on return). Not yet: call-site return attributes, attributes of
-  external (declared-only) functions, and an attribute split between the
-  declaration and the call site (e.g. `nonnull` declared, `noundef` at the
-  call), which LangRef combines.
+  arguments and return values (call and invoke), and on the arguments and
+  return value of a *defined* callee (on entry and on return). Not yet:
+  attributes of external (declared-only) functions, and an attribute split
+  between the declaration and the call site (e.g. `nonnull` declared,
+  `noundef` at the call), which LangRef combines.
 - Not enforced at all: the memory part of `dereferenceable[_or_null]`,
   `noreturn`, `nounwind`, `memory(...)`, `readonly`/`readnone`, `captures`,
   `nofree`, `noalias`, `initializes`, `writable`, `nocreateundeforpoison`.

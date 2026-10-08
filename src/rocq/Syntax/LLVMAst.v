@@ -804,6 +804,10 @@ Definition ann_ret_attribute (a:annotation) : option param_attr :=
   | _ => None
   end.
 
+(* All the return-value attributes among a call's annotations. *)
+Definition ann_ret_attributes (anns : list annotation) : list param_attr :=
+  flat_map (fun a => match ann_ret_attribute a with Some p => [p] | None => [] end) anns.
+
 Definition ann_fun_attribute (a:annotation) : option fn_attr :=
   match a with
   | ANN_fun_attribute f => Some f

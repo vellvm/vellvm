@@ -343,7 +343,9 @@ Section withParams.
         do 3 bind.
         break_match_goal.
         + bind; ret.
-        + break_match_goal.
+        + (* the invoke's return-value attributes, then the result *)
+          bind.
+          break_match_goal.
           bind; ret.
           bind; ret.
     Qed.
