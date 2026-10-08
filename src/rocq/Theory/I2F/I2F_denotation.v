@@ -66,6 +66,26 @@ Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R
   I2F_refine_CFG RR (EOU_to_itree m1) (EOU_to_itree m2).
 Proof. intros H; unfold I2F_refine_CFG; apply (I2F_refine_lift_gen I2FE_CFG_Throw); exact H. Qed.
 
+(** The explicit-[align] check: related pointers are aligned alike
+    ([I2F_Addr_ptr_aligned_to]), so both sides continue, or the infinite
+    side raises UB. *)
+Lemma I2F_assert_alignment a1 a2 anns msg :
+  I2F_dvalue a1 a2 ->
+  I2F_refine_CFG (fun _ _ => True)
+    (@assert_alignment PInf a1 anns msg) (@assert_alignment PFin a2 anns msg).
+Proof.
+  intros H; unfold I2F_refine_CFG, assert_alignment.
+  inv H; [inv H0 | |]; cbn; try now (rstep; cbnn; try easy; eauto).
+  break_match_goal; [ | rstep; cbnn; easy].
+  (* The two conditions differ in hidden instance arguments, so equate
+     them by [apply] (up to conversion) rather than rewriting. *)
+  match goal with
+  | |- ruttc _ _ _ _ _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
+      assert (EQ : b1 = b2) by (apply I2F_Addr_ptr_aligned_to; exact H);
+      rewrite EQ; destruct b2
+  end; rstep; cbnn; try easy; eauto.
+Qed.
+
 Lemma I2F_denote_instr :
   forall i va1 va2,
     option_rel I2F_Addr va1 va2 ->
@@ -153,6 +173,7 @@ Lemma I2F_denote_instr :
     - destruct x; cbn...
       destruct ptr.
       bind_exp.
+      rbind (fun _ _ => True); [apply I2F_assert_alignment; auto | intros _ _ _].
       erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       auto... (* [apply I2F_freeze'; auto | intros]...*)
     - destruct val,ptr, x; cbn...

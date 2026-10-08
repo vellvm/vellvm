@@ -471,6 +471,21 @@ Section Denotation.
     ret tt.
 
   (* An instruction has only side-effects, it therefore returns [unit] *)
+  (** Check an access's explicit [align] annotation against the address
+      [a]: UB (reported with [msg]) if [a] is a pointer that is not aligned
+      to it.  LangRef (load/store): "Overestimating the alignment results in
+      undefined behavior."  Without an [align] annotation, or when [a] is not
+      a pointer (e.g. poison, which the access itself rejects), it does
+      nothing. *)
+  Definition assert_alignment (a : dvalue) (anns : list (annotation dtyp)) (msg : string)
+    : CFGtop unit :=
+    match a, find_option ann_align anns with
+    | DVALUE_Base (DVALUE_Pointer p), Some al =>
+        if ptr_aligned_to p (Z.to_N (denote_int_syntax al)) then ret tt
+        else raiseUB msg
+    | _, _ => ret tt
+    end.
+
   Definition denote_instr
     (i: (instr_id * instr dtyp * list (metadata dtyp)))
     (varargs : option ptr) : CFGtop unit :=
@@ -524,8 +539,9 @@ Section Denotation.
         ret tt
 
     (* Load *)
-    | (IId id, INSTR_Load dt (du,ptr) _) =>
+    | (IId id, INSTR_Load dt (du,ptr) anns) =>
       a <- denote_exp' (Some du) ptr;;
+      assert_alignment a anns (err_loc tt ++ ": Load with overestimated alignment.");;
       v <- load dt a;;
       (* v' <- freeze dt v;; *)
       lwrite id v
