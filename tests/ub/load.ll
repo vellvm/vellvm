@@ -152,6 +152,21 @@ define i32 @load_aligned_ok() {
 
 ; ASSERT EQ: i32 2 = call i32 @load_aligned_ok()
 
+; Control: an alloca without `align` is still aligned for its type (LangRef:
+; "any convenient boundary compatible with the type"), and a <4 x i32> is
+; 16-byte aligned by default, so this `align 16` load is fine.  The leading
+; i8 alloca would leave %p misaligned if the natural alignment were ignored.
+define i32 @load_vector_alloca_natural_align() {
+  %pad = alloca i8
+  %p = alloca <4 x i32>
+  store <4 x i32> <i32 1, i32 2, i32 3, i32 4>, ptr %p, align 16
+  %v = load <4 x i32>, ptr %p, align 16
+  %e = extractelement <4 x i32> %v, i32 0
+  ret i32 %e
+}
+
+; ASSERT EQ: i32 1 = call i32 @load_vector_alloca_natural_align()
+
 ; A misaligned *byte* address with align 2.
 define i16 @load_misaligned_odd() {
   %p = alloca [4 x i8], align 4
@@ -161,7 +176,7 @@ define i16 @load_misaligned_odd() {
   ret i16 %v
 }
 
-; ASSERT UB 160: call i16 @load_misaligned_odd()
+; ASSERT UB 175: call i16 @load_misaligned_odd()
 
 ; !noundef on a load of uninitialized memory.
 define i32 @load_noundef_uninit() {
@@ -170,7 +185,7 @@ define i32 @load_noundef_uninit() {
   ret i32 %v
 }
 
-; ASSERT UB 169: call i32 @load_noundef_uninit()
+; ASSERT UB 184: call i32 @load_noundef_uninit()
 
 ; !noundef on a load of a stored poison value.
 define i32 @load_noundef_poison() {
@@ -180,7 +195,7 @@ define i32 @load_noundef_poison() {
   ret i32 %v
 }
 
-; ASSERT UB 179: call i32 @load_noundef_poison()
+; ASSERT UB 194: call i32 @load_noundef_poison()
 
 ; !noundef where only one byte of the loaded value is uninitialized.
 define i32 @load_noundef_partial() {
@@ -190,7 +205,7 @@ define i32 @load_noundef_partial() {
   ret i32 %v
 }
 
-; ASSERT UB 189: call i32 @load_noundef_partial()
+; ASSERT UB 204: call i32 @load_noundef_partial()
 
 ; !noundef on an aggregate with a poison field.
 define { i32, i32 } @load_noundef_aggregate() {
@@ -200,7 +215,7 @@ define { i32, i32 } @load_noundef_aggregate() {
   ret { i32, i32 } %v
 }
 
-; ASSERT UB 199: call { i32, i32 } @load_noundef_aggregate()
+; ASSERT UB 214: call { i32, i32 } @load_noundef_aggregate()
 
 ; Controls: without !noundef these loads produce poison, not UB.
 define i32 @load_uninit() {
@@ -228,7 +243,7 @@ define i32 @load_nonnull_noundef_null() {
   ret i32 0
 }
 
-; ASSERT UB 227: call i32 @load_nonnull_noundef_null()
+; ASSERT UB 242: call i32 @load_nonnull_noundef_null()
 
 ; ... but !nonnull alone only makes the loaded value poison.
 define i64 @load_nonnull_null() {
@@ -255,7 +270,7 @@ f:
   ret i32 0
 }
 
-; ASSERT UB 251: call i32 @load_nonnull_null_branch()
+; ASSERT UB 266: call i32 @load_nonnull_null_branch()
 
 ; !align + !noundef with a misaligned pointer value is UB.
 define i32 @load_align_md_noundef() {
@@ -267,7 +282,7 @@ define i32 @load_align_md_noundef() {
   ret i32 0
 }
 
-; ASSERT UB 266: call i32 @load_align_md_noundef()
+; ASSERT UB 281: call i32 @load_align_md_noundef()
 
 ; !align alone yields poison.
 define i64 @load_align_md() {
@@ -398,80 +413,86 @@ define i32 @ub_case_13() {
   ret i32 %r
 }
 
-; case 14 (line 164): ASSERT UB 160: call i16 @load_misaligned_odd()
-define i16 @ub_case_14() {
+; case 14 (line 168): ASSERT EQ: i32 1 = call i32 @load_vector_alloca_natural_align()
+define i32 @ub_case_14() {
+  %r = call i32 @load_vector_alloca_natural_align()
+  ret i32 %r
+}
+
+; case 15 (line 179): ASSERT UB 175: call i16 @load_misaligned_odd()
+define i16 @ub_case_15() {
   %r = call i16 @load_misaligned_odd()
   ret i16 %r
 }
 
-; case 15 (line 173): ASSERT UB 169: call i32 @load_noundef_uninit()
-define i32 @ub_case_15() {
+; case 16 (line 188): ASSERT UB 184: call i32 @load_noundef_uninit()
+define i32 @ub_case_16() {
   %r = call i32 @load_noundef_uninit()
   ret i32 %r
 }
 
-; case 16 (line 183): ASSERT UB 179: call i32 @load_noundef_poison()
-define i32 @ub_case_16() {
+; case 17 (line 198): ASSERT UB 194: call i32 @load_noundef_poison()
+define i32 @ub_case_17() {
   %r = call i32 @load_noundef_poison()
   ret i32 %r
 }
 
-; case 17 (line 193): ASSERT UB 189: call i32 @load_noundef_partial()
-define i32 @ub_case_17() {
+; case 18 (line 208): ASSERT UB 204: call i32 @load_noundef_partial()
+define i32 @ub_case_18() {
   %r = call i32 @load_noundef_partial()
   ret i32 %r
 }
 
-; case 18 (line 203): ASSERT UB 199: call { i32, i32 } @load_noundef_aggregate()
-define { i32, i32 } @ub_case_18() {
+; case 19 (line 218): ASSERT UB 214: call { i32, i32 } @load_noundef_aggregate()
+define { i32, i32 } @ub_case_19() {
   %r = call { i32, i32 } @load_noundef_aggregate()
   ret { i32, i32 } %r
 }
 
-; case 19 (line 212): ASSERT EQ: i32 poison = call i32 @load_uninit()
-define i32 @ub_case_19() {
+; case 20 (line 227): ASSERT EQ: i32 poison = call i32 @load_uninit()
+define i32 @ub_case_20() {
   %r = call i32 @load_uninit()
   ret i32 %r
 }
 
-; case 20 (line 221): ASSERT EQ: i32 5 = call i32 @load_noundef_ok()
-define i32 @ub_case_20() {
+; case 21 (line 236): ASSERT EQ: i32 5 = call i32 @load_noundef_ok()
+define i32 @ub_case_21() {
   %r = call i32 @load_noundef_ok()
   ret i32 %r
 }
 
-; case 21 (line 231): ASSERT UB 227: call i32 @load_nonnull_noundef_null()
-define i32 @ub_case_21() {
+; case 22 (line 246): ASSERT UB 242: call i32 @load_nonnull_noundef_null()
+define i32 @ub_case_22() {
   %r = call i32 @load_nonnull_noundef_null()
   ret i32 %r
 }
 
-; case 22 (line 242): ASSERT EQ: i64 poison = call i64 @load_nonnull_null()
-define i64 @ub_case_22() {
+; case 23 (line 257): ASSERT EQ: i64 poison = call i64 @load_nonnull_null()
+define i64 @ub_case_23() {
   %r = call i64 @load_nonnull_null()
   ret i64 %r
 }
 
-; case 23 (line 258): ASSERT UB 251: call i32 @load_nonnull_null_branch()
-define i32 @ub_case_23() {
+; case 24 (line 273): ASSERT UB 266: call i32 @load_nonnull_null_branch()
+define i32 @ub_case_24() {
   %r = call i32 @load_nonnull_null_branch()
   ret i32 %r
 }
 
-; case 24 (line 270): ASSERT UB 266: call i32 @load_align_md_noundef()
-define i32 @ub_case_24() {
+; case 25 (line 285): ASSERT UB 281: call i32 @load_align_md_noundef()
+define i32 @ub_case_25() {
   %r = call i32 @load_align_md_noundef()
   ret i32 %r
 }
 
-; case 25 (line 283): ASSERT EQ: i64 poison = call i64 @load_align_md()
-define i64 @ub_case_25() {
+; case 26 (line 298): ASSERT EQ: i64 poison = call i64 @load_align_md()
+define i64 @ub_case_26() {
   %r = call i64 @load_align_md()
   ret i64 %r
 }
 
-; case 26 (line 305): ASSERT EQ: i32 poison = call i32 @load_after_lifetime_end()
-define i32 @ub_case_26() {
+; case 27 (line 320): ASSERT EQ: i32 poison = call i32 @load_after_lifetime_end()
+define i32 @ub_case_27() {
   %r = call i32 @load_after_lifetime_end()
   ret i32 %r
 }
@@ -521,6 +542,7 @@ dispatch:
     i32 24, label %case24
     i32 25, label %case25
     i32 26, label %case26
+    i32 27, label %case27
   ]
 case0:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 0)
@@ -635,17 +657,17 @@ case13:
   ret i32 0
 case14:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 14)
-  %c14_r = call i16 @ub_case_14()
+  %c14_r = call i32 @ub_case_14()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 14)
-  %c14_0 = sext i16 %c14_r to i64
+  %c14_0 = sext i32 %c14_r to i64
   call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c14_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case15:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 15)
-  %c15_r = call i32 @ub_case_15()
+  %c15_r = call i16 @ub_case_15()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 15)
-  %c15_0 = sext i32 %c15_r to i64
+  %c15_0 = sext i16 %c15_r to i64
   call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c15_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
@@ -667,22 +689,22 @@ case17:
   ret i32 0
 case18:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 18)
-  %c18_r = call { i32, i32 } @ub_case_18()
+  %c18_r = call i32 @ub_case_18()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 18)
-  %c18_0 = extractvalue { i32, i32 } %c18_r, 0
-  %c18_1 = sext i32 %c18_0 to i64
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c18_1)
-  %c18_2 = extractvalue { i32, i32 } %c18_r, 1
-  %c18_3 = sext i32 %c18_2 to i64
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c18_3)
+  %c18_0 = sext i32 %c18_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c18_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case19:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 19)
-  %c19_r = call i32 @ub_case_19()
+  %c19_r = call { i32, i32 } @ub_case_19()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 19)
-  %c19_0 = sext i32 %c19_r to i64
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c19_0)
+  %c19_0 = extractvalue { i32, i32 } %c19_r, 0
+  %c19_1 = sext i32 %c19_0 to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c19_1)
+  %c19_2 = extractvalue { i32, i32 } %c19_r, 1
+  %c19_3 = sext i32 %c19_2 to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c19_3)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case20:
@@ -703,17 +725,17 @@ case21:
   ret i32 0
 case22:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 22)
-  %c22_r = call i64 @ub_case_22()
+  %c22_r = call i32 @ub_case_22()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 22)
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c22_r)
+  %c22_0 = sext i32 %c22_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c22_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case23:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 23)
-  %c23_r = call i32 @ub_case_23()
+  %c23_r = call i64 @ub_case_23()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 23)
-  %c23_0 = sext i32 %c23_r to i64
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c23_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c23_r)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case24:
@@ -726,17 +748,25 @@ case24:
   ret i32 0
 case25:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 25)
-  %c25_r = call i64 @ub_case_25()
+  %c25_r = call i32 @ub_case_25()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 25)
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c25_r)
+  %c25_0 = sext i32 %c25_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c25_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case26:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 26)
-  %c26_r = call i32 @ub_case_26()
+  %c26_r = call i64 @ub_case_26()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 26)
-  %c26_0 = sext i32 %c26_r to i64
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c26_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c26_r)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case27:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 27)
+  %c27_r = call i32 @ub_case_27()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 27)
+  %c27_0 = sext i32 %c27_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c27_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 bad:
