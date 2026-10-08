@@ -1,0 +1,67 @@
+<!-- Included by pandoc (-H) when converting results/compare.md to HTML. -->
+<style>
+  :root {
+    --bg: #fff; --fg: #1f2328; --muted: #656d76; --line: #d0d7de;
+    --head: #f6f8fa; --stripe: #fafbfc;
+    --ok: #dafbe1; --bad: #ffebe9; --warn: #fff8c5; --trap: #fbefff; --asan: #ddf4ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --line: #30363d;
+      --head: #161b22; --stripe: #11161d;
+      --ok: #12361f; --bad: #3d1414; --warn: #3a3010; --trap: #2e1d3a; --asan: #0c2d4a;
+    }
+  }
+  html { background: var(--bg); }
+  body {
+    max-width: none; margin: 0; padding: 1.5rem 2rem; background: var(--bg); color: var(--fg);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  header#title-block-header { margin-bottom: 1rem; }
+  h1.title { font-size: 1.6rem; margin: 0 0 .5rem; }
+  h1, h2 { border-bottom: 1px solid var(--line); padding-bottom: .25rem; }
+  h1 { font-size: 1.3rem; margin-top: 2.5rem; }
+  nav#TOC { columns: 3 14rem; font-size: 13px; margin-bottom: 1.5rem; }
+  nav#TOC ul { margin: 0; padding-left: 1.2rem; }
+  a { color: #0969da; }
+  @media (prefers-color-scheme: dark) { a { color: #4493f8; } }
+  code { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  table { border-collapse: collapse; font-size: 12.5px; margin: .5rem 0 1rem; }
+  th, td { border: 1px solid var(--line); padding: 3px 6px; vertical-align: top; text-align: left; }
+  thead th { position: sticky; top: 0; background: var(--head); z-index: 1; }
+  tbody tr:nth-child(even) td { background: var(--stripe); }
+  td:nth-child(2) { min-width: 20rem; }
+  /* the five native columns: short values, keep them on one line */
+  td:nth-last-child(-n+5) { white-space: nowrap; }
+  td.ok   { background: var(--ok)   !important; }
+  td.bad  { background: var(--bad)  !important; }
+  td.warn { background: var(--warn) !important; }
+  td.trap { background: var(--trap) !important; }
+  td.asan { background: var(--asan) !important; }
+  .legend span { display: inline-block; padding: 1px 8px; margin-right: 6px; border: 1px solid var(--line); }
+</style>
+<script>
+  // Color cells by their verdict mark (Vellvm/llubi columns) or by what the
+  // native run did (signal, timeout, no return, ASan report).
+  document.addEventListener("DOMContentLoaded", () => {
+    for (const td of document.querySelectorAll("td")) {
+      const t = td.textContent.trim();
+      if (t.startsWith("✓")) td.classList.add("ok");
+      else if (t.startsWith("✗")) td.classList.add("bad");
+      else if (t.startsWith("~")) td.classList.add("warn");
+      else if (t.startsWith("ASan:")) td.classList.add("asan");
+      else if (/^(SIG\w+|signal \d+|timeout|no return)/.test(t)) td.classList.add("trap");
+    }
+    const sum = document.getElementById("summary");
+    if (sum) {
+      const p = document.createElement("p");
+      p.className = "legend";
+      p.innerHTML = '<span class="ok-l" style="background:var(--ok)">✓ agrees</span>' +
+        '<span style="background:var(--warn)">~ UB on another line</span>' +
+        '<span style="background:var(--bad)">✗ disagrees</span>' +
+        '<span style="background:var(--trap)">native trap / hang</span>' +
+        '<span style="background:var(--asan)">ASan report</span>';
+      sum.after(p);
+    }
+  });
+</script>

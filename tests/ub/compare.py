@@ -3,7 +3,7 @@
 (-O0..-O3 and AddressSanitizer), one case per process, and tabulate the results.
 
     cd src && make interp            # builds ./vellvm
-    python3 ../tests/ub/compare.py   # writes ../tests/ub/results/compare.{md,json}
+    python3 ../tests/ub/compare.py   # writes ../tests/ub/results/compare.{md,json,html}
 
 Options: --vellvm PATH, --clang PATH, --llubi PATH, --out DIR, -j N, and file
 paths to restrict the run (default: every .ll under tests/ub).
@@ -267,10 +267,28 @@ def main():
                 llubi=" ".join(run([args.llubi, "--version"])[1].split()[:4]))
     with open(os.path.join(args.out, "compare.json"), "w") as fh:
         json.dump(dict(meta=meta, rows=rows), fh, indent=1, ensure_ascii=False)
-    with open(os.path.join(args.out, "compare.md"), "w") as fh:
+    md = os.path.join(args.out, "compare.md")
+    with open(md, "w") as fh:
         fh.write(markdown(meta, rows, tools))
     print(summary(rows, tools))
     print(f"wrote {os.path.relpath(args.out)}/compare.md and compare.json")
+    if html(md):
+        print(f"wrote {os.path.relpath(args.out)}/compare.html")
+
+
+def html(md):
+    """Render compare.md as a standalone, color-coded page with pandoc
+    (styling in compare-head.html).  Skipped if pandoc is not installed."""
+    pandoc = shutil.which("pandoc")
+    if not pandoc:
+        return False
+    rc, out, err = run([pandoc, md, "-f", "gfm", "-s", "--toc", "--toc-depth=1",
+                        "--shift-heading-level-by=-1",
+                        "-H", os.path.join(HERE, "compare-head.html"),
+                        "-o", os.path.splitext(md)[0] + ".html"], timeout=120)
+    if rc != 0:
+        print(f"pandoc failed: {err.strip()}", file=sys.stderr)
+    return rc == 0
 
 
 def summary(rows, tools):
