@@ -278,7 +278,15 @@ Section MemoryModel.
 
   Definition handle_free (args : list dvalue_base) : memM unit :=
     match args with
-    | [DVALUE_Pointer ptr] => free ptr
+    | [DVALUE_Pointer ptr] =>
+        (* C11 7.22.3.3: "If ptr is a null pointer, no action occurs."
+           Compare addresses only: provenance does not matter, so e.g.
+           [inttoptr 0] (which has wildcard provenance) is also null. *)
+        if (ptr_to_int ptr =? ptr_to_int null)%Z then ret tt else free ptr
+    | [DVALUE_Poison] =>
+        (* Poison could be any address, including one that is neither null
+           nor the start of a live heap block. *)
+        mub "Free of a poison pointer."
     | _ => merr "Free: invalid arguments."
     end.
 

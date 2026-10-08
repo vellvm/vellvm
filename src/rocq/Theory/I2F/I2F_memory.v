@@ -1011,9 +1011,15 @@ Lemma I2F_handle_free : forall (args1 : list (@dvalue_base PInf)) (args2 : list 
 Proof.
   intros args1 args2 Hargs; unfold handle_free.
   destruct Hargs as [ | p1 p2 l1 l2 Hp Hargs]; [apply I2F_Merr |].
-  destruct Hp as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
-  destruct Hargs; [ | apply I2F_Merr].
-  apply I2F_Free; auto.
+  destruct Hp as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr;
+    (destruct Hargs; [ | apply I2F_Merr]).
+  - (* The free(NULL) test sees the same addresses on both sides. *)
+    assert (HNULL : @ptr_to_int _ _ (@P2I PInf) null = @ptr_to_int _ _ (@P2I PFin) null)
+      by reflexivity.
+    rewrite (I2F_Addr_ptr_to_int _ _ Hpdst), HNULL.
+    destruct (_ =? _)%Z; [constructor; auto | apply I2F_Free; auto].
+  - (* free(poison) is UB on the infinite side. *)
+    apply I2F_Mub_l.
 Qed.
 
 Theorem I2F_handle_intrinsicM :

@@ -59,6 +59,17 @@ define i32 @free_null_ok() {
 
 ; ASSERT EQ: i32 0 = call i32 @free_null_ok()
 
+; A null *address* is enough, whatever the provenance: `inttoptr i64 0` is the
+; null pointer in address space 0 (LLVM's constant folder turns it into
+; `null`), even though Vellvm gives it wildcard provenance.
+define i32 @free_inttoptr_null_ok() {
+  %p = inttoptr i64 0 to ptr
+  call void @free(ptr %p)
+  ret i32 0
+}
+
+; ASSERT EQ: i32 0 = call i32 @free_inttoptr_null_ok()
+
 define i32 @malloc_free_ok() {
   %p = call ptr @malloc(i64 4)
   store i32 1, ptr %p
@@ -108,8 +119,14 @@ define i32 @ub_case_5() {
   ret i32 %r
 }
 
-; case 6 (line 69): ASSERT EQ: i32 0 = call i32 @malloc_free_ok()
+; case 6 (line 71): ASSERT EQ: i32 0 = call i32 @free_inttoptr_null_ok()
 define i32 @ub_case_6() {
+  %r = call i32 @free_inttoptr_null_ok()
+  ret i32 %r
+}
+
+; case 7 (line 80): ASSERT EQ: i32 0 = call i32 @malloc_free_ok()
+define i32 @ub_case_7() {
   %r = call i32 @malloc_free_ok()
   ret i32 %r
 }
@@ -139,6 +156,7 @@ dispatch:
     i32 4, label %case4
     i32 5, label %case5
     i32 6, label %case6
+    i32 7, label %case7
   ]
 case0:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 0)
@@ -194,6 +212,14 @@ case6:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 6)
   %c6_0 = sext i32 %c6_r to i64
   call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c6_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case7:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 7)
+  %c7_r = call i32 @ub_case_7()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 7)
+  %c7_0 = sext i32 %c7_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c7_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 bad:

@@ -69,17 +69,18 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **171/296**
+As of 2026-10-08, `make interp` on `ub-tests` gives **174/297**
 assertions passing, and the three files that don't parse report as failures. The
-16 failing controls are all accounted for below: the poison-only attribute and
-metadata cases, `initializes` read-before-write, lifetime, memmove, the
-memcpy/memset poison cases, and `free(null)`. Gaps by category:
+15 failing controls are all accounted for below: the poison-only attribute and
+metadata cases, `initializes` read-before-write, lifetime, memmove, and the
+memcpy/memset poison cases. Gaps by category:
 
 **Already handled.** Division and remainder, including `INT_MIN / -1` and
 `INT_MIN srem -1`; branching or
 switching on poison; `unreachable`; null, poison, out-of-bounds, dangling,
 freed, and wrong-provenance loads, stores, and atomics; all of `provenance.ll`;
-memcpy overlap and out of bounds; double free and freeing non-heap memory.
+memcpy overlap and out of bounds; double free, freeing non-heap memory, and
+`free(poison)` (`free(null)` is a no-op, whatever the null pointer's provenance).
 
 **Missing UB (Vellvm returns a value instead):**
 - `undef` in a UB position is drawn as some value instead of being UB: `br`,
@@ -105,10 +106,8 @@ memcpy overlap and out of bounds; double free and freeing non-heap memory.
 - `indirectbr`: "Unsupport itree terminator".
 - Poison callee, and memcpy/memset with poison pointers or length: `Failed`.
   Null or data-pointer callees become an uninterpreted external call.
-  `free(poison)`: "Free: invalid arguments".
 
 **UB where LLVM has none:**
-- `free(null)` raises UB. C defines it as a no-op.
 - memcpy/memset with length 0 and poison pointers fails. So does memset with a
   poison fill *value*, which should just store poison bytes.
 - (Not asserted) Vellvm raises UB when `cmpxchg` compares against poison. The
