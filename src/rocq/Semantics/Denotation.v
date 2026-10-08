@@ -470,7 +470,6 @@ Section Denotation.
     lwrite id loaded_v;;
     ret tt.
 
-  (* An instruction has only side-effects, it therefore returns [unit] *)
   (** Check an access's explicit [align] annotation against the address
       [a]: UB (reported with [msg]) if [a] is a pointer that is not aligned
       to it.  LangRef (load/store): "Overestimating the alignment results in
@@ -486,6 +485,7 @@ Section Denotation.
     | _, _ => ret tt
     end.
 
+  (** An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
     (i: (instr_id * instr dtyp * list (metadata dtyp)))
     (varargs : option ptr) : CFGtop unit :=
