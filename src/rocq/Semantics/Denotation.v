@@ -349,6 +349,26 @@ Section Denotation.
   Definition denote_exp' t e := withCall (denote_exp t e).
   Arguments denote_exp' _ _ : simpl nomatch.
 
+  (** Alignment checks.  LangRef (load/store): "Overestimating the alignment
+      results in undefined behavior."  [assert_aligned_to a align msg] raises
+      UB (reported with [msg]) if [a] is a pointer that is not aligned to the
+      explicit alignment [align].  Without an explicit alignment, or when [a]
+      is not a pointer (e.g. poison, which the access itself rejects), it
+      does nothing.  [assert_alignment] reads the alignment from an
+      instruction's annotations ([align N] on load/store). *)
+  Definition assert_aligned_to (a : dvalue) (align : option int_syntax) (msg : string)
+    : CFGtop unit :=
+    match a, align with
+    | DVALUE_Base (DVALUE_Pointer p), Some al =>
+        if ptr_aligned_to p (Z.to_N (denote_int_syntax al)) then ret tt
+        else raiseUB msg
+    | _, _ => ret tt
+    end.
+
+  Definition assert_alignment (a : dvalue) (anns : list (annotation dtyp)) (msg : string)
+    : CFGtop unit :=
+    assert_aligned_to a (find_option ann_align anns) msg.
+
   Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : CFGtop unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
     let '(ptr_ty, ptr_val) := cpx.(c_ptr) in
@@ -366,6 +386,8 @@ Section Denotation.
       ptr_v <- denote_exp' (Some ptr_ty) ptr_val ;;
       cmp_v <- denote_exp' (Some cmp_ty) cmp_val ;;
       new_v <- denote_exp' (Some cmp_ty) new_val ;;
+
+      assert_aligned_to ptr_v cpx.(c_align) "cmpxchg with overestimated alignment.";;
 
       (* Perform the load *)
       loaded_v <- load cmp_ty ptr_v;;
@@ -458,6 +480,8 @@ Section Denotation.
     ptr_v <- denote_exp' (Some ptr_ty) ptr_val ;;
     a_v <- denote_exp' (Some a_ty) a_val ;;
 
+    assert_aligned_to ptr_v armw.(a_align) "atomicrmw with overestimated alignment.";;
+
     (* Perform the load - load addresses must be unique *)
     loaded_v <- load a_ty ptr_v;;
 
@@ -469,21 +493,6 @@ Section Denotation.
     (* The result is the original value loaded from ptr before the modification *)
     lwrite id loaded_v;;
     ret tt.
-
-  (** Check an access's explicit [align] annotation against the address
-      [a]: UB (reported with [msg]) if [a] is a pointer that is not aligned
-      to it.  LangRef (load/store): "Overestimating the alignment results in
-      undefined behavior."  Without an [align] annotation, or when [a] is not
-      a pointer (e.g. poison, which the access itself rejects), it does
-      nothing. *)
-  Definition assert_alignment (a : dvalue) (anns : list (annotation dtyp)) (msg : string)
-    : CFGtop unit :=
-    match a, find_option ann_align anns with
-    | DVALUE_Base (DVALUE_Pointer p), Some al =>
-        if ptr_aligned_to p (Z.to_N (denote_int_syntax al)) then ret tt
-        else raiseUB msg
-    | _, _ => ret tt
-    end.
 
   (** An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
@@ -547,9 +556,10 @@ Section Denotation.
       lwrite id v
 
     (* Store *)
-    | (IVoid _, INSTR_Store (dt, val) (du, ptr) _) =>
+    | (IVoid _, INSTR_Store (dt, val) (du, ptr) anns) =>
       v <- denote_exp' (Some dt) val ;;
       a <- denote_exp' (Some du) ptr ;;
+      assert_alignment a anns (err_loc tt ++ ": Store with overestimated alignment.");;
       match a with
       | DVALUE_Poison => raiseUB (err_loc tt ++ ": Store to poisoned address.")
       | _ => store dt a v

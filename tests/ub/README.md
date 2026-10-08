@@ -76,7 +76,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **194/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **197/301**
 assertions passing, and the three files that don't parse report as failures. The
 12 failing controls are all accounted for below: the poison-only attribute and
 metadata cases, `initializes` read-before-write, lifetime, and memmove. Gaps by category:
@@ -97,9 +97,10 @@ memset with a poison fill value (stores poison); double free, freeing non-heap m
   the same reasons as their poison counterparts listed here.)
 - `alloca i32, i32 poison` is not UB *at the alloca*. The assertion passes only
   because the following store fails (the reported location is the store).
-- Alignment is checked only for an explicit `align` on `load`. Not yet checked:
-  `store`/`atomicrmw`/`cmpxchg` `align`, a `load` with no `align` (which has the
-  type's ABI alignment), and the `align` attribute. (Allocas without `align`
+- Alignment is checked only where it is explicit: `align` on `load`, `store`,
+  `atomicrmw`, and `cmpxchg`. Not yet checked: accesses with no `align` (LangRef:
+  load/store then have the type's ABI alignment, atomics the value's size), and
+  the `align` attribute. (Allocas without `align`
   now get their type's natural alignment, vectors included.)
 - `getelementptr` `inbounds`/`nuw`/`nusw` never produce poison.
 - No parameter, return, or function attribute is enforced: `noundef`,
