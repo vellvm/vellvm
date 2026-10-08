@@ -67,8 +67,10 @@ def vellvm_case(vellvm, path, text, a, tmpdir):
     tmp = os.path.join(tmpdir, os.path.basename(path))
     with open(tmp, "w") as f:
         f.write("\n".join(lines))
-    # Vellvm writes scratch files (.ll_files_N.tmp) into its working
-    # directory, so each run gets its own.
+    # Vellvm writes scratch files (output/.ll_files_N.tmp) relative to its
+    # working directory, picking a free name and deleting it afterwards; that
+    # races between parallel runs that share a directory, so each run gets its
+    # own.
     libll = os.path.join(os.path.dirname(vellvm), "libll")
     rc, out, err = run([vellvm, "-L", libll, "-test-file", tmp], cwd=tmpdir)
     o = out + err
