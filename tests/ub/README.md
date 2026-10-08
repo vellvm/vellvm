@@ -8,6 +8,13 @@ Each file quotes the LangRef clause it tests in its header.
 The corpus states what LLVM requires. It does not record what Vellvm does
 today, so many of these assertions fail at the moment (see [Status](#status)).
 
+One deliberate exception: this branch follows LLVM's plan to remove `undef` in
+favor of `poison`, and Vellvm denotes `undef` as `poison`. In UB positions the
+two agree (branching on either is UB). They differ only where `undef`'s "any
+value" reading is masked, like `or i8 undef, 255`, which today's LangRef makes
+255 but which is poison here. Such tests (`switch.ll`'s
+`@switch_or_undef_255`) assert the poison answer and say so in a comment.
+
 ```sh
 cd src
 ./vellvm -L libll -test-dir ../tests/ub            # whole directory
@@ -69,7 +76,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **174/297**
+As of 2026-10-08, `make interp` on `ub-tests` gives **176/297**
 assertions passing, and the three files that don't parse report as failures. The
 15 failing controls are all accounted for below: the poison-only attribute and
 metadata cases, `initializes` read-before-write, lifetime, memmove, and the
@@ -77,14 +84,15 @@ memcpy/memset poison cases. Gaps by category:
 
 **Already handled.** Division and remainder, including `INT_MIN / -1` and
 `INT_MIN srem -1`; branching or
-switching on poison; `unreachable`; null, poison, out-of-bounds, dangling,
+switching on poison or `undef`; `unreachable`; null, poison, out-of-bounds, dangling,
 freed, and wrong-provenance loads, stores, and atomics; all of `provenance.ll`;
 memcpy overlap and out of bounds; double free, freeing non-heap memory, and
 `free(poison)` (`free(null)` is a no-op, whatever the null pointer's provenance).
 
 **Missing UB (Vellvm returns a value instead):**
-- `undef` in a UB position is drawn as some value instead of being UB: `br`,
-  `switch`, `alloca` count, memcpy/memset length, `ret` with `noundef`.
+- (`undef` now behaves exactly like poison. The remaining `undef` cases, the
+  `alloca` count, the memcpy/memset length, and a `noundef` return, fail for
+  the same reasons as their poison counterparts listed here.)
 - `alloca i32, i32 poison` is not UB *at the alloca*. The assertion passes only
   because the following store fails (the reported location is the store).
 - Alignment is never checked: `load`/`store`/`atomicrmw`/`cmpxchg` `align`, and
@@ -187,8 +195,9 @@ Out of 195 UB cases and 111 controls:
 - **llubi** finds most of what Vellvm misses: alignment, `!noundef` and the
   other load metadata, parameter attributes, `getelementptr` flags, lifetime,
   `assume`, and srem overflow. It misses:
-  - `undef` in UB positions (division, `br`, `switch`, `alloca`, `noundef`), which
-    Vellvm catches for division;
+  - `undef` in UB positions (division, `br`, `switch`, `alloca`, `noundef`).
+    Vellvm caught these for division in this run; now that it denotes `undef`
+    as poison, it also catches `br` and `switch`;
   - the function and pointer-capability attributes (`memory(...)`, `noreturn`,
     `readonly`/`readnone`, `captures`, `nofree`, `noalias`, `initializes`,
     `writable`, `nocreateundeforpoison`);

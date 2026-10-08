@@ -227,10 +227,6 @@ Section Denotation.
 
     (* [undef] is treated semantically as [poison] on this branch. *)
     | EXP_Undef => ret (DVALUE_Base DVALUE_Poison)
-        (* match top with *)
-        (* | None   => raise ("denote_exp given untyped EXP_Undef") *)
-        (* | Some t => freeze t (DVALUE_Base DVALUE_Poison) *)
-        (* end *)
 
     | EXP_Poison => ret (DVALUE_Base DVALUE_Poison)
 
