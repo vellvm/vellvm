@@ -617,11 +617,28 @@ Proof.
     gstep; constructor; auto.
 Qed.
 
+(** Per-argument attributes applied to related argument lists. *)
+Lemma I2F_apply_args_attrs attrss msg args1 args2 :
+  Forall2 I2F_dvalue args1 args2 ->
+  I2F_refine_CFG (Forall2 I2F_dvalue)
+    (@apply_args_attrs PInf attrss msg args1) (@apply_args_attrs PFin attrss msg args2).
+Proof.
+  intros H; revert attrss; induction H as [| v1 v2 vs1 vs2 Hv _ IH]; intros attrss; cbn.
+  - unfold I2F_refine_CFG; rstep; cbnn; auto.
+  - destruct attrss as [| attrs rest];
+      (erbind; [apply I2F_apply_value_attrs; eauto | intros v1' v2' Hv'];
+       erbind; [apply IH | intros vs1' vs2' Hvs'];
+       unfold I2F_refine_CFG; rstep; cbnn; auto).
+Qed.
+
 Lemma I2F_denote_function d :
     I2F_function_denotation (@denote_function PInf d) (@denote_function PFin d).
 Proof with try now (rstep; cbnn; try (easy); eauto).
   unfold denote_function.
+  destruct (dc_param_attrs (df_prototype d)) as [ret_attrs args_attrs].
   intros ???.
+  (* the callee's declared argument attributes, on entry *)
+  rbind (Forall2 I2F_dvalue); [apply I2F_apply_args_attrs; auto | intros args1' args2' Hargs'].
   rbind I2F_Addr; [apply I2F_push_call_frame; auto | intros].
   erbind...
   eapply I2F_run_exc, I2F_denote_cfg; constructor; auto.
@@ -630,7 +647,11 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   rbind TT...
   intros ???.
   rbind TT...
-  intros ???...
+  intros ???.
+  (* the callee's declared return attributes, on a normal return *)
+  match goal with HR : sum_rel I2F_dvalue I2F_dvalue _ _ |- _ => destruct HR end.
+  - rstep; cbnn; auto.
+  - erbind; [apply I2F_apply_value_attrs; eauto | intros]...
 Qed.
 
 (** Pointwise lifting of [I2F_function_denotation] to function contexts,

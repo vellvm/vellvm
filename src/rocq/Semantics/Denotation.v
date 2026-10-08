@@ -970,18 +970,47 @@ Section Denotation.
     | _ => raise "Non-address returned from alloca of varargs"
     end.
 
+  (** Apply per-argument attribute lists to a list of arguments.  Arguments
+      past the end of [attrss] (e.g. variadic ones) have no attributes. *)
+  Fixpoint apply_args_attrs (attrss : list (list param_attr)) (msg : string)
+    (args : list dvalue) : CFGtop (list dvalue) :=
+    match args with
+    | [] => ret []
+    | v :: vs =>
+        let '(attrs, rest) :=
+          match attrss with
+          | [] => ([], [])
+          | a :: r => (a, r)
+          end in
+        v' <- apply_value_attrs attrs msg v;;
+        vs' <- apply_args_attrs rest msg vs;;
+        ret (v' :: vs')
+    end.
+
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     (* Built outside the closure: one block map per definition (see
        [TopLevel] building [fundefs]), shared by every call to it. *)
     let bmap := ocfg_map (blks (df_instrs df)) in
+    (* The attributes declared on the function's parameters and return value
+       (e.g. [noundef], [nonnull]) apply on entry and on a normal return. *)
+    let '(ret_attrs, args_attrs) := dc_param_attrs (df_prototype df) in
+    let fname := show_raw_id (dc_name (df_prototype df)) in
     fun (args : list dvalue) =>
+      args <- apply_args_attrs args_attrs
+               ("Argument of " ++ fname ++ " violates noundef.") args;;
       varg <- push_call_frame df args;;
       (* Catch a frame-local unwind so the result surfaces as [exc + dvalue].
          [pop_call_frame] runs on both the normal and the unwinding path, so the
          frame is always torn down before the (value-carried) unwind continues. *)
       rv <- run_exc (denote_cfg_map bmap (df_instrs df) (Some varg));;
       pop_call_frame;;
-      ret rv.
+      match rv with
+      | inl exc => ret (inl exc)
+      | inr v =>
+          v' <- apply_value_attrs ret_attrs
+                  ("Return value of " ++ fname ++ " violates noundef.") v;;
+          ret (inr v')
+      end.
 
   (* We now turn to the second knot to be tied: a top-level itree program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to

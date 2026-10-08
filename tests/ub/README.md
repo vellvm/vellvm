@@ -76,10 +76,10 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **199/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **224/301**
 assertions passing, and the three files that don't parse report as failures. The
-12 failing controls are all accounted for below: the poison-only attribute and
-metadata cases, `initializes` read-before-write, lifetime, and memmove. Gaps by category:
+7 failing controls are all accounted for below: the poison-only load-metadata
+cases, `initializes` read-before-write, lifetime, and memmove. Gaps by category:
 
 **Already handled.** Division and remainder, including `INT_MIN / -1` and
 `INT_MIN srem -1`; branching or
@@ -104,10 +104,14 @@ memset with a poison fill value (stores poison); double free, freeing non-heap m
   now get their type's natural alignment, vectors included.)
 - `getelementptr` `inbounds`/`nuw`/`nusw` never produce poison.
 - Value attributes (`noundef`, `nonnull`, `align`, `range`, and the
-  nonnull/noundef part of `dereferenceable`) are enforced only on *call-site*
-  arguments so far; attributes declared on the callee, and return-value
-  attributes, are not. Because of that, the poison-only controls (for example
-  `nonnull` alone should yield poison) still fail.
+  nonnull/noundef part of `dereferenceable`) are enforced on call-site
+  arguments, and on the arguments and return value of a *defined* callee (on
+  entry and on return). Not yet: call-site return attributes, attributes of
+  external (declared-only) functions, and an attribute split between the
+  declaration and the call site (e.g. `nonnull` declared, `noundef` at the
+  call), which LangRef combines.
+- `icmp` of a poison pointer fails ("ill-typed") instead of yielding poison, so
+  branching on a comparison with a poisoned `nonnull` pointer is not UB yet.
 - Not enforced at all: the memory part of `dereferenceable[_or_null]`,
   `noreturn`, `nounwind`, `memory(...)`, `readonly`/`readnone`, `captures`,
   `nofree`, `noalias`, `initializes`, `writable`, `nocreateundeforpoison`.
@@ -115,7 +119,8 @@ memset with a poison fill value (stores poison); double free, freeing non-heap m
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
 - Stores to `constant` globals are allowed, directly and through memcpy/memset.
-- `llvm.assume` is a no-op in `libll`, and assume operand bundles are ignored.
+- `llvm.assume(false)` is not UB and assume operand bundles are ignored
+  (`llvm.assume(poison)` is UB, via its `noundef` parameter in `libll`).
 - Calling-convention mismatches aren't detected.
 
 **Wrong kind of error (fails instead of UB):**
