@@ -404,25 +404,10 @@ define noalias i8* @__rust_realloc(i8* %old, i64 %old_size, i64 %align, i64 %new
   ret i8* %ptr
 }
 
-define void @llvm.memset.p0.i64(ptr %dest, i8 %val, i64 %len, i1 %vol) {
-        call void @llvm.memset.p0i8.i64(ptr %dest, i8 %val, i64 %len, i1 %vol)
-        ret void
-}
-
-define void @llvm.memset.p0.i32(ptr %dest, i8 %val, i32 %len, i1 %vol) {
-        call void @llvm.memset.p0i8.i32(ptr %dest, i8 %val, i32 %len, i1 %vol)
-        ret void
-}
-
 define i8* @memset(i8* %ptr, i32 %val, i64 %len) {
   %valc = trunc i32 %val to i8
   call void @llvm.memset.p0.i64(i8* %ptr, i8 %valc, i64 %len, i1 false)
   ret i8* %ptr
-}
-
-define void @llvm.memcpy.p0.p0.i64(i8* %ptr, i8* %old, i64 %len, i1 %vol) {
-  call void @llvm.memcpy.p0i8.p0i8.i64(i8* %ptr, i8* %old, i64 %len, i1 %vol)
-  ret void
 }
 
 define dso_local noundef i32 @memcmp(i8* %0, i8* %1, i64 %2) {

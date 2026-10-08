@@ -1054,12 +1054,10 @@ Proof.
     eapply I2F_EOU_map_monad2; [exact Hargs |].
     intros a1 a2 Ha; apply I2F_dvalue_to_dvalue_base; auto. }
   intros args1' args2' Hargs'.
-  destruct (orb (Rocqlib.proj_sumbool (string_dec f2 "llvm.memcpy.p0i8.p0i8.i32"))
-              (Rocqlib.proj_sumbool (string_dec f2 "llvm.memcpy.p0i8.p0i8.i64"))).
+  destruct (is_memcpy_name f2).
   - eapply I2F_memS_bind; [apply I2F_handle_memcpy; auto |].
     intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
-  - destruct (orb (Rocqlib.proj_sumbool (string_dec f2 "llvm.memset.p0i8.i32"))
-                (Rocqlib.proj_sumbool (string_dec f2 "llvm.memset.p0i8.i64"))).
+  - destruct (is_memset_name f2).
     + eapply I2F_memS_bind; [apply I2F_handle_memset; auto |].
       intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
     + destruct (Rocqlib.proj_sumbool (string_dec f2 "malloc")).

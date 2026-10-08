@@ -317,6 +317,18 @@ Section MemoryModel.
 
   Definition NONE := DVALUE_Base DVALUE_None.
   
+  (** The names of the memcpy and memset intrinsics, under both the
+      typed-pointer (`p0i8`) and opaque-pointer (`p0`) manglings. *)
+  Definition is_memcpy_name (name : string) : bool :=
+    existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
+      ["llvm.memcpy.p0i8.p0i8.i32"; "llvm.memcpy.p0i8.p0i8.i64";
+       "llvm.memcpy.p0.p0.i32"; "llvm.memcpy.p0.p0.i64"].
+
+  Definition is_memset_name (name : string) : bool :=
+    existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
+      ["llvm.memset.p0i8.i32"; "llvm.memset.p0i8.i64";
+       "llvm.memset.p0.i32"; "llvm.memset.p0.i64"].
+
   Definition handle_intrinsicM : IntrinsicE ~> memM :=
     fun T e =>
       match e with
@@ -325,14 +337,12 @@ Section MemoryModel.
           (* Pick all arguments, they should all be unique. *)
           (* TODO: add more variants to memcpy *)
           (* FIXME: use reldec typeclass? *)
-          if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
-               (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
+          if is_memcpy_name name
           then
             handle_memcpy args' ;;
             ret (inr NONE)
           else
-            if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
-                 (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
+            if is_memset_name name
             then
               handle_memset args' ;;
               ret (inr NONE)

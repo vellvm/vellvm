@@ -147,10 +147,10 @@ or because Vellvm has no corresponding feature:
 
 - The UB string already carries a source span (`[file:L.C-L.C]: msg`), so
   `ASSERT UB <line>` can be checked by testing whether `<line>` falls in that
-  span. Checked this way, 69 of the currently passing UB assertions match. The
-  exceptions are the `alloca` case above and memcpy/memset, whose UB is reported
-  inside the `libll` opaque-pointer shims (`llvm.memcpy.p0.p0.i64` and
-  `llvm.memset.p0.i64`) rather than at the call.
+  span. Checked this way (as `compare.py` does), 93 of the 94 UB cases Vellvm
+  currently detects match. The exception is the `alloca` case above. (memcpy
+  and memset UB used to be reported inside `libll` shims for the
+  opaque-pointer intrinsic names; Vellvm now handles those names directly.)
 - Asserting a UB *kind* would need a stable tag. Today the kind is only in
   free-form messages ("Reading from unallocated memory.", "Read from memory with
   invalid provenance", "Division by poison.", …).
