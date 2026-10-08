@@ -174,15 +174,16 @@ Section MemoryModel.
       | MemPush => mempush
       | MemPop => mempop
       | Alloca t n align =>
-          (* SAZ: double check the alignment when an alignment is specified, that is a _minimal_
-             guarantee.  If the "natural" alignment of the type is larger, that might be used
-             instead.  We need to figure out whether `allocate_dtyp` is responsible for that
-             or whether to put that logic here.  Currently it seems that no place
-             properly handles that.
-           *)
+          (* LangRef (alloca): "If not specified, the target can choose to
+             align the allocation on any convenient boundary compatible with
+             the type."  Like LLVM (which uses the preferred type alignment),
+             default to the type's preferred alignment.  An explicit alignment
+             is a minimum ("at least that boundary") and is used as given.
+             A larger alignment would also be allowed, but it would hide
+             overestimated-alignment UB in later accesses. *)
           let align :=
             match align with
-            | None => 8%N  (* TODO: This should probably depend on some configuration *)
+            | None => preferred_alignment (dtyp_alignment t)
             | Some align => align
             end in
           ptr <- allocate_dtyp t n align;;
