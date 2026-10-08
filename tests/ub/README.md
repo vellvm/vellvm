@@ -76,7 +76,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **197/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **199/301**
 assertions passing, and the three files that don't parse report as failures. The
 12 failing controls are all accounted for below: the poison-only attribute and
 metadata cases, `initializes` read-before-write, lifetime, and memmove. Gaps by category:
@@ -103,11 +103,14 @@ memset with a poison fill value (stores poison); double free, freeing non-heap m
   the `align` attribute. (Allocas without `align`
   now get their type's natural alignment, vectors included.)
 - `getelementptr` `inbounds`/`nuw`/`nusw` never produce poison.
-- No parameter, return, or function attribute is enforced: `noundef`,
-  `nonnull`, `align`, `dereferenceable[_or_null]`, `range`, `noreturn`,
-  `nounwind`, `memory(...)`, `readonly`/`readnone`, `captures`, `nofree`,
-  `noalias`, `initializes`, `writable`, `nocreateundeforpoison`. This also makes
-  the poison-only controls fail (for example `nonnull` alone should yield poison).
+- Value attributes (`noundef`, `nonnull`, `align`, `range`, and the
+  nonnull/noundef part of `dereferenceable`) are enforced only on *call-site*
+  arguments so far; attributes declared on the callee, and return-value
+  attributes, are not. Because of that, the poison-only controls (for example
+  `nonnull` alone should yield poison) still fail.
+- Not enforced at all: the memory part of `dereferenceable[_or_null]`,
+  `noreturn`, `nounwind`, `memory(...)`, `readonly`/`readnone`, `captures`,
+  `nofree`, `noalias`, `initializes`, `writable`, `nocreateundeforpoison`.
 - Load metadata `!noundef`, `!nonnull`, `!align` is ignored.
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.

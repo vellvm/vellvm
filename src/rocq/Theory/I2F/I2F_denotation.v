@@ -157,6 +157,18 @@ Proof.
   end; rstep; cbnn; try easy; eauto.
 Qed.
 
+(** Call arguments: each is evaluated and passed through its attributes on
+    both sides. *)
+Lemma I2F_denote_call_args args msg :
+  I2F_refine_CFG (Forall2 I2F_dvalue)
+    (@denote_call_args PInf args msg) (@denote_call_args PFin args msg).
+Proof.
+  unfold I2F_refine_CFG, denote_call_args.
+  apply ruttc_map_monad.
+  intros [[t op] attrs] _.
+  erbind; [apply I2F_denote_exp' | intros; apply I2F_apply_value_attrs; auto].
+Qed.
+
 Lemma I2F_denote_instr :
   forall i va1 va2,
     option_rel I2F_Addr va1 va2 ->
@@ -174,10 +186,7 @@ Lemma I2F_denote_instr :
     - destruct x, fn.
       + cbn.
         rbind (Forall2 I2F_dvalue).
-        { apply ruttc_map_monad.
-          intros [] HIN.
-          apply I2F_denote_exp'.
-        }
+        { apply I2F_denote_call_args. }
         break_match...
         * intros.
           rewrite 2 Eqit.bind_bind.
@@ -199,10 +208,7 @@ Lemma I2F_denote_instr :
           rewrite 2 Eqit.bind_ret_l...
       + cbn.
         rbind (Forall2 I2F_dvalue).
-        { apply ruttc_map_monad.
-          intros [] HIN.
-          apply I2F_denote_exp'.
-        }
+        { apply I2F_denote_call_args. }
         intros.
         break_match...
         * intros.
@@ -393,8 +399,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     bind_exp...
   - destruct fnptrval.
     erbind.
-    apply ruttc_map_monad.
-    intros [] ?; apply I2F_denote_exp'.
+    apply I2F_denote_call_args.
     intros.
     bind_exp.
     rbind (sum_rel I2F_dvalue I2F_dvalue)...

@@ -558,6 +558,14 @@ Section Denotation.
     lwrite id loaded_v;;
     ret tt.
 
+  (** Evaluate a call's arguments, passing each through its call-site
+      attributes ([apply_value_attrs]); [msg] reports a violated [noundef]. *)
+  Definition denote_call_args (args : list (texp dtyp * list param_attr)) (msg : string)
+    : CFGtop (list dvalue) :=
+    map_monad (fun '((t, op), attrs) =>
+                 v <- denote_exp' (Some t) op ;;
+                 apply_value_attrs attrs msg v) args.
+
   (** An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
     (i: (instr_id * instr dtyp * list (metadata dtyp)))
@@ -635,7 +643,7 @@ Section Denotation.
     (* Call *)
     (* TODO: technically operand bundles can affect semantics *)
     | (pt, INSTR_Call (dt, f) args _ _) =>
-        vs <- map_monad (fun '(t, op) => denote_exp' (Some t) op) (List.map fst args) ;;
+        vs <- denote_call_args args (err_loc tt ++ ": Call argument violates noundef.") ;;
         returned_value <-
           match intrinsic_exp f with
           | Some s =>
@@ -779,7 +787,7 @@ Section Denotation.
 
     (* TODO: technically operand bundles can affect the semantics of invoke *)
     | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
-      uvs <- map_monad (fun '(t, op) => denote_exp' (Some t) op) (List.map fst args) ;;
+      uvs <- denote_call_args args (err_loc tt ++ ": Invoke argument violates noundef.") ;;
       fv <- denote_exp' None fnptrval ;;
       rv <- call dt fv uvs ;;
       (* branch to to_label *)
