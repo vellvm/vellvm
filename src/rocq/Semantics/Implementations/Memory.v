@@ -227,12 +227,11 @@ Section MemoryModel.
 
   (** memset spec *)
   Definition memset
-    (dst : ptr) (val : int8) (len : Z) (volatile : bool) : memM unit :=
+    (dst : ptr) (byte : memory_byte) (len : Z) (volatile : bool) : memM unit :=
     if Z.ltb len 0
     then
       mub "memset given negative length."
     else
-      let byte := BYTE_I val in
       write_bytes dst (repeatN (Z.to_N len) byte).
   
   Definition handle_memcpy (args : list dvalue_base) : memM unit :=
@@ -261,22 +260,37 @@ Section MemoryModel.
     | _ => merr "Unsupported arguments to memcpy."
     end.
   
-  Definition handle_memset (args : list dvalue_base) : memM unit.
-    refine
-      (match args with
-       | DVALUE_Pointer dst ::
-           DVALUE_I sz_val val ::
-           DVALUE_I sz_len len ::
-           DVALUE_I sz_vol volatile :: [] (* volatile ignored *)  =>
-           _
-       | _ => merr "Unsupported arguments to memset."
-       end).
-
-    destruct (Pos.eq_dec sz_val 8); subst.
-    - exact
-        (memset dst val (unsigned len) (equ volatile VellvmIntegers.one)).
-    - exact (merr "Unsupported arguments to memset.").
-  Defined. 
+  Definition handle_memset (args : list dvalue_base) : memM unit :=
+    match args with
+    | dst :: val :: len :: DVALUE_I _ volatile :: [] (* volatile ignored *) =>
+        (* The fill byte: an i8 value, or poison bytes for a poison value
+           (which is not UB: it just stores poison). *)
+        byte <- match val with
+               | DVALUE_I sz v =>
+                   if Pos.eqb sz 8 then ret (BYTE_I (repr (unsigned v) : int8))
+                   else merr "Unsupported arguments to memset."
+               | DVALUE_Poison => ret poison_memory_byte
+               | _ => merr "Unsupported arguments to memset."
+               end;;
+        size <- match len with
+               | DVALUE_I _ len => ret (unsigned len)
+               (* LangRef: "If <len> is not a well-defined value, the
+                  behavior is undefined." *)
+               | DVALUE_Poison => mub "memset with poison length."
+               | _ => merr "Unsupported arguments to memset."
+               end;;
+        match dst with
+        | DVALUE_Pointer dst => memset dst byte size (equ volatile VellvmIntegers.one)
+        (* LangRef: "If <len> is 0, it is no-op ...  If <len> is not zero,
+           <dest> should be well-defined, otherwise the behavior is
+           undefined." *)
+        | DVALUE_Poison =>
+            if (size =? 0)%Z then ret tt
+            else mub "memset with a poison destination and nonzero length."
+        | _ => merr "Unsupported arguments to memset."
+        end
+    | _ => merr "Unsupported arguments to memset."
+    end.
 
   Definition handle_malloc (args : list dvalue_base) (align : N) : memM ptr :=
     match args with
