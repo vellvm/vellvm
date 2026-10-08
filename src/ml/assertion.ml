@@ -243,9 +243,16 @@ let dvalue_eq_assertion name (ty:DynamicTypes.dtyp) (expected : DV.dvalue) (got 
      | DTYPE_Base DTYPE_Iptr
      | DTYPE_Base DTYPE_Pointer ->
         (* integral comparison *)
-        let v = ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in
-        if dvalue_i1_to_bool v then () else
-          failwith msg
+        begin match result with
+        | DVALUE_Base DV.DVALUE_Poison ->
+           (* [icmp eq] against poison is poison, not a verdict: the
+              expected value is not poison (handled above), so fail. *)
+           failwith msg
+        | _ ->
+           let v = ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in
+           if dvalue_i1_to_bool v then () else
+             failwith msg
+        end
      | _ -> (* Best effort comparison of other types *)
         compare_dvalues_exn expected result msg
      end
