@@ -769,7 +769,13 @@ Section DValue.
           else
             if (msigned y =? 0)%Z
             then raise_ub "Signed mod 0."
-            else tdb <$> mmods x y
+            else
+              (* LangRef: "Overflow also leads to undefined behavior ... by
+                 taking the remainder of a 32-bit division of -2147483648 by
+                 -1", even though the remainder itself does not overflow. *)
+              if (from_option false (fmap (fun min => min =? msigned x) mmin_signed) && (msigned y =? -1))%Z
+              then raise_ub "Signed mod overflow."
+              else tdb <$> mmods x y
                            
       | And =>
           ret (tdb (mand x y))
@@ -820,16 +826,18 @@ Section DValue.
            eval_int_op iop i1 i2
        | DVALUE_Poison, _             =>
            match iop with
-           | SDiv _ =>
+           (* A poison dividend could be INT_MIN, and INT_MIN / -1 is UB for
+              both sdiv and srem. *)
+           | SDiv _ | SRem =>
                x <- match v2 with
                    | DVALUE_I sz2 i2 =>
                        ret (@Integers.signed sz2 i2)
                    | DVALUE_Iptr i2 =>
                        ret (to_Z i2)
-                   | _ => raise_error "ill_typed-iop: sdiv"
+                   | _ => raise_error "ill_typed-iop: sdiv/srem"
                    end;;
                if Z.eq_dec x (-1)
-               then raise_ub "Signed division poison overflow"
+               then raise_ub "Signed division/remainder poison overflow"
                else ret DVALUE_Poison
            | _ =>
                ret DVALUE_Poison 

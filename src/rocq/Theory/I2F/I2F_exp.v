@@ -746,10 +746,11 @@ Proof.
   - repeat break_goal_fast; eauto.
     subst; cbn; apply I2F_eval_int_op_bit_int.
   - apply I2F_eval_int_op_iptr; eauto.
-  - (* Poison rows: the guards are shared, up to [I2F_Iptr] on the payload *)
+  - (* Poison rows: the guards are shared, up to [I2F_Iptr] on the payload
+       (one goal each for SDiv and SRem, which check for a -1 divisor) *)
     destruct iop; cbn; eauto.
-    try (match goal with H : I2F_Iptr _ _ |- _ => red in H; subst end).
-    repeat break_goal_fast; eauto.
+    all: try (match goal with H : I2F_Iptr _ _ |- _ => red in H; subst end).
+    all: repeat break_goal_fast; eauto.
 Qed.
 
 (* Destruct the (variable) vector flags blocking the [eval_*] wrapper
