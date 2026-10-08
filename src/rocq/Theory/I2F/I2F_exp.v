@@ -1787,6 +1787,22 @@ Proof.
   intros * H; destruct H; [destruct H |..]; auto.
 Qed.
 
+(** Related values are equally well defined: poison and poison bits sit at
+    the same places on both sides. *)
+Lemma I2F_dvalue_well_defined : forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    @dvalue_well_defined PInf v1 = @dvalue_well_defined PFin v2.
+Proof.
+  intros v1 v2 H; induction H as [b b' Hb | p s1 s2 _ IH | v s1 s2 _ IH] using I2F_dvalue_ind; cbn.
+  - destruct Hb; cbn; auto.
+    match goal with HB : I2F_dvalue_bv _ _ |- _ => destruct HB as [| | bits bits' Hbits] end;
+      cbn; auto.
+    f_equal; induction Hbits as [| x y xs ys Hxy _ IHb]; cbn; auto.
+    destruct Hxy; cbn; auto.
+  - induction IH; cbn; congruence.
+  - induction IH; cbn; congruence.
+Qed.
+
 Lemma I2F_forallb_is_poison : forall l1 l2,
     Forall2 I2F_dvalue l1 l2 ->
     forallb (@dvalue_is_poison PInf) l1 = forallb (@dvalue_is_poison PFin) l2.

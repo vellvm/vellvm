@@ -516,6 +516,26 @@ Section DValue.
     Lemma dvalue_is_poison_false : forall d,
         dvalue_is_poison d = false -> d <> DVALUE_Base DVALUE_Poison.
     Proof. intros d H C; subst; discriminate. Qed.
+
+    (** LangRef (Well-Defined Values): "a value is *well defined* if the
+        value does not have an undef bit and is not poison ...  An aggregate
+        value or vector is well defined if its elements are well defined."
+        ([undef] is denoted as poison.)  This is what the [noundef]
+        attribute and [!noundef] metadata require. *)
+    Definition dvalue_base_well_defined (v : dvalue_base) : bool :=
+      match v with
+      | DVALUE_Poison => false
+      (* a byte value with some poison bits *)
+      | DVALUE_B _ (BYTE_Mixed bits) => negb (existsb is_poison_bit bits)
+      | _ => true
+      end.
+
+    Fixpoint dvalue_well_defined (dv : dvalue) : bool :=
+      match dv with
+      | DVALUE_Base v => dvalue_base_well_defined v
+      | DVALUE_Struct _ fields => forallb dvalue_well_defined fields
+      | DVALUE_Array _ elts => forallb dvalue_well_defined elts
+      end.
     
     Lemma ibinop_eq_dec : forall (op1 op2:ibinop), {op1 = op2} + {op1 <> op2}.
       intros.

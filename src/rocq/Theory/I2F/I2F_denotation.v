@@ -92,6 +92,71 @@ Lemma I2F_assert_alignment a1 a2 anns msg :
     (@assert_alignment PInf a1 anns msg) (@assert_alignment PFin a2 anns msg).
 Proof. apply I2F_assert_aligned_to. Qed.
 
+(** Value attributes.  Each poison-producing stage keeps related values
+    related: both sides test the same address or the same integer. *)
+Lemma I2F_value_attr_nonnull attrs v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_attr_nonnull PInf attrs v1) (@value_attr_nonnull PFin attrs v2).
+Proof.
+  intros H; pose proof H as H'; unfold value_attr_nonnull.
+  inv H; [inv H0 | |]; cbn; auto.
+  match goal with
+  | |- I2F_dvalue (if ?b1 then _ else _) (if ?b2 then _ else _) =>
+      assert (EQ : b1 = b2)
+        by (f_equal; destruct p, p'; destruct H as [HI ->]; red in HI; subst; reflexivity);
+      rewrite EQ; destruct b2; auto
+  end.
+Qed.
+
+Lemma I2F_value_attr_align attrs v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_attr_align PInf attrs v1) (@value_attr_align PFin attrs v2).
+Proof.
+  intros H; pose proof H as H'; unfold value_attr_align.
+  inv H; [inv H0 | |]; cbn; auto.
+  break_match_goal; auto.
+  match goal with
+  | |- I2F_dvalue (if ?b1 then _ else _) (if ?b2 then _ else _) =>
+      assert (EQ : b1 = b2) by (apply I2F_Addr_ptr_aligned_to; exact H);
+      rewrite EQ; destruct b2; auto
+  end.
+Qed.
+
+Lemma I2F_value_attr_range attrs v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_attr_range PInf attrs v1) (@value_attr_range PFin attrs v2).
+Proof.
+  intros H; pose proof H as H'; unfold value_attr_range.
+  inv H; [inv H0 | |]; cbn; auto.
+  repeat break_match_goal; auto.
+Qed.
+
+Lemma I2F_value_attrs_poison attrs v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_attrs_poison PInf attrs v1) (@value_attrs_poison PFin attrs v2).
+Proof.
+  intros H; unfold value_attrs_poison.
+  apply I2F_value_attr_range, I2F_value_attr_align, I2F_value_attr_nonnull, H.
+Qed.
+
+(** Applying value attributes: related values give the same [noundef]
+    verdict ([I2F_dvalue_well_defined]), so both sides pass on related
+    values, or the infinite side raises UB. *)
+Lemma I2F_apply_value_attrs attrs msg v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_refine_CFG I2F_dvalue
+    (@apply_value_attrs PInf attrs msg v1) (@apply_value_attrs PFin attrs msg v2).
+Proof.
+  intros H; unfold I2F_refine_CFG, apply_value_attrs.
+  pose proof (I2F_value_attrs_poison attrs H) as HP.
+  match goal with
+  | |- ruttc _ _ _ _ _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
+      assert (EQ : b1 = b2)
+        by (f_equal; f_equal; apply I2F_dvalue_well_defined; exact HP);
+      rewrite EQ; destruct b2
+  end; rstep; cbnn; try easy; eauto.
+Qed.
+
 Lemma I2F_denote_instr :
   forall i va1 va2,
     option_rel I2F_Addr va1 va2 ->

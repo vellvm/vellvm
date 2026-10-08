@@ -369,6 +369,70 @@ Section Denotation.
     : CFGtop unit :=
     assert_aligned_to a (find_option ann_align anns) msg.
 
+  (** ** Value attributes on parameters and return values
+
+      LangRef: [nonnull], [align N], and [range(a, b)] turn a violating value
+      into poison ("poison value is returned or passed instead"); [noundef]
+      makes a value that is not well defined immediate UB.  So [nonnull]
+      without [noundef] passes poison on, while [nonnull noundef] on null is
+      UB.  [dereferenceable(n)] "implies nonnull in addrspace(0)" and "implies
+      noundef"; only those two consequences are checked here (that [n] bytes
+      are accessible needs the memory model).
+
+      Only attributes that can be checked from the value itself are handled.
+      Vectors of pointers ([align]/[nonnull] per lane) and [nofpclass] (not
+      parsed) are not yet covered. *)
+
+  (** Is the [sz]-bit integer [x] in the (possibly wrapping) range [[lo, hi)]?
+      LangRef (range): "The pair a,b represents the range [a,b) ... The range
+      is allowed to wrap.  The empty range is represented using 0,0." *)
+  Definition in_wrapping_range (sz : positive) (x lo hi : Z) : bool :=
+    let m := (2 ^ Z.pos sz)%Z in
+    let x := (x mod m)%Z in
+    let lo := (lo mod m)%Z in
+    let hi := (hi mod m)%Z in
+    if (lo =? hi)%Z then false                     (* the empty range *)
+    else if (lo <? hi)%Z then (lo <=? x)%Z && (x <? hi)%Z
+    else (lo <=? x)%Z || (x <? hi)%Z.              (* wraps around *)
+
+  (** The poison-producing attributes, one at a time. *)
+  Definition value_attr_nonnull (attrs : list param_attr) (v : dvalue) : dvalue :=
+    match v with
+    | DVALUE_Base (DVALUE_Pointer p) =>
+        if has_param_attr attr_is_nonnull attrs && (ptr_to_int p =? ptr_to_int null)%Z
+        then DVALUE_Base DVALUE_Poison else v
+    | _ => v
+    end.
+
+  Definition value_attr_align (attrs : list param_attr) (v : dvalue) : dvalue :=
+    match v, find_option attr_align attrs with
+    | DVALUE_Base (DVALUE_Pointer p), Some al =>
+        if ptr_aligned_to p (Z.to_N (denote_int_syntax al)) then v
+        else DVALUE_Base DVALUE_Poison
+    | _, _ => v
+    end.
+
+  Definition value_attr_range (attrs : list param_attr) (v : dvalue) : dvalue :=
+    match v, find_option attr_range attrs with
+    | DVALUE_Base (DVALUE_I sz x), Some (lo, hi) =>
+        if in_wrapping_range sz (unsigned x) (denote_int_syntax lo) (denote_int_syntax hi)
+        then v else DVALUE_Base DVALUE_Poison
+    | _, _ => v
+    end.
+
+  (** The value passed on after the poison-producing attributes. *)
+  Definition value_attrs_poison (attrs : list param_attr) (v : dvalue) : dvalue :=
+    value_attr_range attrs (value_attr_align attrs (value_attr_nonnull attrs v)).
+
+  (** Apply a parameter's or return value's attributes to [v]: the value to
+      pass on, or UB (reported with [msg]) if [noundef] is violated. *)
+  Definition apply_value_attrs (attrs : list param_attr) (msg : string) (v : dvalue)
+    : CFGtop dvalue :=
+    let v := value_attrs_poison attrs v in
+    if has_param_attr attr_is_noundef attrs && negb (dvalue_well_defined v)
+    then raiseUB msg
+    else ret v.
+
   Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : CFGtop unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
     let '(ptr_ty, ptr_val) := cpx.(c_ptr) in
