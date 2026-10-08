@@ -104,6 +104,36 @@ define i32 @inttoptr_constant() {
 
 ; ASSERT UB 101: call i32 @inttoptr_constant()
 
+; Address 0 is null's address, which LangRef says "is associated with no
+; address", so nothing may be allocated there.  `inttoptr i64 0` has no
+; specific provenance, so this load would quietly succeed if some object
+; (a function, global, or alloca) had been placed at address 0, as Vellvm's
+; allocator once did.
+define i64 @inttoptr_zero_load() {
+  %r = inttoptr i64 0 to ptr
+  %v = load i64, ptr %r                           ; <- UB @inttoptr_zero_load
+  ret i64 %v
+}
+
+; ASSERT UB 114: call i64 @inttoptr_zero_load()
+
+; Control: no allocated object compares equal to null.
+define i32 @objects_not_null() {
+  %a = alloca i32
+  %h = call ptr @malloc(i64 4)
+  %c1 = icmp eq ptr @objects_not_null, null
+  %c2 = icmp eq ptr @g1, null
+  %c3 = icmp eq ptr %a, null
+  %c4 = icmp eq ptr %h, null
+  %o1 = or i1 %c1, %c2
+  %o2 = or i1 %c3, %c4
+  %o = or i1 %o1, %o2
+  %r = zext i1 %o to i32
+  ret i32 %r
+}
+
+; ASSERT EQ: i32 0 = call i32 @objects_not_null()
+
 ; Old pointers cannot access a new allocation, even at the same address.
 define i32 @stale_heap_pointer() {
   %p = call ptr @malloc(i64 4)
@@ -114,7 +144,7 @@ define i32 @stale_heap_pointer() {
   ret i32 %v
 }
 
-; ASSERT UB 113: call i32 @stale_heap_pointer()
+; ASSERT UB 143: call i32 @stale_heap_pointer()
 
 ; Same for a popped stack frame whose slot is reused by a later call.
 define ptr @escape_local() {
@@ -136,7 +166,7 @@ define i32 @stale_stack_pointer() {
   ret i32 0
 }
 
-; ASSERT UB 135: call i32 @stale_stack_pointer()
+; ASSERT UB 165: call i32 @stale_stack_pointer()
 
 ; Control: a pointer stored to memory and loaded back keeps its provenance.
 define i32 @ptr_through_memory_ok() {
@@ -191,20 +221,32 @@ define i32 @ub_case_5() {
   ret i32 %r
 }
 
-; case 6 (line 117): ASSERT UB 113: call i32 @stale_heap_pointer()
-define i32 @ub_case_6() {
+; case 6 (line 118): ASSERT UB 114: call i64 @inttoptr_zero_load()
+define i64 @ub_case_6() {
+  %r = call i64 @inttoptr_zero_load()
+  ret i64 %r
+}
+
+; case 7 (line 135): ASSERT EQ: i32 0 = call i32 @objects_not_null()
+define i32 @ub_case_7() {
+  %r = call i32 @objects_not_null()
+  ret i32 %r
+}
+
+; case 8 (line 147): ASSERT UB 143: call i32 @stale_heap_pointer()
+define i32 @ub_case_8() {
   %r = call i32 @stale_heap_pointer()
   ret i32 %r
 }
 
-; case 7 (line 139): ASSERT UB 135: call i32 @stale_stack_pointer()
-define i32 @ub_case_7() {
+; case 9 (line 169): ASSERT UB 165: call i32 @stale_stack_pointer()
+define i32 @ub_case_9() {
   %r = call i32 @stale_stack_pointer()
   ret i32 %r
 }
 
-; case 8 (line 152): ASSERT EQ: i32 5 = call i32 @ptr_through_memory_ok()
-define i32 @ub_case_8() {
+; case 10 (line 182): ASSERT EQ: i32 5 = call i32 @ptr_through_memory_ok()
+define i32 @ub_case_10() {
   %r = call i32 @ptr_through_memory_ok()
   ret i32 %r
 }
@@ -236,6 +278,8 @@ dispatch:
     i32 6, label %case6
     i32 7, label %case7
     i32 8, label %case8
+    i32 9, label %case9
+    i32 10, label %case10
   ]
 case0:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 0)
@@ -287,10 +331,9 @@ case5:
   ret i32 0
 case6:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 6)
-  %c6_r = call i32 @ub_case_6()
+  %c6_r = call i64 @ub_case_6()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 6)
-  %c6_0 = sext i32 %c6_r to i64
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c6_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c6_r)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case7:
@@ -307,6 +350,22 @@ case8:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 8)
   %c8_0 = sext i32 %c8_r to i64
   call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c8_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case9:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 9)
+  %c9_r = call i32 @ub_case_9()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 9)
+  %c9_0 = sext i32 %c9_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c9_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case10:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 10)
+  %c10_r = call i32 @ub_case_10()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 10)
+  %c10_0 = sext i32 %c10_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c10_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 bad:
