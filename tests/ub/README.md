@@ -76,7 +76,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **247/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **249/301**
 assertions passing, and the three files that don't parse report as failures. The
 3 failing controls are all accounted for below: `!align` given as a named
 metadata node, `initializes` read-before-write, and lifetime. Gaps by category:
@@ -119,8 +119,10 @@ memcpy, overlap allowed); double free, freeing non-heap memory, and
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
 - Stores to `constant` globals are allowed, directly and through memcpy/memset.
-- `llvm.assume(false)` is not UB and assume operand bundles are ignored
-  (`llvm.assume(poison)` is UB, via its `noundef` parameter in `libll`).
+- Assume operand bundles are ignored. (`llvm.assume` itself is enforced by
+  its definition in `libll`: a false condition reaches `unreachable`, and a
+  poison one violates its `noundef` parameter. That UB is reported inside
+  `libll`, not at the call.)
 - Calling-convention mismatches aren't detected.
 
 **Wrong kind of error (fails instead of UB):**
