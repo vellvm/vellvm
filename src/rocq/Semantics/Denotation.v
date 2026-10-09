@@ -613,6 +613,11 @@ Section Denotation.
             lwrite id v
         | Some (t, num_exp) =>
             n <- denote_exp' (Some t) num_exp;;
+            (* LangRef (alloca): "If the element count is undef or poison,
+               this instruction has undefined behavior." *)
+            if dvalue_is_poison n
+            then raiseUB (err_loc tt ++ ": Alloca with poison element count.")
+            else
             n' <- (lift (dvalue_to_dvalue_base n)) ;;
             v <- alloca dt (Z.to_N (dvalue_base_int_unsigned n')) align;;
             lwrite id v

@@ -244,6 +244,14 @@ Lemma I2F_denote_instr :
       + break_goal_fast.
         cbn; rewrite 2 Eqit.bind_bind.
         bind_exp.
+        (* a poison element count is UB, and related counts agree on it *)
+        match goal with
+        | |- ruttc _ _ _ _ _ (ITree.bind (if ?b1 then _ else _) _)
+                             (ITree.bind (if ?b2 then _ else _) _) =>
+            assert (EQP : b1 = b2) by (apply I2F_dvalue_is_poison; exact H);
+            rewrite EQP; clear EQP; destruct b2;
+            [rbind (fun _ _ => False); [rstep; cbnn; easy | intros ?? []] |]
+        end.
         rewrite ?Eqit.bind_bind.
         rbind I2F_dvalue_base; [apply I2F_refine_lift', I2F_dvalue_to_dvalue_base; auto |].
         intros.

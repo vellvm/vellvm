@@ -76,7 +76,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **242/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **243/301**
 assertions passing, and the three files that don't parse report as failures. The
 3 failing controls are all accounted for below: `!align` given as a named
 metadata node, `initializes` read-before-write, and lifetime. Gaps by category:
@@ -93,11 +93,6 @@ memcpy, overlap allowed); double free, freeing non-heap memory, and
 `free(poison)` (`free(null)` is a no-op, whatever the null pointer's provenance).
 
 **Missing UB (Vellvm returns a value instead):**
-- (`undef` now behaves exactly like poison. The remaining `undef` cases, the
-  `alloca` count and a `noundef` return, fail for
-  the same reasons as their poison counterparts listed here.)
-- `alloca i32, i32 poison` is not UB *at the alloca*. The assertion passes only
-  because the following store fails (the reported location is the store).
 - Alignment is checked only where it is explicit: `align` on `load`, `store`,
   `atomicrmw`, and `cmpxchg`. Not yet checked: accesses with no `align` (LangRef:
   load/store then have the type's ABI alignment, atomics the value's size), and
@@ -159,8 +154,8 @@ or because Vellvm has no corresponding feature:
 
 - The UB string already carries a source span (`[file:L.C-L.C]: msg`), so
   `ASSERT UB <line>` can be checked by testing whether `<line>` falls in that
-  span. Checked this way (as `compare.py` does), 93 of the 94 UB cases Vellvm
-  currently detects match. The exception is the `alloca` case above. (memcpy
+  span. Checked this way (as `compare.py` does), all 136 UB cases Vellvm
+  currently detects match. (memcpy
   and memset UB used to be reported inside `libll` shims for the
   opaque-pointer intrinsic names; Vellvm now handles those names directly.)
 - Asserting a UB *kind* would need a stable tag. Today the kind is only in
