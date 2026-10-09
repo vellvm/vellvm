@@ -76,7 +76,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **249/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **251/301**
 assertions passing, and the three files that don't parse report as failures. The
 3 failing controls are all accounted for below: `!align` given as a named
 metadata node, `initializes` read-before-write, and lifetime. Gaps by category:
@@ -126,7 +126,9 @@ memcpy, overlap allowed); double free, freeing non-heap memory, and
 - Calling-convention mismatches aren't detected.
 
 **Wrong kind of error (fails instead of UB):**
-- `indirectbr`: "Unsupport itree terminator".
+- `indirectbr` on a non-poison address: "Unsupport itree terminator" (a
+  poison or `undef` address is UB; jumping to a real address needs
+  `blockaddress`, which does not parse).
 - Calls through data pointers become an uninterpreted external call.
 
 **UB where LLVM has none:**

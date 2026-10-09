@@ -335,6 +335,10 @@ Section withParams.
           ret.
           eapply has_post_weaken; [apply IH |].
           intros ? [|]; eauto. 
+      - (* IndirectBr: UB on a poison address, otherwise unsupported *)
+        break_match_goal.
+        bind.
+        break_match_goal; abs.
       - (* Resume *)
         break_match_goal.
         bind; abs.

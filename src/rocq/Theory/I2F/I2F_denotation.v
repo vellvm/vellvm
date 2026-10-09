@@ -432,6 +432,10 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
         erewrite I2F_select_switch; eauto.
         apply I2F_EOU_refl. }
     intros ?? <-...
+  - (* indirectbr: UB on a poison address, otherwise unsupported *)
+    destruct v; bind_exp.
+    rewrite (I2F_dvalue_is_poison H).
+    break_match_goal...
   - destruct v.
     bind_exp...
   - destruct fnptrval.

@@ -848,7 +848,14 @@ Section Denotation.
       raiseLLVM exn
 
     (* Currently unhandled VIR terminators *)
-    | TERM_IndirectBr _ _ => raise (err_loc tt ++ ": Unsupport itree terminator")
+    | TERM_IndirectBr (t, addr) _ =>
+      (* LangRef (indirectbr): "If 'address' is poison or undef, this
+         instruction has undefined behavior."  Jumping to a real address
+         (needs [blockaddress]) is not supported yet. *)
+      a <- denote_exp' (Some t) addr ;;
+      if dvalue_is_poison a
+      then raiseUB (err_loc tt ++ ": indirectbr on a poison address.")
+      else raise (err_loc tt ++ ": Unsupport itree terminator")
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
