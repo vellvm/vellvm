@@ -558,6 +558,24 @@ Section Denotation.
     lwrite id loaded_v;;
     ret tt.
 
+  (** Check how a call ended against the [noreturn] / [nounwind] function
+      attributes [fattrs] (of the callee's definition or of the call site).
+      LangRef (noreturn): "This produces undefined behavior at runtime if the
+      function ever does dynamically return."  (nounwind): "If the function
+      does raise an exception, its runtime behavior is undefined." *)
+  Definition check_call_result (fattrs : list fn_attr) (msg : string) (res : exc + dvalue)
+    : CFGtop unit :=
+    match res with
+    | inl _ =>
+        if existsb fn_attr_is_nounwind fattrs
+        then raiseUB (msg ++ ": unwinding out of a nounwind function.")
+        else ret tt
+    | inr _ =>
+        if existsb fn_attr_is_noreturn fattrs
+        then raiseUB (msg ++ ": returning from a noreturn function.")
+        else ret tt
+    end.
+
   (** Evaluate a call's arguments, passing each through its call-site
       attributes ([apply_value_attrs]); [msg] reports a violated [noundef]. *)
   Definition denote_call_args (args : list (texp dtyp * list param_attr)) (msg : string)
@@ -657,6 +675,7 @@ Section Denotation.
           match intrinsic_exp f with
           | Some s =>
               res <- intrinsic dt s vs varargs ;;
+              check_call_result (ann_fun_attributes anns) (err_loc tt) res ;;
               match res with
               | inl exc => raiseLLVM exc
               | inr dv => ret dv
@@ -665,6 +684,7 @@ Section Denotation.
           | None =>
               fv <- denote_exp' None f;;
               res <- call dt fv vs;;
+              check_call_result (ann_fun_attributes anns) (err_loc tt) res ;;
               match res with
               | inl exc => raiseLLVM exc
               | inr uv => ret uv
@@ -803,6 +823,7 @@ Section Denotation.
       uvs <- denote_call_args args (err_loc tt ++ ": Invoke argument violates noundef.") ;;
       fv <- denote_exp' None fnptrval ;;
       rv <- call dt fv uvs ;;
+      check_call_result (ann_fun_attributes anns) (err_loc tt) rv ;;
       (* branch to to_label *)
       match rv with
       | inl exn =>
@@ -1021,6 +1042,7 @@ Section Denotation.
          frame is always torn down before the (value-carried) unwind continues. *)
       rv <- run_exc (denote_cfg_map bmap (df_instrs df) (Some varg));;
       pop_call_frame;;
+      check_call_result (dc_attrs (df_prototype df)) fname rv;;
       match rv with
       | inl exc => ret (inl exc)
       | inr v =>

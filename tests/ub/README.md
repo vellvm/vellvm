@@ -76,7 +76,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **243/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **247/301**
 assertions passing, and the three files that don't parse report as failures. The
 3 failing controls are all accounted for below: `!align` given as a named
 metadata node, `initializes` read-before-write, and lifetime. Gaps by category:
@@ -106,8 +106,11 @@ memcpy, overlap allowed); double free, freeing non-heap memory, and
   attributes of external (declared-only) functions, and an attribute split
   between the declaration and the call site (e.g. `nonnull` declared,
   `noundef` at the call), which LangRef combines.
+- `noreturn` and `nounwind` are enforced when written directly on a
+  definition or a call site; attribute groups (`#0`, as clang emits) are not
+  resolved, so attributes given that way are not checked.
 - Not enforced at all: the memory part of `dereferenceable[_or_null]`,
-  `noreturn`, `nounwind`, `memory(...)`, `readonly`/`readnone`, `captures`,
+  `memory(...)`, `readonly`/`readnone`, `captures`,
   `nofree`, `noalias`, `initializes`, `writable`, `nocreateundeforpoison`.
 - Load metadata `!noundef` and `!nonnull` are enforced, and `!align` when
   its value is written inline (`!align !{i64 8}`). A named node

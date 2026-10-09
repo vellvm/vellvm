@@ -814,6 +814,16 @@ Definition ann_fun_attribute (a:annotation) : option fn_attr :=
   | _ => None
   end.
 
+(* All the function attributes among a call's annotations. *)
+Definition ann_fun_attributes (anns : list annotation) : list fn_attr :=
+  flat_map (fun a => match ann_fun_attribute a with Some f => [f] | None => [] end) anns.
+
+Definition fn_attr_is_noreturn (f : fn_attr) : bool :=
+  match f with FNATTR_Noreturn => true | _ => false end.
+
+Definition fn_attr_is_nounwind (f : fn_attr) : bool :=
+  match f with FNATTR_Nounwind => true | _ => false end.
+
 Definition ann_atomic (a:annotation) : option unit :=
   match a with
   | ANN_atomic => Some tt

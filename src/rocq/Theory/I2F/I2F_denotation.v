@@ -157,6 +157,17 @@ Proof.
   end; rstep; cbnn; try easy; eauto.
 Qed.
 
+(** The noreturn/nounwind check sees related call results, which are both
+    returns or both unwinds. *)
+Lemma I2F_check_call_result fattrs msg r1 r2 :
+  sum_rel I2F_dvalue I2F_dvalue r1 r2 ->
+  I2F_refine_CFG (fun _ _ => True)
+    (@check_call_result PInf fattrs msg r1) (@check_call_result PFin fattrs msg r2).
+Proof.
+  intros H; unfold I2F_refine_CFG, check_call_result.
+  destruct H; break_match_goal; rstep; cbnn; try easy; eauto.
+Qed.
+
 (** Call arguments: each is evaluated and passed through its attributes on
     both sides. *)
 Lemma I2F_denote_call_args args msg :
@@ -192,6 +203,8 @@ Lemma I2F_denote_instr :
           rewrite 2 Eqit.bind_bind.
           rbind (sum_rel I2F_dvalue I2F_dvalue)...
           intros * HR'.
+          rewrite 2 Eqit.bind_bind.
+          rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
           inv HR'.
           rbind (fun _ _ => False)...
           intros ?? [].
@@ -204,6 +217,8 @@ Lemma I2F_denote_instr :
           rewrite 2 Eqit.bind_bind.
           rbind (sum_rel I2F_dvalue I2F_dvalue)...
           intros * HR'.
+          rewrite 2 Eqit.bind_bind.
+          rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
           inv HR'.
           rbind (fun _ _ => False)...
           intros ?? [].
@@ -219,6 +234,8 @@ Lemma I2F_denote_instr :
           rewrite 2 Eqit.bind_bind.
           rbind (sum_rel I2F_dvalue I2F_dvalue)...
           intros * HR'.
+          rewrite 2 Eqit.bind_bind.
+          rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
           inv HR'.
           rbind (fun _ _ => False)...
           intros ?? [].
@@ -231,6 +248,8 @@ Lemma I2F_denote_instr :
           rewrite 2 Eqit.bind_bind.
           rbind (sum_rel I2F_dvalue I2F_dvalue)...
           intros * HR'.
+          rewrite 2 Eqit.bind_bind.
+          rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
           inv HR'.
           rbind (fun _ _ => False)...
           intros ?? [].
@@ -422,6 +441,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     bind_exp.
     rbind (sum_rel I2F_dvalue I2F_dvalue)...
     intros * HR.
+    rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
     induction HR.
     rbind TT...
     intros...
@@ -668,6 +688,8 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   intros ???.
   rbind TT...
   intros ???.
+  (* the callee's noreturn / nounwind attributes *)
+  rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
   (* the callee's declared return attributes, on a normal return *)
   match goal with HR : sum_rel I2F_dvalue I2F_dvalue _ _ |- _ => destruct HR end.
   - rstep; cbnn; auto.

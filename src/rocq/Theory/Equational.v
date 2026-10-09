@@ -340,7 +340,8 @@ Section withParams.
         bind; abs.
       - (* Invoke *)
         break_match_goal.
-        do 3 bind.
+        (* arguments, callee, call, then the noreturn/nounwind check *)
+        do 4 bind.
         break_match_goal.
         + bind; ret.
         + (* the invoke's return-value attributes, then the result *)
