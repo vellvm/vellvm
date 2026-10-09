@@ -76,10 +76,10 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **228/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **235/301**
 assertions passing, and the three files that don't parse report as failures. The
-7 failing controls are all accounted for below: the poison-only load-metadata
-cases, `initializes` read-before-write, lifetime, and memmove. Gaps by category:
+4 failing controls are all accounted for below: the poison-only load-metadata
+cases, `initializes` read-before-write, and lifetime. Gaps by category:
 
 **Already handled.** Division and remainder, including `INT_MIN / -1` and
 `INT_MIN srem -1`; branching or
@@ -88,7 +88,8 @@ freed, and wrong-provenance loads, stores, and atomics; all of `provenance.ll`;
 calls through poison, `undef`, or null (including `inttoptr 0`) function
 pointers; memcpy overlap and out of bounds; memcpy/memset with a poison
 length, or poison pointers and a nonzero length (a no-op with length 0), and
-memset with a poison fill value (stores poison); double free, freeing non-heap memory, and
+memset with a poison fill value (stores poison); memmove (same checks as
+memcpy, overlap allowed); double free, freeing non-heap memory, and
 `free(poison)` (`free(null)` is a no-op, whatever the null pointer's provenance).
 
 **Missing UB (Vellvm returns a value instead):**
@@ -130,7 +131,6 @@ memset with a poison fill value (stores poison); double free, freeing non-heap m
   LangRef doesn't list that case.
 
 **Unsupported:**
-- `llvm.memmove.*`: "Uninterpreted Call".
 - The parser rejects `blockaddress`, `nofpclass`, `nofreeobj`, `dead_on_return`,
   `captures(ret: …)`, `!captures` store metadata, and `!dereferenceable` /
   `!dereferenceable_or_null` load metadata (`dereferenceable` is lexed as a

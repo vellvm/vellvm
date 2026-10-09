@@ -226,6 +226,14 @@ Section MemoryModel.
     else
       mub "memcpy with overlapping or non-equal src and dst memory locations.".
 
+  Definition memmove (src dst : ptr) (size : N) (volatile : bool) : memM unit :=
+    (* LangRef: "The 'llvm.memmove.*' intrinsics copy a block of memory from
+       the source location to the destination location, which may overlap."
+       All the source bytes are read before any is written, so overlapping
+       ranges are copied correctly. *)
+    src_bytes <- read_bytes src size;;
+    write_bytes dst src_bytes.
+
   (** memset spec *)
   Definition memset
     (dst : ptr) (byte : memory_byte) (len : Z) (volatile : bool) : memM unit :=
@@ -235,7 +243,10 @@ Section MemoryModel.
     else
       write_bytes dst (repeatN (Z.to_N len) byte).
   
-  Definition handle_memcpy (args : list dvalue_base) : memM unit :=
+  (** The shared argument handling of memcpy and memmove: [overlap_ok] is
+      true for memmove (overlapping ranges allowed) and false for memcpy. *)
+  Definition handle_memtransfer (overlap_ok : bool) (args : list dvalue_base) : memM unit :=
+    let name := if overlap_ok then "memmove" else "memcpy" in
     match args with
     | dst :: src :: len :: DVALUE_I _ volatile :: [] (* volatile ignored *) =>
         size <- match len with
@@ -243,24 +254,31 @@ Section MemoryModel.
                | DVALUE_Iptr size => ret (Z.to_N (to_Z size))
                (* LangRef: "If <len> is not a well-defined value, the
                   behavior is undefined." *)
-               | DVALUE_Poison => mub "memcpy with poison length."
-               | _ => merr "Unsupported arguments to memcpy."
+               | DVALUE_Poison => mub (name ++ " with poison length.")
+               | _ => merr ("Unsupported arguments to " ++ name ++ ".")
                end;;
         match dst, src with
         | DVALUE_Pointer dst, DVALUE_Pointer src =>
-            memcpy src dst size (equ volatile VellvmIntegers.one)
+            (if overlap_ok then memmove else memcpy)
+              src dst size (equ volatile VellvmIntegers.one)
         | DVALUE_Poison, (DVALUE_Pointer _ | DVALUE_Poison)
         | DVALUE_Pointer _, DVALUE_Poison =>
             (* LangRef: "If <len> is 0, it is no-op ...  If <len> is not
                zero, both <dest> and <src> should be well-defined, otherwise
                the behavior is undefined." *)
             if (size =? 0)%N then ret tt
-            else mub "memcpy with a poison source or destination and nonzero length."
-        | _, _ => merr "Unsupported arguments to memcpy."
+            else mub (name ++ " with a poison source or destination and nonzero length.")
+        | _, _ => merr ("Unsupported arguments to " ++ name ++ ".")
         end
-    | _ => merr "Unsupported arguments to memcpy."
+    | _ => merr ("Unsupported arguments to " ++ name ++ ".")
     end.
-  
+
+  Definition handle_memcpy (args : list dvalue_base) : memM unit :=
+    handle_memtransfer false args.
+
+  Definition handle_memmove (args : list dvalue_base) : memM unit :=
+    handle_memtransfer true args.
+
   Definition handle_memset (args : list dvalue_base) : memM unit :=
     match args with
     | dst :: val :: len :: DVALUE_I _ volatile :: [] (* volatile ignored *) =>
@@ -318,12 +336,17 @@ Section MemoryModel.
 
   Definition NONE := DVALUE_Base DVALUE_None.
   
-  (** The names of the memcpy and memset intrinsics, under both the
-      typed-pointer (`p0i8`) and opaque-pointer (`p0`) manglings. *)
+  (** The names of the memcpy, memmove, and memset intrinsics, under both
+      the typed-pointer (`p0i8`) and opaque-pointer (`p0`) manglings. *)
   Definition is_memcpy_name (name : string) : bool :=
     existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
       ["llvm.memcpy.p0i8.p0i8.i32"; "llvm.memcpy.p0i8.p0i8.i64";
        "llvm.memcpy.p0.p0.i32"; "llvm.memcpy.p0.p0.i64"].
+
+  Definition is_memmove_name (name : string) : bool :=
+    existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
+      ["llvm.memmove.p0i8.p0i8.i32"; "llvm.memmove.p0i8.p0i8.i64";
+       "llvm.memmove.p0.p0.i32"; "llvm.memmove.p0.p0.i64"].
 
   Definition is_memset_name (name : string) : bool :=
     existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
@@ -341,6 +364,11 @@ Section MemoryModel.
           if is_memcpy_name name
           then
             handle_memcpy args' ;;
+            ret (inr NONE)
+          else
+          if is_memmove_name name
+          then
+            handle_memmove args' ;;
             ret (inr NONE)
           else
             if is_memset_name name

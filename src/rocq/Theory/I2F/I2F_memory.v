@@ -924,6 +924,19 @@ Proof.
   - apply I2F_Mub_l.
 Qed.
 
+Lemma I2F_memmove : forall (src1 dst1 : @ptr (@PROV PInf) (@PTR PInf))
+                          (src2 dst2 : @ptr (@PROV PFin) (@PTR PFin)),
+    I2F_Addr src1 src2 -> I2F_Addr dst1 dst2 ->
+    forall size volatile,
+    I2F_memS I2F_State (fun (_ _ : unit) => True)
+      (memmove src1 dst1 size volatile) (memmove src2 dst2 size volatile).
+Proof.
+  intros src1 dst1 src2 dst2 Hsrc Hdst size volatile; unfold memmove.
+  eapply I2F_memS_bind; [apply I2F_read_bytes; auto |].
+  intros bytes1 bytes2 Hbytes.
+  apply I2F_write_bytes; auto.
+Qed.
+
 Lemma I2F_memset : forall (dst1 : @ptr (@PROV PInf) (@PTR PInf)) (dst2 : @ptr (@PROV PFin) (@PTR PFin)),
     I2F_Addr dst1 dst2 ->
     forall byte1 byte2, I2F_memory_byte byte1 byte2 ->
@@ -949,11 +962,17 @@ Proof.
   apply I2F_Malloc_bytes_with_pr; auto.
 Qed.
 
-Lemma I2F_handle_memcpy : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
+(** The shared argument handling of memcpy and memmove.  (The lemma
+    quantifies over the [overlap_ok] flag rather than over the copy
+    primitive: spelling out a [memM]-valued function type here sends
+    instance resolution into a loop.) *)
+Lemma I2F_handle_memtransfer : forall overlap_ok
+    (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
     Forall2 I2F_dvalue_base args1 args2 ->
-    I2F_memS I2F_State (fun (_ _ : unit) => True) (handle_memcpy args1) (handle_memcpy args2).
+    I2F_memS I2F_State (fun (_ _ : unit) => True)
+      (handle_memtransfer overlap_ok args1) (handle_memtransfer overlap_ok args2).
 Proof.
-  intros args1 args2 Hargs; unfold handle_memcpy.
+  intros overlap_ok args1 args2 Hargs; unfold handle_memtransfer.
   destruct Hargs as [ | dst1 dst2 l1 l2 Hdst Hargs]; [apply I2F_Merr |].
   destruct Hargs as [ | src1 src2 l1' l2' Hsrc Hargs]; [apply I2F_Merr |].
   destruct Hargs as [ | sz1 sz2 l1'' l2'' Hsz Hargs]; [apply I2F_Merr |].
@@ -973,8 +992,19 @@ Proof.
     destruct Hsrc as [psrc1 psrc2 Hpsrc | | | | | | | ];
     try apply I2F_Merr;
     try (destruct (size =? 0)%N; [constructor; auto | apply I2F_Mub_l]).
-  apply I2F_memcpy; auto.
+  destruct overlap_ok; [apply I2F_memmove | apply I2F_memcpy]; auto.
 Qed.
+
+
+Lemma I2F_handle_memcpy : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
+    Forall2 I2F_dvalue_base args1 args2 ->
+    I2F_memS I2F_State (fun (_ _ : unit) => True) (handle_memcpy args1) (handle_memcpy args2).
+Proof. apply I2F_handle_memtransfer. Qed.
+
+Lemma I2F_handle_memmove : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
+    Forall2 I2F_dvalue_base args1 args2 ->
+    I2F_memS I2F_State (fun (_ _ : unit) => True) (handle_memmove args1) (handle_memmove args2).
+Proof. apply I2F_handle_memtransfer. Qed.
 
 Lemma I2F_handle_memset : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
     Forall2 I2F_dvalue_base args1 args2 ->
@@ -1055,8 +1085,11 @@ Proof.
     intros a1 a2 Ha; apply I2F_dvalue_to_dvalue_base; auto. }
   intros args1' args2' Hargs'.
   destruct (is_memcpy_name f2).
-  - eapply I2F_memS_bind; [apply I2F_handle_memcpy; auto |].
-    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
+  { eapply I2F_memS_bind; [apply I2F_handle_memcpy; auto |].
+    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor. }
+  destruct (is_memmove_name f2).
+  { eapply I2F_memS_bind; [apply I2F_handle_memmove; auto |].
+    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor. }
   - destruct (is_memset_name f2).
     + eapply I2F_memS_bind; [apply I2F_handle_memset; auto |].
       intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.

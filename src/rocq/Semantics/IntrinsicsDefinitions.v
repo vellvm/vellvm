@@ -139,6 +139,54 @@ Definition memcpy_8_64_decl: declaration typ :=
     dc_annotations  := []
   |}.
 
+Definition memmove_8_32_decl: declaration typ :=
+  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
+  let i32 := TYPE_I 32%positive in
+  let i1 := TYPE_I 1%positive in
+  {|
+    dc_name        := Name "llvm.memmove.p0i8.p0i8.i32";
+    dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i1] false;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition memmove_8_64_decl: declaration typ :=
+  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
+  let i64 := TYPE_I 64%positive in
+  let i1 := TYPE_I 1%positive in
+  {|
+    dc_name        := Name "llvm.memmove.p0i8.p0i8.i64";
+    dc_type        := TYPE_Function TYPE_Void [pt; pt; i64; i1] false;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition memmove_p0_32_decl: declaration typ :=
+  let pt := TYPE_Pointer None in
+  let i32 := TYPE_I 32%positive in
+  let i1 := TYPE_I 1%positive in
+  {|
+    dc_name        := Name "llvm.memmove.p0.p0.i32";
+    dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i1] false;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
+Definition memmove_p0_64_decl: declaration typ :=
+  let pt := TYPE_Pointer None in
+  let i64 := TYPE_I 64%positive in
+  let i1 := TYPE_I 1%positive in
+  {|
+    dc_name        := Name "llvm.memmove.p0.p0.i64";
+    dc_type        := TYPE_Function TYPE_Void [pt; pt; i64; i1] false;
+    dc_param_attrs := ([], [[];[];[];[];[]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
 Definition memset_8_32_decl: declaration typ :=
   let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
   let i32 := TYPE_I 32%positive in
@@ -341,6 +389,10 @@ Definition defined_intrinsics_decls :=
     (* memory intrinsics *)
     memcpy_8_32_decl;
     memcpy_8_64_decl;
+    memmove_8_32_decl;
+    memmove_8_64_decl;
+    memmove_p0_32_decl;
+    memmove_p0_64_decl;
     memset_8_32_decl;
     memset_8_64_decl;
     memcpy_p0_32_decl;
