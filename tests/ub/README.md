@@ -76,53 +76,59 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **251/301**
-assertions passing, and the three files that don't parse report as failures. The
-3 failing controls are all accounted for below: `!align` given as a named
-metadata node, `initializes` read-before-write, and lifetime. Gaps by category:
+As of 2026-10-09 (`ub-tests` at 775c9b35), `make interp` gives **251/301**
+assertions passing, and the three files that don't parse report as failures
+(the whole `make test` suite: 785/835). The 3 failing controls are all
+accounted for below: `!align` given as a named metadata node, `initializes`
+read-before-write, and lifetime. Gaps by category:
 
-**Already handled.** Division and remainder, including `INT_MIN / -1` and
-`INT_MIN srem -1`; branching or
-switching on poison or `undef`; `unreachable`; null, poison, out-of-bounds, dangling,
-freed, and wrong-provenance loads, stores, and atomics; all of `provenance.ll`;
-calls through poison, `undef`, or null (including `inttoptr 0`) function
-pointers; memcpy overlap and out of bounds; memcpy/memset with a poison
-length, or poison pointers and a nonzero length (a no-op with length 0), and
-memset with a poison fill value (stores poison); memmove (same checks as
-memcpy, overlap allowed); double free, freeing non-heap memory, and
-`free(poison)` (`free(null)` is a no-op, whatever the null pointer's provenance).
+**Already handled.**
+- Arithmetic: division and remainder, including `INT_MIN / -1` and
+  `INT_MIN srem -1` (and a poison dividend with divisor `-1`).
+- Control flow: branching or switching on poison or `undef`; `unreachable`;
+  `indirectbr` on a poison or `undef` address.
+- Memory accesses: null, poison, out-of-bounds, dangling, freed, and
+  wrong-provenance loads, stores, and atomics; all of `provenance.ll`; nothing
+  is ever allocated at address 0; an overestimated explicit `align` on `load`,
+  `store`, `atomicrmw`, and `cmpxchg`; an `alloca` with a poison or `undef`
+  count. (Allocas without `align` get their type's natural alignment, vectors
+  included.)
+- Calls: through poison, `undef`, or null (including `inttoptr 0`) function
+  pointers; `noreturn` functions that return and `nounwind` functions that
+  unwind (when written directly on a definition or call site).
+- Value attributes `noundef`, `nonnull`, `align`, `range`, and the
+  nonnull/noundef part of `dereferenceable`: on call-site arguments and return
+  values (call and invoke), and on the arguments and return value of a
+  *defined* callee. Without `noundef`, a violation passes poison on.
+- Load metadata `!noundef`, `!nonnull`, and `!align` (inline node only).
+- Intrinsics and libc: memcpy overlap and out of bounds; memcpy, memmove, and
+  memset with a poison length, or poison pointers and a nonzero length (a no-op
+  with length 0); memset with a poison fill value (stores poison); memmove
+  (overlap allowed); `llvm.assume(false)` and `llvm.assume(poison)`; double
+  free, freeing non-heap memory, and `free(poison)` (`free(null)` is a no-op).
+- `icmp` on a poison pointer yields poison.
 
 **Missing UB (Vellvm returns a value instead):**
-- Alignment is checked only where it is explicit: `align` on `load`, `store`,
-  `atomicrmw`, and `cmpxchg`. Not yet checked: accesses with no `align` (LangRef:
-  load/store then have the type's ABI alignment, atomics the value's size), and
-  the `align` attribute. (Allocas without `align`
-  now get their type's natural alignment, vectors included.)
-- `getelementptr` `inbounds`/`nuw`/`nusw` never produce poison.
-- Value attributes (`noundef`, `nonnull`, `align`, `range`, and the
-  nonnull/noundef part of `dereferenceable`) are enforced on call-site
-  arguments and return values (call and invoke), and on the arguments and
-  return value of a *defined* callee (on entry and on return). Not yet:
-  attributes of external (declared-only) functions, and an attribute split
-  between the declaration and the call site (e.g. `nonnull` declared,
+- Accesses with no `align` are not checked (LangRef: load/store then have the
+  type's ABI alignment, atomics the value's size).
+- `getelementptr` `inbounds`/`nuw`/`nusw` never produce poison (the parser does
+  not record these flags).
+- Value attributes of external (declared-only) functions, and an attribute
+  split between the declaration and the call site (e.g. `nonnull` declared,
   `noundef` at the call), which LangRef combines.
-- `noreturn` and `nounwind` are enforced when written directly on a
-  definition or a call site; attribute groups (`#0`, as clang emits) are not
-  resolved, so attributes given that way are not checked.
+- Attribute groups (`#0`, as clang emits) are not resolved, so `noreturn` /
+  `nounwind` given that way are not checked.
 - Not enforced at all: the memory part of `dereferenceable[_or_null]`,
-  `memory(...)`, `readonly`/`readnone`, `captures`,
-  `nofree`, `noalias`, `initializes`, `writable`, `nocreateundeforpoison`.
-- Load metadata `!noundef` and `!nonnull` are enforced, and `!align` when
-  its value is written inline (`!align !{i64 8}`). A named node
-  (`!align !1`, as clang emits) is not read, because the module's metadata
-  definitions are not kept in the mcfg. `!range` is not handled yet.
+  `memory(...)`, `readonly`/`readnone`, `captures`, `nofree`, `noalias`,
+  `initializes`, `writable`, `nocreateundeforpoison`.
+- Load metadata given as a named node (`!align !1`, as clang emits) is not
+  read, because the module's metadata definitions are not kept in the mcfg;
+  `!range` is not handled.
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
 - Stores to `constant` globals are allowed, directly and through memcpy/memset.
-- Assume operand bundles are ignored. (`llvm.assume` itself is enforced by
-  its definition in `libll`: a false condition reaches `unreachable`, and a
-  poison one violates its `noundef` parameter. That UB is reported inside
-  `libll`, not at the call.)
+- Assume operand bundles are ignored. (`llvm.assume` itself is enforced by its
+  definition in `libll`, so its UB is reported inside `libll`, not at the call.)
 - Calling-convention mismatches aren't detected.
 
 **Wrong kind of error (fails instead of UB):**
@@ -161,10 +167,11 @@ or because Vellvm has no corresponding feature:
 
 - The UB string already carries a source span (`[file:L.C-L.C]: msg`), so
   `ASSERT UB <line>` can be checked by testing whether `<line>` falls in that
-  span. Checked this way (as `compare.py` does), all 136 UB cases Vellvm
-  currently detects match. (memcpy
-  and memset UB used to be reported inside `libll` shims for the
-  opaque-pointer intrinsic names; Vellvm now handles those names directly.)
+  span. Checked this way (as `compare.py` does), 142 of the 144 UB cases Vellvm
+  currently detects match; the other two are `llvm.assume` cases, whose UB is
+  reported inside `libll`. (memcpy and memset UB used to be reported inside
+  `libll` shims for the opaque-pointer intrinsic names; Vellvm now handles
+  those names directly.)
 - Asserting a UB *kind* would need a stable tag. Today the kind is only in
   free-form messages ("Reading from unallocated memory.", "Read from memory with
   invalid provenance", "Division by poison.", …).
@@ -193,6 +200,28 @@ python3 ../tests/ub/compare.py [files...] [--clang PATH] [--llubi PATH] [-j N]
 The Vellvm and llubi cells are marked ✓ (agrees with the assertion), ~ (UB, but
 on a different line), or ✗. The native columns are not marked, because they
 aren't UB detectors. They show what the UB turns into.
+
+### Latest run (2026-10-09, `ub-tests` at 775c9b35)
+
+Out of 198 UB cases and 113 controls:
+
+| | Vellvm | llubi | O0 | O1–O3 | ASan |
+|---|---|---|---|---|---|
+| UB cases reported as UB | 144 | 146 | – | – | – |
+| … on the asserted line | 142 | 140 | – | – | – |
+| UB cases that trap or fail an ASan check | – | – | 43 | 34 | 56 |
+| controls flagged | 0 | 0 | 0 | 0 | 0 |
+| errors (unsupported, build/parse failures) | 12 | 14 | 5 | 5 | 5 |
+
+Only Vellvm reports UB for `undef` in UB positions (division, `br`, `switch`,
+`alloca` count, `noundef`; llubi picks a value), `atomicrmw`/`cmpxchg` (which
+llubi does not implement), and `noreturn`/`nounwind` (21 cases). Only llubi
+reports UB for the memory part of `dereferenceable` (too-small and
+one-past-the-end objects), `getelementptr` flags, lifetime, writes to
+`constant` globals, assume bundles, named `!align` metadata, `nofpclass`,
+`indirectbr` to null, calls through data pointers, and an attribute split
+between declaration and call site (23 cases). Neither catches
+calling-convention mismatches or the pointer-capability attributes.
 
 ### First run (2026-10-08, macOS arm64, Homebrew clang/llubi 23.1.2)
 
