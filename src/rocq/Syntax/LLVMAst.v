@@ -862,6 +862,24 @@ Definition attr_range (a : param_attr) : option (int_syntax * int_syntax) :=
   | _ => None
   end.
 
+(* The value-constraining metadata of a load, as the parameter attributes
+   LangRef defines them by analogy with: [!nonnull] ("analogous to the nonnull
+   attribute"), [!align] ("analogous to the 'align' attribute"), and
+   [!noundef].  Only an inline [!align] node ([!align !{i64 N}]) is read:
+   named metadata nodes ([!align !1]) are not kept in the mcfg.  [!range] and
+   [!dereferenceable] are not handled yet. *)
+Definition load_metadata_attr (md : metadata) : list param_attr :=
+  match md with
+  | METADATA_Pair (METADATA_Id (Name "nonnull")) _ => [PARAMATTR_Nonnull]
+  | METADATA_Pair (METADATA_Id (Name "noundef")) _ => [PARAMATTR_Noundef]
+  | METADATA_Pair (METADATA_Id (Name "align"))
+                  (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) => [PARAMATTR_Align n]
+  | _ => []
+  end.
+
+Definition load_metadata_attrs (mds : list metadata) : list param_attr :=
+  flat_map load_metadata_attr mds.
+
 (* Operand Bundles
    - Note: does not support `preallocated(%foo)` style bundles.
  *)

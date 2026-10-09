@@ -259,7 +259,9 @@ Lemma I2F_denote_instr :
       destruct ptr.
       bind_exp.
       rbind (fun _ _ => True); [apply I2F_assert_alignment; auto | intros _ _ _].
-      erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+      rbind I2F_dvalue; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+      (* the load's value metadata, applied like attributes *)
+      erbind; [apply I2F_apply_value_attrs; eauto | intros].
       auto... (* [apply I2F_freeze'; auto | intros]...*)
     - destruct val,ptr, x; cbn...
       bind_exp.

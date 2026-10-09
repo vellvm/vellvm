@@ -624,6 +624,10 @@ Section Denotation.
       a <- denote_exp' (Some du) ptr;;
       assert_alignment a anns (err_loc tt ++ ": Load with overestimated alignment.");;
       v <- load dt a;;
+      (* the load's !nonnull / !align / !noundef metadata, which act like the
+         corresponding attributes on the loaded value *)
+      v <- apply_value_attrs (load_metadata_attrs md)
+             (err_loc tt ++ ": Loaded value violates !noundef.") v;;
       (* v' <- freeze dt v;; *)
       lwrite id v
 

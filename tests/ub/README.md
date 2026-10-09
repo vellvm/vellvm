@@ -76,10 +76,10 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-08, `make interp` on `ub-tests` gives **235/301**
+As of 2026-10-08, `make interp` on `ub-tests` gives **242/301**
 assertions passing, and the three files that don't parse report as failures. The
-4 failing controls are all accounted for below: the poison-only load-metadata
-cases, `initializes` read-before-write, and lifetime. Gaps by category:
+3 failing controls are all accounted for below: `!align` given as a named
+metadata node, `initializes` read-before-write, and lifetime. Gaps by category:
 
 **Already handled.** Division and remainder, including `INT_MIN / -1` and
 `INT_MIN srem -1`; branching or
@@ -114,7 +114,10 @@ memcpy, overlap allowed); double free, freeing non-heap memory, and
 - Not enforced at all: the memory part of `dereferenceable[_or_null]`,
   `noreturn`, `nounwind`, `memory(...)`, `readonly`/`readnone`, `captures`,
   `nofree`, `noalias`, `initializes`, `writable`, `nocreateundeforpoison`.
-- Load metadata `!noundef`, `!nonnull`, `!align` is ignored.
+- Load metadata `!noundef` and `!nonnull` are enforced, and `!align` when
+  its value is written inline (`!align !{i64 8}`). A named node
+  (`!align !1`, as clang emits) is not read, because the module's metadata
+  definitions are not kept in the mcfg. `!range` is not handled yet.
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
 - Stores to `constant` globals are allowed, directly and through memcpy/memset.
