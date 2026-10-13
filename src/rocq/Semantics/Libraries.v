@@ -70,7 +70,7 @@ Section withParams.
          | bad => raiseUB ("putc got non-i32 argument " ++ show_dvalue bad)
          end
        in
-       fun (args : list dvalue) =>
+       fun (_ : cconv) (args : list dvalue) =>
          match args with
          | char::[] => inr <$> putchar_body char
          | _ => raise "putc called with zero or more than one arguments"
@@ -102,7 +102,7 @@ Section withParams.
       end
     in
 
-    fun (args : list dvalue) =>
+    fun (_ : cconv) (args : list dvalue) =>
       match args with
       | strptr::[] => inr <$> puts_body strptr
       | _ => raise "puts called with zero or more than one arguments"

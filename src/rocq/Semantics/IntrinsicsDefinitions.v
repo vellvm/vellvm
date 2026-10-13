@@ -69,6 +69,15 @@ Definition vellvm_internal_throw_decl: declaration typ :=
     dc_annotations  := []
   |}.
 
+Definition assume_decl: declaration typ :=
+  {|
+    dc_name        := Name "llvm.assume";
+    dc_type        := TYPE_Function TYPE_Void [TYPE_I 1] false;
+    dc_param_attrs := ([], [[PARAMATTR_Noundef]]);
+    dc_attrs       := [];
+    dc_annotations  := []
+  |}.
+
 Definition va_start_decl: declaration typ :=
   {|
     dc_name        := Name "llvm.va_start";
@@ -405,6 +414,9 @@ Definition defined_intrinsics_decls :=
     (* exception intrinsics *)
     vellvm_internal_throw_decl;
 
+    (* assumptions *)
+    assume_decl;
+
     (* Vararg intrinsics *)
     va_start_decl;
     va_end_decl;
@@ -691,6 +703,19 @@ Section Intrinsics.
       | _ => raise_error "llvm_vellvm_internal_throw got incorrect / ill-typed inputs"
       end.
 
+  (* LangRef (llvm.assume): "If the condition is violated during execution,
+     the behavior is undefined."  Its operand bundles belong to the call, not
+     to the intrinsic: [denote_operand_bundles] (Denotation.v) checks them. *)
+  Definition llvm_assume : pure_base_function :=
+    fun args =>
+      match args with
+      | [DVALUE_I 1 c] =>
+          if equ c one then ret (inr DVALUE_None)
+          else raise_ub "llvm.assume: the condition is false."
+      | [DVALUE_Poison] => raise_ub "llvm.assume: the condition is poison."
+      | _ => raise_error "llvm.assume got incorrect / ill-typed inputs"
+      end.
+
   Definition llvm_va_start : semantic_function :=
     fun args varargs =>
       match args, varargs with
@@ -747,6 +772,7 @@ Section Intrinsics.
       (ushl_sat_32_decl, pure_base_to_semantic llvm_ushl_sat_32);
       (ushl_sat_64_decl, pure_base_to_semantic llvm_ushl_sat_64);
       (vellvm_internal_throw_decl, pure_base_to_semantic llvm_vellvm_internal_throw);
+      (assume_decl, pure_base_to_semantic llvm_assume);
       (va_start_decl, llvm_va_start);
       (va_end_decl, llvm_va_end);
       (va_copy_decl, llvm_va_copy)

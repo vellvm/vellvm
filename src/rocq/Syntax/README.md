@@ -3,6 +3,7 @@ Its content gets re-exported in `/rocq` as a module `Syntax` for easier external
 
 - `LLVMAst.v`       the VIR front AST. Our parser of native llvm syntax returns an element of this AST
 - `CFG.v`           the VIR internal AST as used for the semantics
+- `ModuleRefs.v`    resolution of a module's numbered metadata (`!N`) and attribute group (`#N`) references
 - `Traversal.v`     typeclass-based mechanism to define operations manipulating the whole ast painlessly
 - `DynamicTypes.v`  definition of the dynamic types manipulated internally
 - `TypToDtyp.v`     conversion of static types into dynamic types

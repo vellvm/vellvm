@@ -1,5 +1,5 @@
-; UB tests for pointer-attribute features that Vellvm's parser does not
-; accept yet.  This whole file currently fails to parse; each section is
+; UB tests for pointer-attribute features that Vellvm parses but does not
+; enforce yet (they used to be parse errors).  Each section is
 ; self-contained so it can be moved into call-ptr-attrs.ll once supported.
 ;
 ; LangRef (captures(...)): "it is possible to specify that some components are

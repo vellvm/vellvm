@@ -91,17 +91,17 @@ Section withParams.
   (** [denote_phi] *)
   (* TODO: make a choice about it and move *)
   Arguments assoc : simpl never.
-  Lemma denote_phi_hd : forall bid e id τ tl,
-      ⟦ (id, Phi τ ((bid,e)::tl), []) ⟧Φ bid
+  Lemma denote_phi_hd : forall bid e id fm τ tl,
+      ⟦ (id, Phi fm τ ((bid,e)::tl), []) ⟧Φ bid
      ≈ uv <- ⟦ e at τ ⟧e';; Ret (id,uv).
   Proof with solve.
     intros; cbn.
     rewrite assoc_hd...
   Qed.
 
-  Lemma denote_phi_tl : forall bid bid' e id τ tl,
+  Lemma denote_phi_tl : forall bid bid' e id fm τ tl,
       bid <> bid' ->
-      ⟦ (id, Phi τ ((bid',e)::tl), []) ⟧Φ bid ≈ ⟦ (id, Phi τ tl, []) ⟧Φ bid.
+      ⟦ (id, Phi fm τ ((bid',e)::tl), []) ⟧Φ bid ≈ ⟦ (id, Phi fm τ tl, []) ⟧Φ bid.
   Proof with solve.
     intros; cbn.
     rewrite assoc_tl...
@@ -335,17 +335,25 @@ Section withParams.
           ret.
           eapply has_post_weaken; [apply IH |].
           intros ? [|]; eauto. 
-      - (* IndirectBr: UB on a poison address, otherwise unsupported *)
+      - (* IndirectBr: UB on a poison address or an unlisted target;
+           otherwise the listed block whose address is the target *)
         break_match_goal.
         bind.
         break_match_goal; abs.
+        break_match_goal; abs.
+        bind.
+        break_match_goal; abs.
+        break_match_goal; abs.
+        ret; cbn.
+        eapply indirectbr_target_In; eauto.
       - (* Resume *)
         break_match_goal.
         bind; abs.
       - (* Invoke *)
         break_match_goal.
-        (* arguments, callee, call, then the noreturn/nounwind check *)
-        do 4 bind.
+        (* arguments, operand bundles, callee, call, then the
+           noreturn/nounwind check *)
+        do 5 bind.
         break_match_goal.
         + bind; ret.
         + (* the invoke's return-value attributes, then the result *)

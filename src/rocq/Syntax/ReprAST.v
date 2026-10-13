@@ -188,6 +188,10 @@ Section ReprInstances.
    Instance reprIBinop : Repr ibinop
     := {| repr := repr_ibinop |}.
 
+  Definition repr_gep_flags (f : gep_flags) : string :=
+    "(mk_gep_flags " ++ repr (gep_inbounds f) ++ " " ++ repr (gep_nusw f) ++ " "
+      ++ repr (gep_nuw f) ++ ")".
+
   Definition repr_icmp (cmp : icmp) : string
     := match cmp with
        | Eq  => "Eq"
@@ -457,12 +461,13 @@ Section ReprInstances.
                       "] " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_Fneg fm v =>
         "(OP_Fneg [" ++ (contents id (List.map repr_fast_math fm)) ++ "] " ++ texp v ++")"
-    | OP_FCmp cmp t v1 v2 =>
-        "(OP_FCmp " ++ repr cmp ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
+    | OP_FCmp cmp fm t v1 v2 =>
+        "(OP_FCmp " ++ repr cmp ++ " [" ++ (contents id (List.map repr_fast_math fm)) ++
+                    "] " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_Conversion c from v to =>
         "(OP_Conversion " ++ repr c ++ " " ++ repr from ++ " " ++ repr_exp v ++ " " ++ repr to ++ ")"
-    | OP_GetElementPtr t ptrval idxs =>
-        "(OP_GetElementPtr " ++ repr t ++
+    | OP_GetElementPtr flags t ptrval idxs =>
+        "(OP_GetElementPtr " ++ repr_gep_flags flags ++ " " ++ repr t ++
                              "(" ++ texp ptrval ++  ") ["
                              ++ (contents id (List.map texp idxs)) ++ "])"
     | OP_ExtractElement v i =>
@@ -475,8 +480,9 @@ Section ReprInstances.
         "(OP_ExtractValue " ++ texp v ++ " [" ++ (contents id (List.map show idxs)) ++ "])"
     | OP_InsertValue v e idxs =>
         "(OP_ExtractValue " ++ texp v ++ " " ++ texp e ++ " [" ++ (contents id (List.map show idxs)) ++ "])"
-    | OP_Select cnd v1 v2 =>
-        "(OP_Select " ++ texp cnd ++ " " ++ texp v1 ++ " " ++ texp v2 ++ ")"
+    | OP_Select fm cnd v1 v2 =>
+        "(OP_Select [" ++ (contents id (List.map repr_fast_math fm)) ++
+                     "] " ++ texp cnd ++ " " ++ texp v1 ++ " " ++ texp v2 ++ ")"
     | OP_Freeze v =>
         "(OP_Freeze " ++ texp v ++")"
     | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
@@ -491,6 +497,8 @@ Section ReprInstances.
         "(EXP_Metadata " ++ repr_metadata md ++ ")"
     | EXP_Splat elt =>
         "(EXP_splt " ++ texp elt ++ ")"
+    | EXP_BlockAddress fn blk =>
+        "(EXP_BlockAddress " ++ repr fn ++ " " ++ repr blk ++ ")"
     end with
   repr_metadata (m : metadata typ) : string :=
     let texp (te : (typ * exp typ)) : string :=
@@ -559,6 +567,8 @@ Section ReprInstances.
     | PARAMATTR_Swifterror => "PARAMATTR_Swifterror"
     | PARAMATTR_Immarg => "PARAMATTR_Immarg"
     | PARAMATTR_Noundef => "PARAMATTR_Noundef"
+    | PARAMATTR_Nofpclass mask => "(PARAMATTR_Nofpclass " ++ repr mask ++ ")"
+    | PARAMATTR_Nofreeobj => "PARAMATTR_Nofreeobj"
     | PARAMATTR_Alignstack (a) => "PARAMATTR_Alignstack " ++ repr a
     | PARAMATTR_Allocalign =>  "PARAMATTR_Allocalign"
     | PARAMATTR_Allocptr => "PARAMATTR_Allocptr"
@@ -567,6 +577,7 @@ Section ReprInstances.
     | PARAMATTR_Writeonly => "PARAMATTR_Writeonly"
     | PARAMATTR_Writable => "PARAMATTR_Writable"
     | PARAMATTR_Dead_on_unwind => "PARAMATTR_Dead_on_unwind"
+    | PARAMATTR_Dead_on_return size => "(PARAMATTR_Dead_on_return " ++ repr size ++ ")"
     | PARAMATTR_Range t a b => "(PARAMATTR_Range " ++ repr t ++ " " ++ repr a ++ " " ++ repr b ++ ")"
     | PARAMATTR_Initializes l => "(PARAMATTR_Initializes " ++ repr l ++ ")"
     | PARAMATTR_Captures p => "(PARAMATTR_Captures " ++ repr p ++ ")"
@@ -706,6 +717,7 @@ Section ReprInstances.
     | FNATTR_Willreturn => "FNATTR_Willreturn"
     | FNATTR_Nosync => "FNATTR_Nosync"
     | FNATTR_Nounwind => "FNATTR_Nounwind"
+    | FNATTR_Nocreateundeforpoison => "FNATTR_Nocreateundeforpoison"
     | FNATTR_Nosanitize_bounds => "FNATTR_Nosanitize_bounds"
     | FNATTR_Nosanitize_coverage => "FNATTR_Nosanitize_coverage"
     | FNATTR_Null_pointer_is_valid => "FNATTR_Null_pointer_is_valid"
@@ -1006,8 +1018,8 @@ Section ReprInstances.
        | TERM_Br_1 b => "(TERM_Br_1 " ++ repr b ++ ")"
        | TERM_Switch v dest brs  => 
           "(TERM_Switch " ++ repr v ++ " " ++ repr dest ++ repr brs ++ ")"
-      | TERM_IndirectBr v brs  => 
-          "(TERM_IndirectBr " ++ repr v ++ " " ++ repr brs ++ ")" 
+      | TERM_IndirectBr v brs fn  => 
+          "(TERM_IndirectBr " ++ repr v ++ " " ++ repr brs ++ " " ++ repr fn ++ ")" 
       | TERM_Resume v  => "(TERM_Resume " ++ repr v ++ ")"
       | TERM_Invoke fnptrval args to_label unwind_label anns obs  =>
           "(TERM_Invoke " ++ repr fnptrval ++ " " ++ repr args 
@@ -1021,8 +1033,8 @@ Section ReprInstances.
 
   Definition repr_phi (p : phi typ) : string
     := match p with
-       | Phi t args =>
-         "(Phi " ++ repr t ++ repr args ++ ")"
+       | Phi fm t args =>
+         "(Phi [" ++ (contents id (List.map repr_fast_math fm)) ++ "] " ++ repr t ++ repr args ++ ")"
        end.
 
   #[global]
