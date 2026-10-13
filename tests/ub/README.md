@@ -71,7 +71,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 | `call-ptr-attrs-unparsed.ll` | `captures(ret: …)`, `!captures` store metadata *(parses now, but neither is enforced)* |
 | `call-ptr-attrs-nofreeobj.ll` | `nofreeobj` *(LLVM 23.1 does not parse it)* |
 | `intrinsics/memcpy.ll`, `memmove.ll`, `memset.ll` | poison or undef length; null or poison pointers with nonzero length; overlap (memcpy only); out of bounds; writing to a constant |
-| `intrinsics/assume.ll`, `assume-bundles.ll` | a false or poison condition; violated `"nonnull"`, `"align"`, `"dereferenceable"` bundles |
+| `intrinsics/assume.ll`, `assume-bundles.ll` | a false or poison condition; violated `"nonnull"`, `"noundef"`, `"align"` (with an offset, or a non-power-of-two alignment), `"dereferenceable"`, `"dereferenceable_or_null"` bundles |
 | `libc/free.ll` | double free; freeing a stack, global, interior, or poison pointer |
 
 ## Status
@@ -112,8 +112,11 @@ pass poison on). Gaps by category:
 - Intrinsics and libc: memcpy overlap and out of bounds; memcpy, memmove, and
   memset with a poison length, or poison pointers and a nonzero length (a no-op
   with length 0); memset with a poison fill value (stores poison); memmove
-  (overlap allowed); `llvm.assume(false)` and `llvm.assume(poison)`; double
-  free, freeing non-heap memory, and `free(poison)` (`free(null)` is a no-op).
+  (overlap allowed); `llvm.assume(false)` and `llvm.assume(poison)`, and the
+  `"nonnull"`, `"noundef"`, `"align"`, `"dereferenceable"`, and
+  `"dereferenceable_or_null"` assume bundles (`"separate_storage"` is left to
+  the provenance work); double free, freeing non-heap memory, and
+  `free(poison)` (`free(null)` is a no-op).
 - `icmp` on a poison pointer yields poison.
 
 **Missing UB (Vellvm returns a value instead):**
@@ -131,8 +134,6 @@ pass poison on). Gaps by category:
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
 - Stores to `constant` globals are allowed, directly and through memcpy/memset.
-- Assume operand bundles are ignored. (`llvm.assume` itself is enforced by its
-  definition in `libll`, so its UB is reported inside `libll`, not at the call.)
 - Calling-convention mismatches aren't detected.
 
 **Wrong kind of error (fails instead of UB):**
@@ -169,11 +170,9 @@ or because Vellvm has no corresponding feature:
 
 - The UB string already carries a source span (`[file:L.C-L.C]: msg`), so
   `ASSERT UB <line>` can be checked by testing whether `<line>` falls in that
-  span. Checked this way (as `compare.py` does), 165 of the 167 UB cases Vellvm
-  currently detects match; the other two are `llvm.assume` cases, whose UB is
-  reported inside `libll`. (memcpy and memset UB used to be reported inside
-  `libll` shims for the opaque-pointer intrinsic names; Vellvm now handles
-  those names directly.)
+  span. This is how `compare.py` checks it. (memcpy, memset, and
+  `llvm.assume` UB used to be reported inside `libll`; Vellvm now handles
+  those intrinsics directly, so their UB is reported at the call.)
 - Asserting a UB *kind* would need a stable tag. Today the kind is only in
   free-form messages ("Reading from unallocated memory.", "Read from memory with
   invalid provenance", "Division by poison.", …).

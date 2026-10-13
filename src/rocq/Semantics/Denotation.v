@@ -673,6 +673,145 @@ Section Denotation.
                  v <- denote_exp' (Some t) op ;;
                  apply_value_attrs attrs msg v) args.
 
+  (** ** Operand bundles
+
+      Operand bundles belong to the call, not to the callee (LangRef: "An
+      operand bundle at a call site cannot change the implementation of the
+      called function").  Every call and invoke evaluates its bundles'
+      operands at the call ([denote_operand_bundles]); what else a bundle
+      means depends on its tag and on what is called.  So far only the
+      bundles of [llvm.assume] mean more.  LangRef (Assume Operand Bundles):
+      "if any of the provided guarantees are violated at runtime the behavior
+      is undefined." *)
+
+  (* The check of the guarantee an [llvm.assume] bundle states about its
+     operands; the string locates its error messages. *)
+  Definition assume_bundle_check : Type := string -> list dvalue -> CFGtop unit.
+
+  Definition assume_violated {A} (loc tag : string) : CFGtop A :=
+    raiseUB (loc ++ ": llvm.assume operand bundle """ ++ tag ++ """ is violated.").
+
+  Definition assume_malformed {A} (loc tag : string) : CFGtop A :=
+    raise (loc ++ ": malformed llvm.assume operand bundle """ ++ tag ++ """.").
+
+  (* An integer operand of a bundle: an alignment or size (unsigned), or an
+     offset (signed); [None] for poison or a non-integer. *)
+  Definition bundle_uint (v : dvalue) : option Z :=
+    match v with
+    | DVALUE_Base (DVALUE_I _ x) => Some (unsigned x)
+    | _ => None
+    end.
+
+  Definition bundle_sint (v : dvalue) : option Z :=
+    match v with
+    | DVALUE_Base (DVALUE_I _ x) => Some (signed x)
+    | _ => None
+    end.
+
+  Definition is_power_of_two (n : Z) : bool :=
+    (0 <? n)%Z && (Z.land n (n - 1) =? 0)%Z.
+
+  (* ["nonnull"(ptr %p)]: "Equivalent to nonnull on %p". *)
+  Definition assume_nonnull : assume_bundle_check :=
+    fun loc vs =>
+      match vs with
+      | [p] =>
+          match dvalue_ptr_address p with
+          | Some a => if (a =? 0)%Z then assume_violated loc "nonnull" else ret tt
+          | None => assume_violated loc "nonnull"
+          end
+      | _ => assume_malformed loc "nonnull"
+      end.
+
+  (* ["noundef"(%v)]: "Equivalent to noundef on %v". *)
+  Definition assume_noundef : assume_bundle_check :=
+    fun loc vs =>
+      match vs with
+      | [v] => if dvalue_well_defined v then ret tt else assume_violated loc "noundef"
+      | _ => assume_malformed loc "noundef"
+      end.
+
+  (* ["align"(ptr %p, i64 %align[, i64 %offset])]: "Equivalent to align(%align)
+     on %p, or %p - %offset if the %offset argument exists, except that %align
+     may be a non-power-of-two alignment (including a zero alignment). If
+     %align is not a power of two, the pointer value must be all-zero." *)
+  Definition assume_align : assume_bundle_check :=
+    fun loc vs =>
+      match vs with
+      | p :: al :: off =>
+          let offset := match off with
+                        | [] => Some 0%Z
+                        | [o] => bundle_sint o
+                        | _ => None
+                        end in
+          match dvalue_ptr_address p, bundle_uint al, offset with
+          | Some a, Some n, Some o =>
+              if (if is_power_of_two n then ((a - o) mod n) =? 0 else a =? 0)%Z
+              then ret tt else assume_violated loc "align"
+          | _, _, _ => assume_violated loc "align"
+          end
+      | _ => assume_malformed loc "align"
+      end.
+
+  (* ["dereferenceable"(ptr %p, i64 %size)]: "Equivalent to
+     dereferenceable(%size) on %p, except that %size may also be zero, in
+     which case the bundle doesn't imply nonnull"; and likewise
+     ["dereferenceable_or_null"]. *)
+  Definition assume_dereferenceable (or_null : bool) : assume_bundle_check :=
+    fun loc vs =>
+      let tag := if or_null then "dereferenceable_or_null" else "dereferenceable" in
+      match vs with
+      | [p; sz] =>
+          match dvalue_ptr_address p, bundle_uint sz with
+          | Some _, Some n =>
+              if (n =? 0)%Z then ret tt
+              else assert_dereferenceable or_null (Z.to_N n) p
+                     (loc ++ ": llvm.assume operand bundle """ ++ tag ++ """ is violated.")
+          | _, _ => assume_violated loc tag
+          end
+      | _ => assume_malformed loc tag
+      end.
+
+  (** The guarantees an [llvm.assume] bundle can state, by tag.  To support
+      another kind of assumption, add its check here and its case to
+      [I2F_assume_bundle_checks] (Theory/I2F/I2F_denotation.v).  Tags not
+      listed, such as ["separate_storage"] (an aliasing guarantee, left to
+      the provenance model), ["cold"], and ["ignore"], are not checked. *)
+  Definition assume_bundle_checks : list (string * assume_bundle_check) :=
+    [ ("nonnull", assume_nonnull);
+      ("noundef", assume_noundef);
+      ("align", assume_align);
+      ("dereferenceable", assume_dereferenceable false);
+      ("dereferenceable_or_null", assume_dereferenceable true) ].
+
+  Definition is_llvm_assume (f : exp dtyp) : bool :=
+    match intrinsic_exp f with
+    | Some s => String.eqb s "llvm.assume"
+    | None => false
+    end.
+
+  (* The check a bundle of a call to [f] gets, if any. *)
+  Definition bundle_check (f : exp dtyp) (tag : string) : option assume_bundle_check :=
+    if is_llvm_assume f
+    then option_map snd (find (fun '(t, _) => String.eqb t tag) assume_bundle_checks)
+    else None.
+
+  (** Evaluate the operand bundles of a call to [f], and check the ones whose
+      tag means something for [f]. *)
+  Definition denote_operand_bundles (loc : string) (f : exp dtyp) (obs : list (@operand_bundle dtyp))
+    : CFGtop unit :=
+    _ <- map_monad (fun ob =>
+                      vs <- map_monad (fun o =>
+                                         match o with
+                                         | SSA_value (t, e) => denote_exp' (Some t) e
+                                         | Metadata_string _ => ret NONE
+                                         end) (ob_ops ob) ;;
+                      match bundle_check f (ob_tag ob) with
+                      | Some check => check loc vs
+                      | None => ret tt
+                      end) obs ;;
+    ret tt.
+
   (** An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
     (i: (instr_id * instr dtyp * list (metadata dtyp)))
@@ -766,8 +905,9 @@ Section Denotation.
 
     (* Call *)
     (* TODO: technically operand bundles can affect semantics *)
-    | (pt, INSTR_Call (dt, f) args anns _) =>
+    | (pt, INSTR_Call (dt, f) args anns obs) =>
         vs <- denote_call_args args (err_loc tt ++ ": Call argument violates noundef.") ;;
+        denote_operand_bundles (err_loc tt) f obs ;;
         returned_value <-
           match intrinsic_exp f with
           | Some s =>
@@ -917,8 +1057,9 @@ Section Denotation.
     | TERM_Unreachable => raiseUB (err_loc tt ++ ": IMPOSSIBLE: unreachable in reachable position")
 
     (* TODO: technically operand bundles can affect the semantics of invoke *)
-    | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
+    | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns obs =>
       uvs <- denote_call_args args (err_loc tt ++ ": Invoke argument violates noundef.") ;;
+      denote_operand_bundles (err_loc tt) fnptrval obs ;;
       fv <- denote_exp' None fnptrval ;;
       rv <- call dt fv uvs ;;
       check_call_result (ann_fun_attributes anns) (err_loc tt) rv ;;

@@ -351,8 +351,9 @@ Section withParams.
         bind; abs.
       - (* Invoke *)
         break_match_goal.
-        (* arguments, callee, call, then the noreturn/nounwind check *)
-        do 4 bind.
+        (* arguments, operand bundles, callee, call, then the
+           noreturn/nounwind check *)
+        do 5 bind.
         break_match_goal.
         + bind; ret.
         + (* the invoke's return-value attributes, then the result *)

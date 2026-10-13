@@ -171,6 +171,137 @@ Proof.
     apply I2F_assert_dereferenceable; repeat constructor; auto.
 Qed.
 
+(** Related pointers have the same address. *)
+Lemma I2F_dvalue_ptr_address : forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    @dvalue_ptr_address PInf v1 = @dvalue_ptr_address PFin v2.
+Proof.
+  intros v1 v2 R.
+  inversion R; subst; cbn; auto.
+  match goal with
+  | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto
+  end.
+  match goal with
+  | HA : I2F_Addr ?a ?a' |- _ => destruct a, a'; destruct HA as [HI ->]; red in HI; subst
+  end.
+  reflexivity.
+Qed.
+
+(** ** Operand bundles
+
+    The [llvm.assume] bundle checks ask the same questions of related
+    operands on both sides (address, integer value, well-definedness), so
+    both sides take the same branch; a ["dereferenceable"] bundle reads the
+    same bytes. *)
+Lemma I2F_bundle_uint v1 v2 :
+  I2F_dvalue v1 v2 -> @bundle_uint PInf v1 = @bundle_uint PFin v2.
+Proof.
+  intros R; inversion R; subst; cbn; auto.
+  match goal with HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto end.
+Qed.
+
+Lemma I2F_bundle_sint v1 v2 :
+  I2F_dvalue v1 v2 -> @bundle_sint PInf v1 = @bundle_sint PFin v2.
+Proof.
+  intros R; inversion R; subst; cbn; auto.
+  match goal with HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto end.
+Qed.
+
+Definition I2F_assume_bundle_check (c1 : @assume_bundle_check PInf) (c2 : @assume_bundle_check PFin) : Prop :=
+  forall loc vs1 vs2, Forall2 I2F_dvalue vs1 vs2 ->
+    I2F_refine_CFG (fun _ _ => True) (c1 loc vs1) (c2 loc vs2).
+
+(* The proof of an [assume_bundle_check] (unfolded): split the operand
+   lists into the shapes the check matches on, rewrite every question about
+   an operand to the finite side, and close the identical branches. *)
+Ltac i2f_assume_check :=
+  do 4 (try (match goal with
+             | H : Forall2 _ ?l _ |- _ => is_var l; inversion H; subst; clear H
+             end));
+  repeat match goal with
+    | H : I2F_dvalue ?a ?b |- context [@dvalue_ptr_address PInf ?a] =>
+        rewrite (I2F_dvalue_ptr_address H)
+    | H : I2F_dvalue ?a ?b |- context [@bundle_uint PInf ?a] =>
+        rewrite (I2F_bundle_uint H)
+    | H : I2F_dvalue ?a ?b |- context [@bundle_sint PInf ?a] =>
+        rewrite (I2F_bundle_sint H)
+    | H : I2F_dvalue ?a ?b |- context [@dvalue_well_defined PInf ?a] =>
+        rewrite (I2F_dvalue_well_defined H)
+    end;
+  repeat (break_match_goal; cbn -[assert_dereferenceable assume_violated assume_malformed]);
+  try (apply I2F_assert_dereferenceable; auto);
+  try (apply ruttc_ret; auto);
+  unfold assume_violated, assume_malformed; rstep; cbnn; try easy; eauto.
+
+Lemma I2F_assume_nonnull : I2F_assume_bundle_check (@assume_nonnull PInf) (@assume_nonnull PFin).
+Proof. intros loc vs1 vs2 F; unfold I2F_refine_CFG, assume_nonnull; i2f_assume_check. Qed.
+
+Lemma I2F_assume_noundef : I2F_assume_bundle_check (@assume_noundef PInf) (@assume_noundef PFin).
+Proof. intros loc vs1 vs2 F; unfold I2F_refine_CFG, assume_noundef; i2f_assume_check. Qed.
+
+Lemma I2F_assume_align : I2F_assume_bundle_check (@assume_align PInf) (@assume_align PFin).
+Proof. intros loc vs1 vs2 F; unfold I2F_refine_CFG, assume_align; i2f_assume_check. Qed.
+
+Lemma I2F_assume_dereferenceable or_null :
+  I2F_assume_bundle_check (@assume_dereferenceable PInf or_null) (@assume_dereferenceable PFin or_null).
+Proof. intros loc vs1 vs2 F; unfold I2F_refine_CFG, assume_dereferenceable; i2f_assume_check. Qed.
+
+(** The two sides' tables of [llvm.assume] checks agree tag by tag.  A new
+    entry in [assume_bundle_checks] needs its lemma here. *)
+Lemma I2F_assume_bundle_checks :
+  Forall2 (fun '(t1, c1) '(t2, c2) => t1 = t2 /\ I2F_assume_bundle_check c1 c2)
+    (@assume_bundle_checks PInf) (@assume_bundle_checks PFin).
+Proof.
+  unfold assume_bundle_checks.
+  repeat (apply Forall2_cons; [cbn; split; [reflexivity |] |]); [..| apply Forall2_nil].
+  - apply I2F_assume_nonnull.
+  - apply I2F_assume_noundef.
+  - apply I2F_assume_align.
+  - apply I2F_assume_dereferenceable.
+  - apply I2F_assume_dereferenceable.
+Qed.
+
+Lemma I2F_find_bundle_check tag l1 l2 :
+  Forall2 (fun '(t1, c1) '(t2, c2) => t1 = t2 /\ I2F_assume_bundle_check c1 c2) l1 l2 ->
+  match option_map snd (find (fun '(t, _) => String.eqb t tag) l1),
+        option_map snd (find (fun '(t, _) => String.eqb t tag) l2) with
+  | Some c1, Some c2 => I2F_assume_bundle_check c1 c2
+  | None, None => True
+  | _, _ => False
+  end.
+Proof.
+  induction 1 as [|[t1 c1] [t2 c2] l1 l2 [-> Hc] F IH]; cbn; auto.
+  destruct (String.eqb t2 tag); cbn; auto.
+Qed.
+
+Lemma I2F_bundle_check f tag :
+  match @bundle_check PInf f tag, @bundle_check PFin f tag with
+  | Some c1, Some c2 => I2F_assume_bundle_check c1 c2
+  | None, None => True
+  | _, _ => False
+  end.
+Proof.
+  unfold bundle_check.
+  destruct (is_llvm_assume f); [apply I2F_find_bundle_check, I2F_assume_bundle_checks | exact I].
+Qed.
+
+Lemma I2F_denote_operand_bundles loc f obs :
+  I2F_refine_CFG (fun _ _ => True)
+    (@denote_operand_bundles PInf loc f obs) (@denote_operand_bundles PFin loc f obs).
+Proof.
+  unfold I2F_refine_CFG, denote_operand_bundles.
+  rbind (Forall2 (fun (_ _ : unit) => True)); [| intros; apply ruttc_ret; auto].
+  apply ruttc_map_monad; intros ob _.
+  rbind (Forall2 I2F_dvalue).
+  - apply ruttc_map_monad; intros [[t e]|m] _; cbn.
+    + apply I2F_denote_exp'.
+    + apply ruttc_ret; repeat constructor.
+  - intros vs1 vs2 HV.
+    pose proof (I2F_bundle_check f (ob_tag ob)) as HC.
+    destruct (@bundle_check PInf f (ob_tag ob)), (@bundle_check PFin f (ob_tag ob));
+      try contradiction; [apply HC; auto | apply ruttc_ret; auto].
+Qed.
+
 (** Applying value attributes: related values give the same [noundef]
     verdict ([I2F_dvalue_well_defined]), so both sides pass on related
     values, or the infinite side raises UB. *)
@@ -261,6 +392,7 @@ Lemma I2F_denote_instr :
         { apply I2F_denote_call_args. }
         break_match...
         * intros.
+          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _].
           rewrite 2 Eqit.bind_bind.
           rbind (sum_rel I2F_dvalue I2F_dvalue)...
           intros * HR'.
@@ -273,6 +405,7 @@ Lemma I2F_denote_instr :
           (* the call site's return-value attributes *)
           rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
         * intros.
+          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _].
           rewrite 2 Eqit.bind_bind.
           bind_exp.
           rewrite 2 Eqit.bind_bind.
@@ -292,6 +425,7 @@ Lemma I2F_denote_instr :
         intros.
         break_match...
         * intros.
+          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _].
           rewrite 2 Eqit.bind_bind.
           rbind (sum_rel I2F_dvalue I2F_dvalue)...
           intros * HR'.
@@ -304,6 +438,7 @@ Lemma I2F_denote_instr :
           (* the call site's return-value attributes *)
           rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
         * intros.
+          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _].
           rewrite 2 Eqit.bind_bind.
           bind_exp.
           rewrite 2 Eqit.bind_bind.
@@ -475,21 +610,6 @@ Proof.
   break_match_goal; auto.
 Qed.
 
-(** Related pointers have the same address. *)
-Lemma I2F_dvalue_ptr_address : forall v1 v2,
-    I2F_dvalue v1 v2 ->
-    @dvalue_ptr_address PInf v1 = @dvalue_ptr_address PFin v2.
-Proof.
-  intros v1 v2 R.
-  inversion R; subst; cbn; auto.
-  match goal with
-  | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto
-  end.
-  match goal with
-  | HA : I2F_Addr ?a ?a' |- _ => destruct a, a'; destruct HA as [HI ->]; red in HI; subst
-  end.
-  reflexivity.
-Qed.
 
 Lemma I2F_denote_terminator :
   forall t,
@@ -535,6 +655,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     erbind.
     apply I2F_denote_call_args.
     intros.
+    rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _].
     bind_exp.
     rbind (sum_rel I2F_dvalue I2F_dvalue)...
     intros * HR.

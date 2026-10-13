@@ -339,17 +339,9 @@ define void @"_ZN73_$LT$std..env..Args$u20$as$u20$core..iter..traits..iterator..
        ret void
 }
 
-; Function Attrs: inaccessiblememonly mustprogress nofree nosync nounwind willreturn
-; LangRef (llvm.assume): "If the condition is violated during execution, the
-; behavior is undefined."  A false condition reaches `unreachable` (UB); a
-; poison one is UB through `noundef`.
-define void @llvm.assume(i1 noundef %cond) {
-  br i1 %cond, label %holds, label %violated
-holds:
-  ret void
-violated:
-  unreachable
-}
+; llvm.assume is a Vellvm intrinsic (see
+; src/rocq/Semantics/IntrinsicsDefinitions.v), which also checks its operand
+; bundles.
 
 ; Function Attrs: nounwind nonlazybind uwtable
 define void @__rust_dealloc(i8*, i64, i64) unnamed_addr #4 {
