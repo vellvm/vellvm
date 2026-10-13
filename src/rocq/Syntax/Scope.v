@@ -45,7 +45,7 @@ Section LABELS_OPERATIONS.
        | TERM_Br v br1 br2 => [br1; br2]
        | TERM_Br_1 br => [br]
        | TERM_Switch v default_dest brs => default_dest :: map snd brs
-       | TERM_IndirectBr v brs => brs
+       | TERM_IndirectBr v brs _ => brs
        | TERM_Resume v => []
        | TERM_Invoke fnptrval args to_label unwind_label _ _ => [to_label; unwind_label]
        | TERM_Unreachable => []
@@ -258,6 +258,8 @@ Section REGISTER_OPERATIONS.
                       | OP_GetElementPtr _ _ (_,e) l
                         => f e +++ set_flat_map (fun x => f (snd x)) l
                       | EXP_Splat (_,e) => f e
+                      (* a block address names a block, not a local *)
+                      | EXP_BlockAddress _ _ => []
                       end
       |}.
 
@@ -299,7 +301,7 @@ Section REGISTER_OPERATIONS.
       {| use_sites := fun t => match t with
                                | TERM_Ret e
                                | TERM_Br e _ _
-                               | TERM_IndirectBr e _
+                               | TERM_IndirectBr e _ _
                                | TERM_Resume e
                                  => use_sites e
 

@@ -515,6 +515,7 @@ Inductive exp : Set :=
 | EXP_Asm             (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string)
 | EXP_Metadata        (m:metadata)
 | EXP_Splat           (elt:(T * exp))
+| EXP_BlockAddress    (fn:function_id) (blk:block_id) (* blockaddress(@fn, %blk) *)
                       
 with metadata : Set :=
 (* METADATA_Id covers all metadata values of the form:
@@ -975,7 +976,11 @@ Variant terminator : Set :=
 | TERM_Br         (v:texp) (br1:block_id) (br2:block_id)
 | TERM_Br_1       (br:block_id)
 | TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (tint_literal * block_id))
-| TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
+(* address * possible addresses (labels) * the enclosing function.  The
+   function is not written in the source: the parser leaves it [None] and
+   [cfg_of_definition] fills it in, so that [indirectbr] can tell the
+   addresses of its own blocks from those of other functions. *)
+| TERM_IndirectBr (v:texp) (brs:list block_id) (fn:option function_id)
 | TERM_Resume     (v:texp)
 
 | TERM_Invoke  (fnptrval:texp) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id) (anns:list annotation) (obs : list operand_bundle)

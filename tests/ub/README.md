@@ -54,7 +54,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 | `udiv.ll`, `urem.ll` | divisor zero / poison / undef, including a single vector lane |
 | `sdiv.ll`, `srem.ll` | the above plus `INT_MIN / -1`, and a poison dividend with divisor `-1` |
 | `br.ll`, `switch.ll` | branching on poison or undef |
-| `indirectbr.ll` | poison, undef, or null address |
+| `indirectbr.ll` | poison, undef, or null address; a block address not in the label list, or of another function |
 | `unreachable.ll` | executing `unreachable` |
 | `alloca.ll` | poison or undef element count; access through a zero-sized alloca |
 | `load.ll`, `store.ll` | null, poison, or undef address; out of bounds; dangling stack; use after free; overestimated `align`; `!noundef`, `!nonnull`+`!noundef`, `!align`+`!noundef` metadata; store to a `constant` global; store outside `llvm.lifetime.start`/`end` |
@@ -86,7 +86,8 @@ read-before-write, and lifetime. Gaps by category:
 - Arithmetic: division and remainder, including `INT_MIN / -1` and
   `INT_MIN srem -1` (and a poison dividend with divisor `-1`).
 - Control flow: branching or switching on poison or `undef`; `unreachable`;
-  `indirectbr` on a poison or `undef` address.
+  `indirectbr` on a poison, `undef`, or null address, or on a block address
+  that isn't in its label list (including one of another function).
 - Memory accesses: null, poison, out-of-bounds, dangling, freed, and
   wrong-provenance loads, stores, and atomics; all of `provenance.ll`; nothing
   is ever allocated at address 0; an overestimated explicit `align` on `load`,
@@ -132,9 +133,6 @@ read-before-write, and lifetime. Gaps by category:
 - Calling-convention mismatches aren't detected.
 
 **Wrong kind of error (fails instead of UB):**
-- `indirectbr` on a non-poison address: "Unsupport itree terminator" (a
-  poison or `undef` address is UB; jumping to a real address needs
-  `blockaddress`, which does not parse).
 - Calls through data pointers become an uninterpreted external call.
 
 **UB where LLVM has none:**
@@ -142,9 +140,12 @@ read-before-write, and lifetime. Gaps by category:
   LangRef doesn't list that case.
 
 **Unsupported:**
-- The parser rejects `blockaddress`. (`nofpclass`, `nofreeobj`,
-  `dead_on_return`, `captures(ret: …)`, and metadata whose name is a keyword,
-  such as `!captures` and `!dereferenceable`, parse but are not enforced.)
+- `nofpclass`, `nofreeobj`, `dead_on_return`, `captures(ret: …)`, and
+  metadata whose name is a keyword, such as `!captures` and
+  `!dereferenceable`, parse but are not enforced.
+- A block address is a pointer to a 1-byte object, so a load or store
+  through it is not detected as UB (LangRef allows only `indirectbr` and
+  comparison against null).
 
 ## Not covered
 

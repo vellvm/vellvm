@@ -3088,6 +3088,8 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
     + intros [sz t'] ? <-; cbn.
       erbind; [apply IHe |].
       intros...
+  - (* EXP_BlockAddress: a global read, like [EXP_Ident] *)
+    intros; cbn...
 Qed.
 
 Lemma I2F_denote_exp' :

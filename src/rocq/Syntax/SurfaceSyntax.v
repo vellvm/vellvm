@@ -369,6 +369,10 @@ Module VIR_Notations.
      τ custom vir_typ at level 99,
      v custom vir_exp at level 99,
      only printing).
+  (** Block address: the function and block names display as bare constr. *)
+  Notation "'blockaddress' ( f , b )" := (EXP_BlockAddress f b)
+    (in custom vir_exp at level 0, f constr at level 0, b constr at level 0,
+     only printing).
   (** [EXP_Asm] (6 args, very rare in research goals) intentionally
       not given a notation — falls through to constr display. *)
   (** Booleans: each maps to the literal value-keyed [EXP_Bool] case.
@@ -925,7 +929,7 @@ Module VIR_Notations.
      brs custom vir_arm_list at level 99,
      only printing).
   Notation "'indirectbr' τ v ',' brs" :=
-    (_, TERM_IndirectBr (τ, v) brs, _)
+    (_, TERM_IndirectBr (τ, v) brs _, _)
     (in custom vir_term at level 30,
      τ custom vir_typ at level 99, v custom vir_exp at level 99,
      brs custom vir_label_list at level 99,

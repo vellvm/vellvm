@@ -848,6 +848,8 @@ Section ShowInstances.
     | EXP_Splat elt =>
         let (tp, exp) := elt in
         sd "splat (" @@ dshow tp @@ sd " " @@ dshow_exp false exp @@ sd ")"
+    | EXP_BlockAddress fn blk =>
+        sd "blockaddress(@" @@ dshow_raw_id fn @@ sd ", %" @@ dshow_raw_id blk @@ sd ")"
     end
   with dshow_metadata (md : metadata T)  : DString :=
          match md with
@@ -1286,7 +1288,7 @@ tag ::= string constant
                                       fold_left (fun str '(x, y) => str @@ list_to_DString [show x; ", label %"] @@
                                                                    dshow y @@ sd " ") brs DList_empty @@ sd "]"
 
-       | TERM_IndirectBr v brs => sd "indirectbr " @@ dshow_texp v @@ sd ", [" @@
+       | TERM_IndirectBr v brs _ => sd "indirectbr " @@ dshow_texp v @@ sd ", [" @@
                                    concat_DString (sd ", ") (map (fun b => sd "label %" @@ dshow b) brs) @@
                                    sd "]"
 

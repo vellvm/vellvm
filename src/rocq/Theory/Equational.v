@@ -335,10 +335,17 @@ Section withParams.
           ret.
           eapply has_post_weaken; [apply IH |].
           intros ? [|]; eauto. 
-      - (* IndirectBr: UB on a poison address, otherwise unsupported *)
+      - (* IndirectBr: UB on a poison address or an unlisted target;
+           otherwise the listed block whose address is the target *)
         break_match_goal.
         bind.
         break_match_goal; abs.
+        break_match_goal; abs.
+        bind.
+        break_match_goal; abs.
+        break_match_goal; abs.
+        ret; cbn.
+        eapply indirectbr_target_In; eauto.
       - (* Resume *)
         break_match_goal.
         bind; abs.

@@ -109,6 +109,37 @@ Section Denotation.
     | ID_Local x  => lread x
     end.
 
+  (** ** Block addresses
+      The address of block [b] of function [f] is a pointer to a 1-byte
+      allocation of its own, made when the global environment is built (see
+      [allocate_block_addresses] in TopLevel.v) and kept under the reserved
+      global name [blockaddress_id f b].  (A zero-size allocation would not
+      do: consecutive ones share an address.)  The name cannot clash with a
+      global of the program, whose names do not contain "(". *)
+  Definition blockaddress_id (f : function_id) (b : block_id) : raw_id :=
+    Name ("blockaddress(@" ++ show_raw_id f ++ ", %" ++ show_raw_id b ++ ")").
+
+  Definition dvalue_ptr_address (v : dvalue) : option Z :=
+    match v with
+    | DVALUE_Base (DVALUE_Pointer p) => Some (ptr_to_int p)
+    | _ => None
+    end.
+
+  (* The listed block whose address is [z], given each listed block's
+     address. *)
+  Definition indirectbr_target (z : Z) (targets : list (block_id * option Z)) : option block_id :=
+    option_map fst (find (fun '(_, a) => match a with Some a => Z.eqb a z | None => false end) targets).
+
+  Lemma indirectbr_target_In : forall z brs addrs b,
+      indirectbr_target z (combine brs addrs) = Some b -> In b brs.
+  Proof.
+    unfold indirectbr_target.
+    intros z brs addrs b H.
+    destruct (find _ _) as [[b' a]|] eqn:FIND; inv H.
+    apply find_some in FIND as [IN _].
+    eapply in_combine_l; eauto.
+  Qed.
+
   (** ** Denotation of expressions
       [denote_exp top o] is the main entry point for evaluating itree expressions.
       top : the type at which the expression should be evaluated (if any)
@@ -194,6 +225,8 @@ Section Denotation.
     in
     match o with
     | EXP_Ident i => lookup_id i
+
+    | EXP_BlockAddress f b => gread (blockaddress_id f b)
                 
     | EXP_Integer x =>
         match top with
@@ -848,14 +881,32 @@ Section Denotation.
       raiseLLVM exn
 
     (* Currently unhandled VIR terminators *)
-    | TERM_IndirectBr (t, addr) _ =>
-      (* LangRef (indirectbr): "If 'address' is poison or undef, this
-         instruction has undefined behavior."  Jumping to a real address
-         (needs [blockaddress]) is not supported yet. *)
+    | TERM_IndirectBr (t, addr) brs fn =>
+      (* LangRef (indirectbr): "All possible destination blocks must be
+         listed in the label list, otherwise this instruction has undefined
+         behavior. This implies that jumps to labels defined in other
+         functions have undefined behavior as well. If 'address' is poison
+         or undef, this instruction has undefined behavior."  The target is
+         compared by address only, so a block address that went through
+         [ptrtoint]/[inttoptr] still works. *)
       a <- denote_exp' (Some t) addr ;;
       if dvalue_is_poison a
       then raiseUB (err_loc tt ++ ": indirectbr on a poison address.")
-      else raise (err_loc tt ++ ": Unsupport itree terminator")
+      else
+        match fn with
+        | None => raise (err_loc tt ++ ": indirectbr outside of a function")
+        | Some f =>
+            addrs <- map_monad (fun b => ba <- gread (blockaddress_id f b) ;;
+                                        ret (dvalue_ptr_address ba)) brs ;;
+            match dvalue_ptr_address a with
+            | None => raise (err_loc tt ++ ": indirectbr on a non-pointer")
+            | Some z =>
+                match indirectbr_target z (combine brs addrs) with
+                | Some b => ret (inl b)
+                | None => raiseUB (err_loc tt ++ ": indirectbr to an address that is not one of its listed blocks.")
+                end
+            end
+        end
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)

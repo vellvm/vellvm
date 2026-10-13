@@ -113,6 +113,26 @@ Proof.
   - rbind (fun (_ _ : unit) => True); [apply I2F_allocate_declaration | intros [] [] _; apply IH].
 Qed.
 
+Lemma I2F_allocate_block_address : forall (fb : function_id * block_id),
+    I2F_refine_MCFG (fun (_ _ : unit) => True)
+      (@allocate_block_address PInf fb) (@allocate_block_address PFin fb).
+Proof.
+  intros [f b]; unfold allocate_block_address.
+  rbind I2F_dvalue.
+  - unfold alloca; rstep.
+  - intros v1 v2 Hv; unfold gwrite; rstep.
+Qed.
+
+Lemma I2F_allocate_block_addresses : forall (fbs : list (function_id * block_id)),
+    I2F_refine_MCFG (fun (_ _ : unit) => True)
+      (@allocate_block_addresses PInf fbs) (@allocate_block_addresses PFin fbs).
+Proof.
+  intros fbs; unfold allocate_block_addresses, loop_monad.
+  induction fbs as [| fb fbs' IH]; cbn.
+  - apply ruttc_ret; auto.
+  - rbind (fun (_ _ : unit) => True); [apply I2F_allocate_block_address | intros [] [] _; apply IH].
+Qed.
+
 Lemma I2F_initialize_global : forall (g : global dtyp),
     I2F_refine_MCFG (fun (_ _ : unit) => True)
       (@initialize_global PInf g) (@initialize_global PFin g).
@@ -155,8 +175,11 @@ Proof.
   - apply I2F_allocate_declarations.
   - intros [] [] _.
     rbind (fun (_ _ : unit) => True).
-    + apply I2F_allocate_globals.
-    + intros [] [] _; apply I2F_initialize_globals.
+    + apply I2F_allocate_block_addresses.
+    + intros [] [] _.
+      rbind (fun (_ _ : unit) => True).
+      * apply I2F_allocate_globals.
+      * intros [] [] _; apply I2F_initialize_globals.
 Qed.
 
 (** ** Command-line argument allocation *)

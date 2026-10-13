@@ -409,6 +409,22 @@ Proof.
   break_match_goal; auto.
 Qed.
 
+(** Related pointers have the same address. *)
+Lemma I2F_dvalue_ptr_address : forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    @dvalue_ptr_address PInf v1 = @dvalue_ptr_address PFin v2.
+Proof.
+  intros v1 v2 R.
+  inversion R; subst; cbn; auto.
+  match goal with
+  | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto
+  end.
+  match goal with
+  | HA : I2F_Addr ?a ?a' |- _ => destruct a, a'; destruct HA as [HI ->]; red in HI; subst
+  end.
+  reflexivity.
+Qed.
+
 Lemma I2F_denote_terminator :
   forall t,
     I2F_refine_CFG (sum_rel Logic.eq I2F_dvalue) (@denote_terminator PInf t) (@denote_terminator PFin t).
@@ -432,10 +448,21 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
         erewrite I2F_select_switch; eauto.
         apply I2F_EOU_refl. }
     intros ?? <-...
-  - (* indirectbr: UB on a poison address, otherwise unsupported *)
+  - (* indirectbr: UB on a poison address; otherwise both sides read the
+       same block addresses and, related pointers having the same address,
+       pick the same listed block *)
     destruct v; bind_exp.
     rewrite (I2F_dvalue_is_poison H).
     break_match_goal...
+    destruct fn...
+    rbind (Forall2 (@Logic.eq (option Z))).
+    { apply ruttc_map_monad; intros b _.
+      rbind I2F_dvalue; [unfold gread; rstep | intros v1 v2 HV].
+      apply ruttc_ret; now apply I2F_dvalue_ptr_address. }
+    intros addrs1 addrs2 HA; apply ListUtil.Forall2_eq in HA; subst.
+    rewrite (I2F_dvalue_ptr_address H).
+    destruct (dvalue_ptr_address _)...
+    destruct (indirectbr_target _ _)...
   - destruct v.
     bind_exp...
   - destruct fnptrval.

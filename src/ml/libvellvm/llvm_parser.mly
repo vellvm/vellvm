@@ -385,6 +385,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_BR
 %token KW_SWITCH
 %token KW_INDIRECTBR
+%token KW_BLOCKADDRESS
 %token KW_INVOKE
 %token KW_RESUME
 %token KW_UNREACHABLE
@@ -1631,6 +1632,7 @@ expr_val:
   | KW_TRUE                                           { EXP_Bool true        }
   | KW_FALSE                                          { EXP_Bool false       }
   | KW_NULL                                           { EXP_Null             } 
+  | KW_BLOCKADDRESS LPAREN f=gident COMMA b=lident RPAREN { EXP_BlockAddress (f, b) }
   (* We still accept `undef`, but the minimal semantics has no dedicated
      undef value: it is parsed into [EXP_Undef] and denotes as [poison]
      (see [denote_exp] in src/rocq/Semantics/Denotation.v). *)
@@ -1912,7 +1914,7 @@ terminator:
   | KW_INDIRECTBR tv=texp
     COMMA LSQUARE til=separated_list(csep, branch_label)  RSQUARE md=instr_metadata
     { let f_info = metadata_file_info $startpos $endpos in     
-      (TERM_IndirectBr (tv, til), f_info::md) }
+      (TERM_IndirectBr (tv, til, None), f_info::md) }
 
   | KW_RESUME tv=texp md=instr_metadata
     { let f_info = metadata_file_info $startpos $endpos in

@@ -151,6 +151,7 @@ Section Endo.
           EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
       | EXP_Metadata m => EXP_Metadata (@endo_metadata _ _ _ _ _ _ _ m)
       | EXP_Splat elt => EXP_Splat (endo (fst elt), f_exp (snd elt))
+      | EXP_BlockAddress fn blk => EXP_BlockAddress (endo fn) (endo blk)
       end
     with endo_metadata
       `{Endo T}
@@ -279,8 +280,8 @@ Section Endo.
         | TERM_Br_1 br => TERM_Br_1 (endo br)
         | TERM_Switch  v default_dest brs =>
           TERM_Switch (endo v) (endo default_dest) (endo brs)
-        | TERM_IndirectBr v brs =>
-          TERM_IndirectBr (endo v) (endo brs)
+        | TERM_IndirectBr v brs fn =>
+          TERM_IndirectBr (endo v) (endo brs) (endo fn)
         | TERM_Resume v => TERM_Resume (endo v)
         | TERM_Invoke fnptrval args to_label unwind_label atts obs =>
           TERM_Invoke (endo fnptrval) (endo args) (endo to_label) (endo unwind_label) (endo atts) (endo obs)
@@ -553,6 +554,7 @@ Section TFunctor.
             EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
         | EXP_Metadata m => EXP_Metadata (ft_metadata f m)
         | EXP_Splat elt                      => EXP_Splat (ftexp elt)
+        | EXP_BlockAddress fn blk            => EXP_BlockAddress (endo fn) (endo blk)
         end
     with ft_metadata
       `{Endo raw_id}
@@ -697,7 +699,7 @@ Section TFunctor.
         | TERM_Br v br1 br2 => TERM_Br (tfmap f v) (endo br1) (endo br2)
         | TERM_Br_1 br => TERM_Br_1 (endo br)
         | TERM_Switch v default_dest brs => TERM_Switch (tfmap f v) (endo default_dest) (endo brs)
-        | TERM_IndirectBr v brs => TERM_IndirectBr (tfmap f v) (endo brs)
+        | TERM_IndirectBr v brs fn => TERM_IndirectBr (tfmap f v) (endo brs) (endo fn)
         | TERM_Resume v => TERM_Resume (tfmap f v)
         | TERM_Invoke fnptrval args to_label unwind_label atts obs =>
             TERM_Invoke 

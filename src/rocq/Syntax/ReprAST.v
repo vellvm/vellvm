@@ -495,6 +495,8 @@ Section ReprInstances.
         "(EXP_Metadata " ++ repr_metadata md ++ ")"
     | EXP_Splat elt =>
         "(EXP_splt " ++ texp elt ++ ")"
+    | EXP_BlockAddress fn blk =>
+        "(EXP_BlockAddress " ++ repr fn ++ " " ++ repr blk ++ ")"
     end with
   repr_metadata (m : metadata typ) : string :=
     let texp (te : (typ * exp typ)) : string :=
@@ -1013,8 +1015,8 @@ Section ReprInstances.
        | TERM_Br_1 b => "(TERM_Br_1 " ++ repr b ++ ")"
        | TERM_Switch v dest brs  => 
           "(TERM_Switch " ++ repr v ++ " " ++ repr dest ++ repr brs ++ ")"
-      | TERM_IndirectBr v brs  => 
-          "(TERM_IndirectBr " ++ repr v ++ " " ++ repr brs ++ ")" 
+      | TERM_IndirectBr v brs fn  => 
+          "(TERM_IndirectBr " ++ repr v ++ " " ++ repr brs ++ " " ++ repr fn ++ ")" 
       | TERM_Resume v  => "(TERM_Resume " ++ repr v ++ ")"
       | TERM_Invoke fnptrval args to_label unwind_label anns obs  =>
           "(TERM_Invoke " ++ repr fnptrval ++ " " ++ repr args 

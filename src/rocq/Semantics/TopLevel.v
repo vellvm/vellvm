@@ -217,8 +217,23 @@ Section withParams.
   Definition initialize_globals (gs:list (global dtyp)): MCFGtop unit :=
     loop_monad initialize_global gs.
 
+  (** Each block address the module needs gets a 1-byte allocation of its
+      own, under a reserved global name (see [blockaddress_id]). *)
+  Definition allocate_block_address (fb : function_id * block_id) : MCFGtop unit :=
+    let '(f, b) := fb in
+    v <- alloca (DTYPE_I 8) 1%N None;;
+    gwrite (blockaddress_id f b) v.
+
+  Definition allocate_block_addresses (fbs : list (function_id * block_id)) : MCFGtop unit :=
+    loop_monad allocate_block_address fbs.
+
+  Definition block_address_eq_dec : forall x y : function_id * block_id, {x = y} + {x <> y}.
+  Proof. decide equality; apply RawIDOrd.eq_dec. Defined.
+
   Definition build_global_environment (CFGtop : CFG.mcfg dtyp) : MCFGtop unit :=
     allocate_declarations ((m_declarations CFGtop) ++ (List.map (df_prototype) (m_definitions CFGtop)));;
+    (* before the globals, whose initializers may take block addresses *)
+    allocate_block_addresses (nodup block_address_eq_dec (mcfg_block_addresses CFGtop));;
     allocate_globals (m_globals CFGtop) ;;
     initialize_globals (m_globals CFGtop).
 

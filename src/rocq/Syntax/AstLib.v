@@ -359,6 +359,7 @@ Section ExpIndFull.
 
   Hypothesis IH_Metadata      : forall (m:metadata T), Q m -> P (EXP_Metadata m).
   Hypothesis IH_Splat         : forall (elt:(T * exp T)), P (snd elt) -> P (EXP_Splat elt).
+  Hypothesis IH_BlockAddress  : forall (fn:function_id) (blk:block_id), P (EXP_BlockAddress fn blk).
   
   Hypothesis IH_METADATA_Null : Q(METADATA_Null).
   Hypothesis IH_METADATA_Id   : forall (id:raw_id), Q (METADATA_Id id).
@@ -404,6 +405,7 @@ refine(
       IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
   | EXP_Metadata m => IH_Metadata (F0 m)
   | EXP_Splat elt => IH_Splat elt (F (snd elt))
+  | EXP_BlockAddress fn blk => IH_BlockAddress fn blk
   end
 with F0 (m : metadata T) : Q m :=
     match m as m0 return (Q m0) with
@@ -490,6 +492,7 @@ refine(
       IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
   | EXP_Metadata m => IH_Metadata (F0 m)
   | EXP_Splat elt => IH_Splat elt (F (snd elt))
+  | EXP_BlockAddress fn blk => IH_BlockAddress fn blk
   end
 with F0 (m : metadata T) : Q m :=
   match m as m0 return (Q m0) with
@@ -587,6 +590,7 @@ Section ExpInd.
 
   Hypothesis IH_Metadata      : forall (m:metadata T), (forall t e, m = METADATA_Const (t,e) -> P e) -> P (EXP_Metadata m).
   Hypothesis IH_Splat         : forall (elt:(T * exp T)), P (snd elt) -> P (EXP_Splat elt).
+  Hypothesis IH_BlockAddress  : forall (fn:function_id) (blk:block_id), P (EXP_BlockAddress fn blk).
  
   Lemma exp_ind : forall (v:exp T), P v.
   Proof.

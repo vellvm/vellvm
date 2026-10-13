@@ -356,6 +356,7 @@
   ("br"             , KW_BR);
   ("switch"         , KW_SWITCH);
   ("indirectbr"     , KW_INDIRECTBR);
+  ("blockaddress"   , KW_BLOCKADDRESS);
   ("invoke"         , KW_INVOKE);
   ("resume"         , KW_RESUME);
   ("unreachable"    , KW_UNREACHABLE);
