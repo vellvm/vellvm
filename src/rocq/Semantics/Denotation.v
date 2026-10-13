@@ -413,8 +413,7 @@ Section Denotation.
       [assert_attrs_dereferenceable] in [apply_value_attrs].
 
       Only attributes that can be checked from the value itself are handled.
-      Vectors of pointers ([align]/[nonnull] per lane) and [nofpclass] (not
-      parsed) are not yet covered. *)
+      Vectors of pointers ([align]/[nonnull] per lane) are not yet covered. *)
 
   (** Is the [sz]-bit integer [x] in the (possibly wrapping) range [[lo, hi)]?
       LangRef (range): "The pair a,b represents the range [a,b) ... The range
@@ -453,9 +452,54 @@ Section Denotation.
     | _, _ => v
     end.
 
+  (** The floating-point class of a value, as its bit in a [nofpclass] mask
+      (LangRef llvm.is.fpclass: snan 1, qnan 2, ninf 4, nnorm 8, nsub 16,
+      nzero 32, pzero 64, psub 128, pnorm 256, pinf 512), read off the IEEE
+      representation with [e] exponent and [m] mantissa bits. *)
+  Definition fp_class_of_bits (e m : Z) (bits : Z) : Z :=
+    let neg := Z.testbit bits (e + m) in
+    let exp := Z.land (Z.shiftr bits m) (Z.ones e) in
+    let mant := Z.land bits (Z.ones m) in
+    if (exp =? Z.ones e)%Z then
+      if (mant =? 0)%Z then (if neg then 4 else 512)               (* infinities *)
+      else if Z.testbit mant (m - 1) then 2 else 1                 (* quiet / signaling NaN *)
+    else if (exp =? 0)%Z then
+      if (mant =? 0)%Z then (if neg then 32 else 64)               (* zeros *)
+      else (if neg then 16 else 128)                               (* subnormals *)
+    else (if neg then 8 else 256).                                 (* normals *)
+
+  Definition fp_class (v : dvalue_base) : option Z :=
+    match v with
+    | DVALUE_Double d => Some (fp_class_of_bits 11 52 (unsigned (Floats.Float.to_bits d)))
+    | DVALUE_Float f => Some (fp_class_of_bits 8 23 (unsigned (Floats.Float32.to_bits f)))
+    | _ => None
+    end.
+
+  (** LangRef (nofpclass): "If the value is a floating-point class indicated
+      by the nofpclass test mask, a poison value is passed or returned
+      instead."  It applies to floating-point values, vectors of them, and
+      aggregates of those, element by element. *)
+  Fixpoint value_nofpclass (mask : Z) (v : dvalue) : dvalue :=
+    match v with
+    | DVALUE_Base b =>
+        match fp_class b with
+        | Some c => if (Z.land mask c =? 0)%Z then v else DVALUE_Base DVALUE_Poison
+        | None => v
+        end
+    | DVALUE_Array vec elts => DVALUE_Array vec (List.map (value_nofpclass mask) elts)
+    | DVALUE_Struct p fields => DVALUE_Struct p (List.map (value_nofpclass mask) fields)
+    end.
+
+  Definition value_attr_nofpclass (attrs : list param_attr) (v : dvalue) : dvalue :=
+    match find_option attr_nofpclass attrs with
+    | Some mask => value_nofpclass mask v
+    | None => v
+    end.
+
   (** The value passed on after the poison-producing attributes. *)
   Definition value_attrs_poison (attrs : list param_attr) (v : dvalue) : dvalue :=
-    value_attr_range attrs (value_attr_align attrs (value_attr_nonnull attrs v)).
+    value_attr_nofpclass attrs
+      (value_attr_range attrs (value_attr_align attrs (value_attr_nonnull attrs v))).
 
   (** [!dereferenceable n] / [!dereferenceable_or_null n]: LangRef "the value
       loaded is known to be dereferenceable at the current program point

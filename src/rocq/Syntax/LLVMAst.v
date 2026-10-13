@@ -920,6 +920,12 @@ Definition attr_dereferenceable (a : param_attr) : option (bool * int_syntax) :=
   | _ => None
   end.
 
+Definition attr_nofpclass (a : param_attr) : option int_ast :=
+  match a with
+  | PARAMATTR_Nofpclass mask => Some mask
+  | _ => None
+  end.
+
 Definition attr_range (a : param_attr) : option (int_syntax * int_syntax) :=
   match a with
   | PARAMATTR_Range _ lo hi => Some (lo, hi)
@@ -928,7 +934,8 @@ Definition attr_range (a : param_attr) : option (int_syntax * int_syntax) :=
 
 (* The value-constraining metadata of a load, as the parameter attributes
    LangRef defines them by analogy with: [!nonnull] ("analogous to the nonnull
-   attribute"), [!align] ("analogous to the 'align' attribute"), and
+   attribute"), [!align] ("analogous to the 'align' attribute"), [!nofpclass]
+   ("the same meaning and format as the nofpclass attribute"), and
    [!noundef].  The [!align] node must be inline ([!align !{i64 N}]); a
    reference to a numbered node ([!align !1]) is replaced by the node before
    linking (see [resolve_module_refs] in ModuleRefs.v).  [!range] and
@@ -940,6 +947,9 @@ Definition load_metadata_attr (md : metadata) : list param_attr :=
   | METADATA_Pair (METADATA_Id (Name "noundef")) _ => [PARAMATTR_Noundef]
   | METADATA_Pair (METADATA_Id (Name "align"))
                   (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) => [PARAMATTR_Align n]
+  | METADATA_Pair (METADATA_Id (Name "nofpclass"))
+                  (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) =>
+      [PARAMATTR_Nofpclass (BinIntDef.Z.of_num_int n)]
   | _ => []
   end.
 

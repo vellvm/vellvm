@@ -131,12 +131,39 @@ Proof.
   repeat break_match_goal; auto.
 Qed.
 
+(** [nofpclass]: related floats are equal, so both sides test the same
+    class, element by element. *)
+Lemma I2F_fp_class b1 b2 :
+  I2F_dvalue_base b1 b2 -> @fp_class PInf b1 = @fp_class PFin b2.
+Proof. intros H; inversion H; subst; cbn; auto. Qed.
+
+Lemma I2F_value_nofpclass mask v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_nofpclass PInf mask v1) (@value_nofpclass PFin mask v2).
+Proof.
+  induction 1 as [b1 b2 HB | p s1 s2 F IH | vec s1 s2 F IH] using I2F_dvalue_ind; cbn.
+  - rewrite (I2F_fp_class HB).
+    destruct (@fp_class PFin b2); [| constructor; auto].
+    destruct (Z.land mask z =? 0)%Z; repeat constructor; auto.
+  - constructor; induction IH; cbn; constructor; auto; inv F; auto.
+  - constructor; induction IH; cbn; constructor; auto; inv F; auto.
+Qed.
+
+Lemma I2F_value_attr_nofpclass attrs v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_attr_nofpclass PInf attrs v1) (@value_attr_nofpclass PFin attrs v2).
+Proof.
+  intros H; unfold value_attr_nofpclass.
+  destruct (find_option attr_nofpclass attrs); auto using I2F_value_nofpclass.
+Qed.
+
 Lemma I2F_value_attrs_poison attrs v1 v2 :
   I2F_dvalue v1 v2 ->
   I2F_dvalue (@value_attrs_poison PInf attrs v1) (@value_attrs_poison PFin attrs v2).
 Proof.
   intros H; unfold value_attrs_poison.
-  apply I2F_value_attr_range, I2F_value_attr_align, I2F_value_attr_nonnull, H.
+  apply I2F_value_attr_nofpclass, I2F_value_attr_range, I2F_value_attr_align,
+    I2F_value_attr_nonnull, H.
 Qed.
 
 (** [!dereferenceable] metadata and the [dereferenceable] attributes:

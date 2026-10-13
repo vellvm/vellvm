@@ -57,13 +57,13 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 | `indirectbr.ll` | poison, undef, or null address; a block address not in the label list, or of another function |
 | `unreachable.ll` | executing `unreachable` |
 | `alloca.ll` | poison or undef element count; access through a zero-sized alloca |
-| `load.ll`, `store.ll` | null, poison, or undef address; out of bounds; dangling stack; use after free; overestimated `align`; `!noundef`, `!nonnull`+`!noundef`, `!align`+`!noundef`, `!range`+`!noundef`, `!dereferenceable`, `!dereferenceable_or_null` metadata; store to a `constant` global; store outside `llvm.lifetime.start`/`end` |
+| `load.ll`, `store.ll` | null, poison, or undef address; out of bounds; dangling stack; use after free; overestimated `align`; `!noundef`, `!nonnull`+`!noundef`, `!align`+`!noundef`, `!range`+`!noundef`, `!nofpclass`+`!noundef`, `!dereferenceable`, `!dereferenceable_or_null` metadata; store to a `constant` global; store outside `llvm.lifetime.start`/`end` |
 | `getelementptr.ll` | dereferencing the poison result of `inbounds`/`nuw`/`nusw` violations or a poison index |
 | `atomicrmw.ll`, `cmpxchg.ll` | null or poison address, out of bounds, misaligned |
 | `provenance.ll` | access through a pointer *based on* the wrong object (gep across objects, integer constants, stale heap or stack pointers) |
 | `call.ll` | poison, undef, null, or data-pointer callee; calling-convention mismatch |
 | `call-param-attrs.ll` | `noundef`; `nonnull`, `align`, `range` combined with `noundef`; `dereferenceable(n)`, `dereferenceable_or_null(n)`; on the declaration or the call site |
-| `call-param-nofpclass.ll` | `nofpclass` + `noundef` |
+| `call-param-nofpclass.ll` | `nofpclass` + `noundef` (double and float; nan, zero, inf, sub, norm, snan vs. quiet NaN; vector lanes; return values) |
 | `ret.ll` | return-value `noundef`, `nonnull`, `align`, `range`, `dereferenceable`; `!range` on call and invoke results |
 | `call-fn-attrs.ll` | `noreturn` that returns, writes that violate `memory(...)`, `nocreateundeforpoison` |
 | `call-fn-attrs-unwind.ll` | `nounwind` that unwinds *(uses Vellvm's throw intrinsic, so it runs only under Vellvm)* |
@@ -98,8 +98,9 @@ pass poison on). Gaps by category:
   pointers; `noreturn` functions that return and `nounwind` functions that
   unwind (on a definition or call site, directly or through an attribute
   group `#N`).
-- Value attributes `noundef`, `nonnull`, `align`, `range`,
-  `dereferenceable(n)`, and `dereferenceable_or_null(n)`: on call-site
+- Value attributes `noundef`, `nonnull`, `align`, `range`, `nofpclass`
+  (element by element in vectors and aggregates), `dereferenceable(n)`, and
+  `dereferenceable_or_null(n)`: on call-site
   arguments and return values (call and invoke), and on the arguments and
   return value of a *defined* callee. A direct call also gets its callee's
   declared (or defined) parameter and return attributes, so an attribute
@@ -107,8 +108,8 @@ pass poison on). Gaps by category:
   `noundef` at the call) is combined, and the attributes of a declared-only
   callee apply. Without `noundef`, a violation passes poison on. The memory part of `dereferenceable` is checked by reading the
   `n` bytes, so the UB is reported with the memory model's message.
-- Load metadata `!noundef`, `!nonnull`, and `!align` (inline or a numbered
-  node such as `!align !1`); `!range` (a union of possibly wrapping ranges,
+- Load metadata `!noundef`, `!nonnull`, `!align` (inline or a numbered
+  node such as `!align !1`), and `!nofpclass`; `!range` (a union of possibly wrapping ranges,
   lane by lane for vectors; also on call and invoke results); `!dereferenceable` and
   `!dereferenceable_or_null` (checked by reading the bytes, so the UB is
   reported with the memory model's message).
@@ -144,7 +145,7 @@ pass poison on). Gaps by category:
   LangRef doesn't list that case.
 
 **Unsupported:**
-- `nofpclass`, `nofreeobj`, `dead_on_return`, `captures(ret: …)`, and
+- `nofreeobj`, `dead_on_return`, `captures(ret: …)`, and
   `!captures` store metadata parse but are not enforced.
 - A block address is a pointer to a 1-byte object, so a load or store
   through it is not detected as UB (LangRef allows only `indirectbr` and
