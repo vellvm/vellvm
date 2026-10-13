@@ -412,6 +412,7 @@ Section ShowInstances.
     | FNATTR_Willreturn => "willreturn"
     | FNATTR_Nosync => "nosync"
     | FNATTR_Nounwind => "nounwind"
+    | FNATTR_Nocreateundeforpoison => "nocreateundeforpoison"
     | FNATTR_Nosanitize_bounds => "nosanitize_bounds"
     | FNATTR_Nosanitize_coverage => "nosanitize_coverage"
     | FNATTR_Null_pointer_is_valid => "null_pointer_is_valid"

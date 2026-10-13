@@ -294,6 +294,7 @@ Variant fn_attr : Set :=
 | FNATTR_Willreturn
 | FNATTR_Nosync
 | FNATTR_Nounwind
+| FNATTR_Nocreateundeforpoison
 | FNATTR_Nosanitize_bounds
 | FNATTR_Nosanitize_coverage
 | FNATTR_Null_pointer_is_valid
@@ -868,6 +869,9 @@ Definition fn_attr_is_noreturn (f : fn_attr) : bool :=
 
 Definition fn_attr_is_nounwind (f : fn_attr) : bool :=
   match f with FNATTR_Nounwind => true | _ => false end.
+
+Definition fn_attr_is_nocreateundeforpoison (f : fn_attr) : bool :=
+  match f with FNATTR_Nocreateundeforpoison => true | _ => false end.
 
 Definition ann_atomic (a:annotation) : option unit :=
   match a with

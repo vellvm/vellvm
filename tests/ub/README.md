@@ -65,7 +65,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 | `call-param-attrs.ll` | `noundef`; `nonnull`, `align`, `range` combined with `noundef`; `dereferenceable(n)`, `dereferenceable_or_null(n)`; on the declaration or the call site |
 | `call-param-nofpclass.ll` | `nofpclass` + `noundef` (double and float; nan, zero, inf, sub, norm, snan vs. quiet NaN; vector lanes; return values) |
 | `ret.ll` | return-value `noundef`, `nonnull`, `align`, `range`, `dereferenceable`; `!range` on call and invoke results |
-| `call-fn-attrs.ll` | `noreturn` that returns, writes that violate `memory(...)`, `nocreateundeforpoison` |
+| `call-fn-attrs.ll` | `noreturn` that returns, writes that violate `memory(...)`, `nocreateundeforpoison` (on the definition or the call site) |
 | `call-fn-attrs-unwind.ll` | `nounwind` that unwinds *(uses Vellvm's throw intrinsic, so it runs only under Vellvm)* |
 | `call-ptr-attrs.ll` | `readonly`, `readnone`, `captures(...)`, `nofree`, `noalias`, `initializes`, `writable` |
 | `call-ptr-attrs-unparsed.ll` | `captures(ret: …)`, `!captures` store metadata *(parses now, but neither is enforced)* |
@@ -97,7 +97,8 @@ pass poison on). Gaps by category:
 - Calls: through poison, `undef`, or null (including `inttoptr 0`) function
   pointers; `noreturn` functions that return and `nounwind` functions that
   unwind (on a definition or call site, directly or through an attribute
-  group `#N`).
+  group `#N`); `nocreateundeforpoison` functions that return undef or poison
+  for well-defined arguments (checked before the return attributes).
 - Value attributes `noundef`, `nonnull`, `align`, `range`, `nofpclass`
   (element by element in vectors and aggregates), `dereferenceable(n)`, and
   `dereferenceable_or_null(n)`: on call-site
@@ -131,7 +132,7 @@ pass poison on). Gaps by category:
   because the memory model doesn't record object bounds. (`nusw` and `nuw`
   are enforced.)
 - Not enforced at all: `memory(...)`, `readonly`/`readnone`, `captures`, `nofree`, `noalias`,
-  `initializes`, `writable`, `nocreateundeforpoison`.
+  `initializes`, `writable`.
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
 - Stores to `constant` globals are allowed, directly and through memcpy/memset.

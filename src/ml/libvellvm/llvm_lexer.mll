@@ -250,6 +250,7 @@
   ("willreturn"                   , KW_WILLRETURN);
   ("nosync"                       , KW_NOSYNC);
   ("nounwind"                     , KW_NOUNWIND);
+  ("nocreateundeforpoison"        , KW_NOCREATEUNDEFORPOISON);
   ("nosantitize_bounds"           , KW_NOSANITIZE_BOUNDS);
   ("nosantitize_coverage"         , KW_NOSANITIZE_COVERAGE);
   ("null_pointer_is_valid"        , KW_NULL_POINTER_IS_VALID);

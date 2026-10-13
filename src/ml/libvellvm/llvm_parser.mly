@@ -263,6 +263,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_WILLRETURN
 %token KW_NOSYNC
 %token KW_NOUNWIND
+%token KW_NOCREATEUNDEFORPOISON
 %token KW_NOSANITIZE_BOUNDS
 %token KW_NOSANITIZE_COVERAGE
 %token KW_NULL_POINTER_IS_VALID
@@ -1343,6 +1344,7 @@ fn_attr:
   | KW_WILLRETURN                         { FNATTR_Willreturn       }
   | KW_NOSYNC                             { FNATTR_Nosync           }
   | KW_NOUNWIND                           { FNATTR_Nounwind         }
+  | KW_NOCREATEUNDEFORPOISON              { FNATTR_Nocreateundeforpoison }
   | KW_NOSANITIZE_BOUNDS                  { FNATTR_Nosanitize_bounds }
   | KW_NOSANITIZE_COVERAGE                { FNATTR_Nosanitize_coverage }
   | KW_NULL_POINTER_IS_VALID              { FNATTR_Null_pointer_is_valid }

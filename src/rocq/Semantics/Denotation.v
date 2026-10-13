@@ -691,21 +691,28 @@ Section Denotation.
     lwrite id loaded_v;;
     ret tt.
 
-  (** Check how a call ended against the [noreturn] / [nounwind] function
+  (** Check how a call with arguments [args] ended against the function
       attributes [fattrs] (of the callee's definition or of the call site).
       LangRef (noreturn): "This produces undefined behavior at runtime if the
       function ever does dynamically return."  (nounwind): "If the function
-      does raise an exception, its runtime behavior is undefined." *)
-  Definition check_call_result (fattrs : list fn_attr) (msg : string) (res : exc + dvalue)
-    : CFGtop unit :=
+      does raise an exception, its runtime behavior is undefined."
+      (nocreateundeforpoison): "the result of the function (prior to
+      application of return attributes/metadata) will not be undef or poison
+      if all arguments are not undef and not poison. Otherwise, it is
+      undefined behavior."  So this runs before the return attributes. *)
+  Definition check_call_result (fattrs : list fn_attr) (msg : string) (args : list dvalue)
+             (res : exc + dvalue) : CFGtop unit :=
     match res with
     | inl _ =>
         if existsb fn_attr_is_nounwind fattrs
         then raiseUB (msg ++ ": unwinding out of a nounwind function.")
         else ret tt
-    | inr _ =>
+    | inr v =>
         if existsb fn_attr_is_noreturn fattrs
         then raiseUB (msg ++ ": returning from a noreturn function.")
+        else if existsb fn_attr_is_nocreateundeforpoison fattrs
+                && forallb dvalue_well_defined args && negb (dvalue_well_defined v)
+        then raiseUB (msg ++ ": a nocreateundeforpoison function returned undef or poison for well-defined arguments.")
         else ret tt
     end.
 
@@ -956,7 +963,7 @@ Section Denotation.
           match intrinsic_exp f with
           | Some s =>
               res <- intrinsic dt s vs varargs ;;
-              check_call_result (ann_fun_attributes anns) (err_loc tt) res ;;
+              check_call_result (ann_fun_attributes anns) (err_loc tt) vs res ;;
               match res with
               | inl exc => raiseLLVM exc
               | inr dv => ret dv
@@ -965,7 +972,7 @@ Section Denotation.
           | None =>
               fv <- denote_exp' None f;;
               res <- call dt fv vs;;
-              check_call_result (ann_fun_attributes anns) (err_loc tt) res ;;
+              check_call_result (ann_fun_attributes anns) (err_loc tt) vs res ;;
               match res with
               | inl exc => raiseLLVM exc
               | inr uv => ret uv
@@ -1106,7 +1113,7 @@ Section Denotation.
       denote_operand_bundles (err_loc tt) fnptrval obs ;;
       fv <- denote_exp' None fnptrval ;;
       rv <- call dt fv uvs ;;
-      check_call_result (ann_fun_attributes anns) (err_loc tt) rv ;;
+      check_call_result (ann_fun_attributes anns) (err_loc tt) uvs rv ;;
       (* branch to to_label *)
       match rv with
       | inl exn =>
@@ -1350,7 +1357,7 @@ Section Denotation.
          frame is always torn down before the (value-carried) unwind continues. *)
       rv <- run_exc (denote_cfg_map bmap (df_instrs df) (Some varg));;
       pop_call_frame;;
-      check_call_result (dc_attrs (df_prototype df)) fname rv;;
+      check_call_result (dc_attrs (df_prototype df)) fname args rv;;
       match rv with
       | inl exc => ret (inl exc)
       | inr v =>

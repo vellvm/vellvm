@@ -376,15 +376,28 @@ Proof.
 Qed.
 
 
-(** The noreturn/nounwind check sees related call results, which are both
-    returns or both unwinds. *)
-Lemma I2F_check_call_result fattrs msg r1 r2 :
+Lemma I2F_forallb_well_defined vs1 vs2 :
+  Forall2 I2F_dvalue vs1 vs2 ->
+  forallb (@dvalue_well_defined PInf) vs1 = forallb (@dvalue_well_defined PFin) vs2.
+Proof.
+  induction 1 as [|v1 v2 vs1 vs2 H F IH]; cbn; auto.
+  rewrite (I2F_dvalue_well_defined H), IH; reflexivity.
+Qed.
+
+(** The noreturn/nounwind/nocreateundeforpoison check sees related call
+    results, which are both returns or both unwinds, and related arguments:
+    both sides agree on which are well defined. *)
+Lemma I2F_check_call_result fattrs msg args1 args2 r1 r2 :
+  Forall2 I2F_dvalue args1 args2 ->
   sum_rel I2F_dvalue I2F_dvalue r1 r2 ->
   I2F_refine_CFG (fun _ _ => True)
-    (@check_call_result PInf fattrs msg r1) (@check_call_result PFin fattrs msg r2).
+    (@check_call_result PInf fattrs msg args1 r1) (@check_call_result PFin fattrs msg args2 r2).
 Proof.
-  intros H; unfold I2F_refine_CFG, check_call_result.
-  destruct H; break_match_goal; rstep; cbnn; try easy; eauto.
+  intros HA H; unfold I2F_refine_CFG, check_call_result.
+  rewrite (I2F_forallb_well_defined HA).
+  destruct H as [e1 e2 He | v1 v2 Hv];
+    [| rewrite (I2F_dvalue_well_defined Hv)];
+    repeat break_match_goal; rstep; cbnn; try easy; eauto.
 Qed.
 
 (** Call arguments: each is evaluated and passed through its attributes on

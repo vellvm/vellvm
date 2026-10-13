@@ -717,6 +717,7 @@ Section ReprInstances.
     | FNATTR_Willreturn => "FNATTR_Willreturn"
     | FNATTR_Nosync => "FNATTR_Nosync"
     | FNATTR_Nounwind => "FNATTR_Nounwind"
+    | FNATTR_Nocreateundeforpoison => "FNATTR_Nocreateundeforpoison"
     | FNATTR_Nosanitize_bounds => "FNATTR_Nosanitize_bounds"
     | FNATTR_Nosanitize_coverage => "FNATTR_Nosanitize_coverage"
     | FNATTR_Null_pointer_is_valid => "FNATTR_Null_pointer_is_valid"
