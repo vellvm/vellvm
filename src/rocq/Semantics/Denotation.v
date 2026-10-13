@@ -409,8 +409,8 @@ Section Denotation.
       makes a value that is not well defined immediate UB.  So [nonnull]
       without [noundef] passes poison on, while [nonnull noundef] on null is
       UB.  [dereferenceable(n)] "implies nonnull in addrspace(0)" and "implies
-      noundef"; only those two consequences are checked here (that [n] bytes
-      are accessible needs the memory model).
+      noundef"; that its [n] bytes are accessible is checked by
+      [assert_attrs_dereferenceable] in [apply_value_attrs].
 
       Only attributes that can be checked from the value itself are handled.
       Vectors of pointers ([align]/[nonnull] per lane) and [nofpclass] (not
@@ -457,14 +457,46 @@ Section Denotation.
   Definition value_attrs_poison (attrs : list param_attr) (v : dvalue) : dvalue :=
     value_attr_range attrs (value_attr_align attrs (value_attr_nonnull attrs v)).
 
+  (** [!dereferenceable n] / [!dereferenceable_or_null n]: LangRef "the value
+      loaded is known to be dereferenceable at the current program point
+      [or null], otherwise the behavior is undefined. The number of bytes
+      known to be dereferenceable is specified by the integer value in the
+      metadata node."  The [n] bytes are checked by reading them at the byte
+      type, which accepts any content: the read raises UB exactly when they
+      are not accessible through the pointer (unallocated, freed, out of
+      bounds, or another object's provenance). *)
+  Definition assert_dereferenceable (or_null : bool) (n : N) (v : dvalue) (msg : string)
+    : CFGtop unit :=
+    match v with
+    | DVALUE_Base (DVALUE_Pointer p) =>
+        if (or_null && (ptr_to_int p =? ptr_to_int null)%Z) || (n =? 0)%N
+        then ret tt
+        else _ <- load (DTYPE_Array false n (DTYPE_B 8)) v ;; ret tt
+    | DVALUE_Base DVALUE_Poison => raiseUB msg
+    | _ => raise (msg ++ " (not a pointer)")
+    end.
+
+  (** The memory part of the [dereferenceable(n)] and
+      [dereferenceable_or_null(n)] attributes, on a pointer.  (A poison value
+      under [dereferenceable] is already UB through the [noundef] it
+      implies.) *)
+  Definition assert_attrs_dereferenceable (attrs : list param_attr) (v : dvalue) (msg : string)
+    : CFGtop unit :=
+    match find_option attr_dereferenceable attrs, v with
+    | Some (or_null, n), DVALUE_Base (DVALUE_Pointer _) =>
+        assert_dereferenceable or_null (Z.to_N (denote_int_syntax n)) v msg
+    | _, _ => ret tt
+    end.
+
   (** Apply a parameter's or return value's attributes to [v]: the value to
-      pass on, or UB (reported with [msg]) if [noundef] is violated. *)
+      pass on, or UB (reported with [msg]) if [noundef] is violated or a
+      [dereferenceable] pointer's bytes are not accessible. *)
   Definition apply_value_attrs (attrs : list param_attr) (msg : string) (v : dvalue)
     : CFGtop dvalue :=
     let v := value_attrs_poison attrs v in
     if has_param_attr attr_is_noundef attrs && negb (dvalue_well_defined v)
     then raiseUB msg
-    else ret v.
+    else assert_attrs_dereferenceable attrs v msg;; ret v.
 
   (** ** Load metadata without an attribute counterpart *)
 
@@ -488,25 +520,6 @@ Section Denotation.
     | None, _ => v
     | Some rs, DVALUE_Array true elts => DVALUE_Array true (List.map (value_metadata_range_base rs) elts)
     | Some rs, _ => value_metadata_range_base rs v
-    end.
-
-  (** [!dereferenceable n] / [!dereferenceable_or_null n]: LangRef "the value
-      loaded is known to be dereferenceable at the current program point
-      [or null], otherwise the behavior is undefined. The number of bytes
-      known to be dereferenceable is specified by the integer value in the
-      metadata node."  The [n] bytes are checked by reading them at the byte
-      type, which accepts any content: the read raises UB exactly when they
-      are not accessible through the pointer (unallocated, freed, out of
-      bounds, or another object's provenance). *)
-  Definition assert_dereferenceable (or_null : bool) (n : N) (v : dvalue) (msg : string)
-    : CFGtop unit :=
-    match v with
-    | DVALUE_Base (DVALUE_Pointer p) =>
-        if (or_null && (ptr_to_int p =? ptr_to_int null)%Z) || (n =? 0)%N
-        then ret tt
-        else _ <- load (DTYPE_Array false n (DTYPE_B 8)) v ;; ret tt
-    | DVALUE_Base DVALUE_Poison => raiseUB msg
-    | _ => raise (msg ++ " (not a pointer)")
     end.
 
   Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : CFGtop unit :=

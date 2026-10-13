@@ -911,6 +911,15 @@ Definition attr_align (a : param_attr) : option int_syntax :=
   | _ => None
   end.
 
+(* [dereferenceable(n)] or [dereferenceable_or_null(n)]: whether null is
+   allowed, and [n]. *)
+Definition attr_dereferenceable (a : param_attr) : option (bool * int_syntax) :=
+  match a with
+  | PARAMATTR_Dereferenceable n => Some (false, n)
+  | PARAMATTR_Dereferenceable_or_null n => Some (true, n)
+  | _ => None
+  end.
+
 Definition attr_range (a : param_attr) : option (int_syntax * int_syntax) :=
   match a with
   | PARAMATTR_Range _ lo hi => Some (lo, hi)

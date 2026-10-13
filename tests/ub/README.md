@@ -98,10 +98,12 @@ read-before-write, and lifetime. Gaps by category:
   pointers; `noreturn` functions that return and `nounwind` functions that
   unwind (on a definition or call site, directly or through an attribute
   group `#N`).
-- Value attributes `noundef`, `nonnull`, `align`, `range`, and the
-  nonnull/noundef part of `dereferenceable`: on call-site arguments and return
-  values (call and invoke), and on the arguments and return value of a
-  *defined* callee. Without `noundef`, a violation passes poison on.
+- Value attributes `noundef`, `nonnull`, `align`, `range`,
+  `dereferenceable(n)`, and `dereferenceable_or_null(n)`: on call-site
+  arguments and return values (call and invoke), and on the arguments and
+  return value of a *defined* callee. Without `noundef`, a violation passes
+  poison on. The memory part of `dereferenceable` is checked by reading the
+  `n` bytes, so the UB is reported with the memory model's message.
 - Load metadata `!noundef`, `!nonnull`, and `!align` (inline or a numbered
   node such as `!align !1`); `!range` (a union of possibly wrapping ranges,
   lane by lane for vectors); `!dereferenceable` and
@@ -124,8 +126,7 @@ read-before-write, and lifetime. Gaps by category:
 - Value attributes of external (declared-only) functions, and an attribute
   split between the declaration and the call site (e.g. `nonnull` declared,
   `noundef` at the call), which LangRef combines.
-- Not enforced at all: the memory part of `dereferenceable[_or_null]`,
-  `memory(...)`, `readonly`/`readnone`, `captures`, `nofree`, `noalias`,
+- Not enforced at all: `memory(...)`, `readonly`/`readnone`, `captures`, `nofree`, `noalias`,
   `initializes`, `writable`, `nocreateundeforpoison`.
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
@@ -143,8 +144,7 @@ read-before-write, and lifetime. Gaps by category:
 
 **Unsupported:**
 - `nofpclass`, `nofreeobj`, `dead_on_return`, `captures(ret: …)`, and
-  metadata whose name is a keyword, such as `!captures` and
-  `!dereferenceable`, parse but are not enforced.
+  `!captures` store metadata parse but are not enforced.
 - A block address is a pointer to a 1-byte object, so a load or store
   through it is not detected as UB (LangRef allows only `indirectbr` and
   comparison against null).

@@ -139,6 +139,38 @@ Proof.
   apply I2F_value_attr_range, I2F_value_attr_align, I2F_value_attr_nonnull, H.
 Qed.
 
+(** [!dereferenceable] metadata and the [dereferenceable] attributes:
+    related pointers have the same address, so both sides skip the check or
+    both read the same bytes. *)
+Lemma I2F_assert_dereferenceable or_null n v1 v2 msg :
+  I2F_dvalue v1 v2 ->
+  I2F_refine_CFG (fun _ _ => True)
+    (@assert_dereferenceable PInf or_null n v1 msg) (@assert_dereferenceable PFin or_null n v2 msg).
+Proof.
+  intros H; pose proof H as H'; unfold I2F_refine_CFG, assert_dereferenceable.
+  inv H; [inv H0 | |]; cbn; try now (rstep; cbnn; try easy; eauto).
+  match goal with
+  | |- ruttc _ _ _ _ _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
+      assert (EQ : b1 = b2)
+        by (destruct p, p'; destruct H as [HI ->]; red in HI; subst; reflexivity);
+      rewrite EQ; destruct b2
+  end.
+  - apply ruttc_ret; auto.
+  - rbind I2F_dvalue; [unfold load; rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+    apply ruttc_ret; auto.
+Qed.
+
+Lemma I2F_assert_attrs_dereferenceable attrs v1 v2 msg :
+  I2F_dvalue v1 v2 ->
+  I2F_refine_CFG (fun _ _ => True)
+    (@assert_attrs_dereferenceable PInf attrs v1 msg) (@assert_attrs_dereferenceable PFin attrs v2 msg).
+Proof.
+  intros H; unfold I2F_refine_CFG, assert_attrs_dereferenceable.
+  destruct (find_option attr_dereferenceable attrs) as [[]|];
+    inv H; [inv H0 | | | inv H0 | |]; cbn -[assert_dereferenceable]; try (apply ruttc_ret; auto);
+    apply I2F_assert_dereferenceable; repeat constructor; auto.
+Qed.
+
 (** Applying value attributes: related values give the same [noundef]
     verdict ([I2F_dvalue_well_defined]), so both sides pass on related
     values, or the infinite side raises UB. *)
@@ -154,7 +186,9 @@ Proof.
       assert (EQ : b1 = b2)
         by (f_equal; f_equal; apply I2F_dvalue_well_defined; exact HP);
       rewrite EQ; destruct b2
-  end; rstep; cbnn; try easy; eauto.
+  end; [rstep; cbnn; easy |].
+  rbind (fun (_ _ : unit) => True); [apply I2F_assert_attrs_dereferenceable; auto | intros _ _ _].
+  apply ruttc_ret; auto.
 Qed.
 
 (** Load metadata [!range]: both sides test the same integer, lane by lane
@@ -183,25 +217,6 @@ Proof.
   end.
 Qed.
 
-(** Load metadata [!dereferenceable]: related pointers have the same
-    address, so both sides skip the check or both read the same bytes. *)
-Lemma I2F_assert_dereferenceable or_null n v1 v2 msg :
-  I2F_dvalue v1 v2 ->
-  I2F_refine_CFG (fun _ _ => True)
-    (@assert_dereferenceable PInf or_null n v1 msg) (@assert_dereferenceable PFin or_null n v2 msg).
-Proof.
-  intros H; pose proof H as H'; unfold I2F_refine_CFG, assert_dereferenceable.
-  inv H; [inv H0 | |]; cbn; try now (rstep; cbnn; try easy; eauto).
-  match goal with
-  | |- ruttc _ _ _ _ _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
-      assert (EQ : b1 = b2)
-        by (destruct p, p'; destruct H as [HI ->]; red in HI; subst; reflexivity);
-      rewrite EQ; destruct b2
-  end.
-  - apply ruttc_ret; auto.
-  - rbind I2F_dvalue; [unfold load; rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
-    apply ruttc_ret; auto.
-Qed.
 
 (** The noreturn/nounwind check sees related call results, which are both
     returns or both unwinds. *)
