@@ -76,11 +76,11 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-09 (`ub-tests` at 775c9b35), `make interp` gives **251/301**
-assertions passing, and the three files that don't parse report as failures
-(the whole `make test` suite: 785/835). The 3 failing controls are all
-accounted for below: `!align` given as a named metadata node, `initializes`
-read-before-write, and lifetime. Gaps by category:
+As of 2026-10-13 (`ub-tests-parser` at 4018304f), `make interp` gives
+**291/336** assertions passing (the whole `make test` suite: 832/877). Every
+file parses. The 3 failing controls are all accounted for below: `initializes`
+read-before-write, lifetime, and `nofpclass` without `noundef` (which should
+pass poison on). Gaps by category:
 
 **Already handled.**
 - Arithmetic: division and remainder, including `INT_MIN / -1` and
@@ -169,7 +169,7 @@ or because Vellvm has no corresponding feature:
 
 - The UB string already carries a source span (`[file:L.C-L.C]: msg`), so
   `ASSERT UB <line>` can be checked by testing whether `<line>` falls in that
-  span. Checked this way (as `compare.py` does), 142 of the 144 UB cases Vellvm
+  span. Checked this way (as `compare.py` does), 165 of the 167 UB cases Vellvm
   currently detects match; the other two are `llvm.assume` cases, whose UB is
   reported inside `libll`. (memcpy and memset UB used to be reported inside
   `libll` shims for the opaque-pointer intrinsic names; Vellvm now handles
@@ -182,7 +182,8 @@ or because Vellvm has no corresponding feature:
 
 `compare.py` runs every case (every `ASSERT` line) **in a separate process**
 under each tool below, and writes `results/compare.md` (a summary plus one
-table per file) and `results/compare.json`. Running each case separately means
+table per file), `results/compare.json`, and, if pandoc is installed,
+`results/compare.html`. Running each case separately means
 UB in one case can't mask or change another case: the interpreters stop at the
 first UB, and the optimizer may treat a whole UB path as unreachable.
 
@@ -203,27 +204,36 @@ The Vellvm and llubi cells are marked ✓ (agrees with the assertion), ~ (UB, bu
 on a different line), or ✗. The native columns are not marked, because they
 aren't UB detectors. They show what the UB turns into.
 
-### Latest run (2026-10-09, `ub-tests` at 775c9b35)
+### Latest run (2026-10-13, `ub-tests-parser` at 4018304f)
 
-Out of 198 UB cases and 113 controls:
+Out of 209 UB cases and 127 controls:
 
 | | Vellvm | llubi | O0 | O1–O3 | ASan |
 |---|---|---|---|---|---|
-| UB cases reported as UB | 144 | 146 | – | – | – |
-| … on the asserted line | 142 | 140 | – | – | – |
-| UB cases that trap or fail an ASan check | – | – | 43 | 34 | 56 |
+| UB cases reported as UB | 167 | 152 | – | – | – |
+| … on the asserted line | 165 | 146 | – | – | – |
+| UB cases that trap or fail an ASan check | – | – | 45 | 38 | 57 |
 | controls flagged | 0 | 0 | 0 | 0 | 0 |
-| errors (unsupported, build/parse failures) | 12 | 14 | 5 | 5 | 5 |
+| errors (unsupported, build/parse failures) | 1 | 14 | 5 | 5 | 5 |
 
-Only Vellvm reports UB for `undef` in UB positions (division, `br`, `switch`,
-`alloca` count, `noundef`; llubi picks a value), `atomicrmw`/`cmpxchg` (which
-llubi does not implement), and `noreturn`/`nounwind` (21 cases). Only llubi
-reports UB for the memory part of `dereferenceable` (too-small and
-one-past-the-end objects), `getelementptr` flags, lifetime, writes to
-`constant` globals, assume bundles, named `!align` metadata, `nofpclass`,
-`indirectbr` to null, calls through data pointers, and an attribute split
-between declaration and call site (23 cases). Neither catches
-calling-convention mismatches or the pointer-capability attributes.
+Only Vellvm reports UB for `undef` in UB positions (division and remainder,
+`br`, `switch`, `alloca` count, `noundef`; llubi picks a value),
+`atomicrmw`/`cmpxchg` (which llubi does not implement), `noreturn`/`nounwind`
+(also through attribute groups), `dereferenceable` on a freed or dangling
+pointer (as an attribute or as load metadata), and a call-site `noundef` on a
+call or invoke result that violates `!range` (29 cases). Only llubi reports UB
+for `getelementptr inbounds` out of bounds of a real object, lifetime, writes
+to `constant` globals (directly and through memcpy/memset), assume bundles,
+`nofpclass`, calls through data pointers, and an attribute split between
+declaration and call site (14 cases). Neither catches `memory(...)`,
+`nocreateundeforpoison`, the pointer-capability attributes (`readonly`,
+`readnone`, `captures`, `nofree`, `noalias`, `initializes`, `writable`),
+`nofreeobj`, `captures(ret: …)` and `!captures`, or calling-convention
+mismatches (28 cases).
+
+The 2026-10-09 run (`ub-tests` at 775c9b35, 198 UB cases) had Vellvm at 144
+reported (142 on the asserted line) with 12 errors, mostly files that did not
+parse; the cases added since cover the newly supported syntax.
 
 ### First run (2026-10-08, macOS arm64, Homebrew clang/llubi 23.1.2)
 
