@@ -9,6 +9,35 @@ From Vellvm.Semantics Require Import
 (* TODO: make parameter? *)
 Definition ptr_size : nat := 8.
 
+Definition byte_sizeof_floating_point_variant (fp : floating_point_variant) : N :=
+  match fp with
+  | FP_half => 2
+  | FP_bfloat => 2
+  | FP_float => 4
+  | FP_double => 8
+  | FP_x86_fp80 => 10
+  | FP_fp128 => 16
+  | FP_ppc_fp128 => 16
+  end.
+
+Definition bit_sizeof_floating_point_variant (fp : floating_point_variant) : N :=
+  8 * (byte_sizeof_floating_point_variant fp).
+
+Definition Bit_sizeof_dtyp_base (ty : dtyp_base) : N :=
+  match ty with
+  | DTYPE_I sz => Npos sz
+  | DTYPE_Iptr => 64 (* TODO: probably kind of a lie... *)
+  | DTYPE_Pointer => 64
+  | DTYPE_Void => 0
+  | DTYPE_FP fp => bit_sizeof_floating_point_variant fp
+  | DTYPE_Label => 64
+  | DTYPE_Token => 64 (* ??? *)
+  | DTYPE_Metadata => 0
+  | DTYPE_X86_mmx => 64
+  | DTYPE_Opaque => 0
+  | DTYPE_B sz => Npos sz
+  end.
+
 Definition Dtyp_base_alignment (dt : dtyp_base) : alignment :=
   match dt with  
     | DTYPE_I sz =>
@@ -50,8 +79,17 @@ Definition max_alignment (a b : alignment) : alignment :=
     (N.max (abi_alignment a) (abi_alignment b))
     (N.max (preferred_alignment a) (preferred_alignment b)).
 
+(* LLVM's default alignment for a vector type (no vector entries in the
+   datalayout): its size in bytes, [ceil (n * element bits / 8)], rounded up
+   to a power of two.  So <4 x i32> and <2 x double> are 16-byte aligned,
+   <3 x i32> (12 bytes) too, and <8 x i1> (1 byte) is 1-byte aligned.
+   [N.log2_up 0 = 0], so a zero-sized vector gets alignment 1. *)
+Definition vector_alignment (n : N) (elt : dtyp_base) : alignment :=
+  let bytes := ((n * Bit_sizeof_dtyp_base elt + 7) / 8)%N in
+  let a := (2 ^ N.log2_up bytes)%N in
+  Build_alignment a a.
+
 Fixpoint Dtyp_alignment (dt : dtyp) : alignment :=
-  (* TODO: 64-bit+ vectors should be 128-bit aligned *)
   match dt with
   | DTYPE_Base t => Dtyp_base_alignment t
   (* "Structures may optionally be “packed” structures, which indicate that the alignment of the
@@ -65,6 +103,9 @@ Fixpoint Dtyp_alignment (dt : dtyp) : alignment :=
      of length at least 16 bytes or a C99 variable-length array variable always has alignment of at
      least 16 bytes."
      Exception not implemented. *)
+  | DTYPE_Array true sz (DTYPE_Base t) => vector_alignment sz t
+  (* Vector elements are scalars in well-formed IR; anything else keeps its
+     element's alignment, like an array. *)
   | DTYPE_Array v sz t => Dtyp_alignment t
   end.
 
@@ -79,35 +120,6 @@ Definition round_up_to_eight (n : N) : N :=
   then 0
   else (((n - 1) / 8) + 1) * 8.
 
-
-Definition byte_sizeof_floating_point_variant (fp : floating_point_variant) : N :=
-  match fp with
-  | FP_half => 2
-  | FP_bfloat => 2
-  | FP_float => 4
-  | FP_double => 8
-  | FP_x86_fp80 => 10
-  | FP_fp128 => 16
-  | FP_ppc_fp128 => 16
-  end.
-
-Definition bit_sizeof_floating_point_variant (fp : floating_point_variant) : N :=
-  8 * (byte_sizeof_floating_point_variant fp).
-
-Definition Bit_sizeof_dtyp_base (ty : dtyp_base) : N :=
-  match ty with
-  | DTYPE_I sz => Npos sz
-  | DTYPE_Iptr => 64 (* TODO: probably kind of a lie... *)
-  | DTYPE_Pointer => 64
-  | DTYPE_Void => 0
-  | DTYPE_FP fp => bit_sizeof_floating_point_variant fp
-  | DTYPE_Label => 64
-  | DTYPE_Token => 64 (* ??? *)
-  | DTYPE_Metadata => 0
-  | DTYPE_X86_mmx => 64
-  | DTYPE_Opaque => 0
-  | DTYPE_B sz => Npos sz
-  end.
 
 Fixpoint Bit_sizeof_dtyp (ty : dtyp) : N :=
   match ty with

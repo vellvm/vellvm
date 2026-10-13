@@ -746,10 +746,11 @@ Proof.
   - repeat break_goal_fast; eauto.
     subst; cbn; apply I2F_eval_int_op_bit_int.
   - apply I2F_eval_int_op_iptr; eauto.
-  - (* Poison rows: the guards are shared, up to [I2F_Iptr] on the payload *)
+  - (* Poison rows: the guards are shared, up to [I2F_Iptr] on the payload
+       (one goal each for SDiv and SRem, which check for a -1 divisor) *)
     destruct iop; cbn; eauto.
-    try (match goal with H : I2F_Iptr _ _ |- _ => red in H; subst end).
-    repeat break_goal_fast; eauto.
+    all: try (match goal with H : I2F_Iptr _ _ |- _ => red in H; subst end).
+    all: repeat break_goal_fast; eauto.
 Qed.
 
 (* Destruct the (variable) vector flags blocking the [eval_*] wrapper
@@ -1784,6 +1785,22 @@ Lemma I2F_dvalue_is_poison : forall v1 v2,
     @dvalue_is_poison PInf v1 = @dvalue_is_poison PFin v2.
 Proof.
   intros * H; destruct H; [destruct H |..]; auto.
+Qed.
+
+(** Related values are equally well defined: poison and poison bits sit at
+    the same places on both sides. *)
+Lemma I2F_dvalue_well_defined : forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    @dvalue_well_defined PInf v1 = @dvalue_well_defined PFin v2.
+Proof.
+  intros v1 v2 H; induction H as [b b' Hb | p s1 s2 _ IH | v s1 s2 _ IH] using I2F_dvalue_ind; cbn.
+  - destruct Hb; cbn; auto.
+    match goal with HB : I2F_dvalue_bv _ _ |- _ => destruct HB as [| | bits bits' Hbits] end;
+      cbn; auto.
+    f_equal; induction Hbits as [| x y xs ys Hxy _ IHb]; cbn; auto.
+    destruct Hxy; cbn; auto.
+  - induction IH; cbn; congruence.
+  - induction IH; cbn; congruence.
 Qed.
 
 Lemma I2F_forallb_is_poison : forall l1 l2,

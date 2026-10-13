@@ -119,3 +119,16 @@ Section Overlap.
 
 End Overlap.
 
+Section Alignment.
+  Context {P : Provenance} {A : @Pointer P} {PI : @PI P A}.
+
+  (** Is [p]'s address a multiple of [align] bytes?  Used for the checks that
+      LLVM's alignment annotations impose (the [align] of load/store/atomics,
+      the [align] attribute, [!align] metadata).  Alignment 0 is treated as
+      "no constraint"; LLVM's alignments are powers of two, so 0 does not
+      arise from well-formed IR. *)
+  Definition ptr_aligned_to (p : ptr) (align : N) : bool :=
+    orb (align =? 0)%N (ptr_to_int p mod Z.of_N align =? 0).
+
+End Alignment.
+

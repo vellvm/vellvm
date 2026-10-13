@@ -174,15 +174,16 @@ Section MemoryModel.
       | MemPush => mempush
       | MemPop => mempop
       | Alloca t n align =>
-          (* SAZ: double check the alignment when an alignment is specified, that is a _minimal_
-             guarantee.  If the "natural" alignment of the type is larger, that might be used
-             instead.  We need to figure out whether `allocate_dtyp` is responsible for that
-             or whether to put that logic here.  Currently it seems that no place
-             properly handles that.
-           *)
+          (* LangRef (alloca): "If not specified, the target can choose to
+             align the allocation on any convenient boundary compatible with
+             the type."  Like LLVM (which uses the preferred type alignment),
+             default to the type's preferred alignment.  An explicit alignment
+             is a minimum ("at least that boundary") and is used as given.
+             A larger alignment would also be allowed, but it would hide
+             overestimated-alignment UB in later accesses. *)
           let align :=
             match align with
-            | None => 8%N  (* TODO: This should probably depend on some configuration *)
+            | None => preferred_alignment (dtyp_alignment t)
             | Some align => align
             end in
           ptr <- allocate_dtyp t n align;;
@@ -225,47 +226,90 @@ Section MemoryModel.
     else
       mub "memcpy with overlapping or non-equal src and dst memory locations.".
 
+  Definition memmove (src dst : ptr) (size : N) (volatile : bool) : memM unit :=
+    (* LangRef: "The 'llvm.memmove.*' intrinsics copy a block of memory from
+       the source location to the destination location, which may overlap."
+       All the source bytes are read before any is written, so overlapping
+       ranges are copied correctly. *)
+    src_bytes <- read_bytes src size;;
+    write_bytes dst src_bytes.
+
   (** memset spec *)
   Definition memset
-    (dst : ptr) (val : int8) (len : Z) (volatile : bool) : memM unit :=
+    (dst : ptr) (byte : memory_byte) (len : Z) (volatile : bool) : memM unit :=
     if Z.ltb len 0
     then
       mub "memset given negative length."
     else
-      let byte := BYTE_I val in
       write_bytes dst (repeatN (Z.to_N len) byte).
   
-  Definition handle_memcpy (args : list dvalue_base) : memM unit :=
+  (** The shared argument handling of memcpy and memmove: [overlap_ok] is
+      true for memmove (overlapping ranges allowed) and false for memcpy. *)
+  Definition handle_memtransfer (overlap_ok : bool) (args : list dvalue_base) : memM unit :=
+    let name := if overlap_ok then "memmove" else "memcpy" in
     match args with
-    | DVALUE_Pointer dst ::
-        DVALUE_Pointer src ::
-        DVALUE_I sz size ::
-        DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-        memcpy src dst (Z.to_N (unsigned size)) (equ volatile VellvmIntegers.one)
-    | DVALUE_Pointer dst ::
-        DVALUE_Pointer src ::
-        DVALUE_Iptr size ::
-        DVALUE_I _ volatile :: [] (* volatile ignored *)  =>
-        memcpy src dst (Z.to_N (to_Z size)) (equ volatile VellvmIntegers.one)
-    | _ => merr "Unsupported arguments to memcpy."
+    | dst :: src :: len :: DVALUE_I _ volatile :: [] (* volatile ignored *) =>
+        size <- match len with
+               | DVALUE_I _ size => ret (Z.to_N (unsigned size))
+               | DVALUE_Iptr size => ret (Z.to_N (to_Z size))
+               (* LangRef: "If <len> is not a well-defined value, the
+                  behavior is undefined." *)
+               | DVALUE_Poison => mub (name ++ " with poison length.")
+               | _ => merr ("Unsupported arguments to " ++ name ++ ".")
+               end;;
+        match dst, src with
+        | DVALUE_Pointer dst, DVALUE_Pointer src =>
+            (if overlap_ok then memmove else memcpy)
+              src dst size (equ volatile VellvmIntegers.one)
+        | DVALUE_Poison, (DVALUE_Pointer _ | DVALUE_Poison)
+        | DVALUE_Pointer _, DVALUE_Poison =>
+            (* LangRef: "If <len> is 0, it is no-op ...  If <len> is not
+               zero, both <dest> and <src> should be well-defined, otherwise
+               the behavior is undefined." *)
+            if (size =? 0)%N then ret tt
+            else mub (name ++ " with a poison source or destination and nonzero length.")
+        | _, _ => merr ("Unsupported arguments to " ++ name ++ ".")
+        end
+    | _ => merr ("Unsupported arguments to " ++ name ++ ".")
     end.
-  
-  Definition handle_memset (args : list dvalue_base) : memM unit.
-    refine
-      (match args with
-       | DVALUE_Pointer dst ::
-           DVALUE_I sz_val val ::
-           DVALUE_I sz_len len ::
-           DVALUE_I sz_vol volatile :: [] (* volatile ignored *)  =>
-           _
-       | _ => merr "Unsupported arguments to memset."
-       end).
 
-    destruct (Pos.eq_dec sz_val 8); subst.
-    - exact
-        (memset dst val (unsigned len) (equ volatile VellvmIntegers.one)).
-    - exact (merr "Unsupported arguments to memset.").
-  Defined. 
+  Definition handle_memcpy (args : list dvalue_base) : memM unit :=
+    handle_memtransfer false args.
+
+  Definition handle_memmove (args : list dvalue_base) : memM unit :=
+    handle_memtransfer true args.
+
+  Definition handle_memset (args : list dvalue_base) : memM unit :=
+    match args with
+    | dst :: val :: len :: DVALUE_I _ volatile :: [] (* volatile ignored *) =>
+        (* The fill byte: an i8 value, or poison bytes for a poison value
+           (which is not UB: it just stores poison). *)
+        byte <- match val with
+               | DVALUE_I sz v =>
+                   if Pos.eqb sz 8 then ret (BYTE_I (repr (unsigned v) : int8))
+                   else merr "Unsupported arguments to memset."
+               | DVALUE_Poison => ret poison_memory_byte
+               | _ => merr "Unsupported arguments to memset."
+               end;;
+        size <- match len with
+               | DVALUE_I _ len => ret (unsigned len)
+               (* LangRef: "If <len> is not a well-defined value, the
+                  behavior is undefined." *)
+               | DVALUE_Poison => mub "memset with poison length."
+               | _ => merr "Unsupported arguments to memset."
+               end;;
+        match dst with
+        | DVALUE_Pointer dst => memset dst byte size (equ volatile VellvmIntegers.one)
+        (* LangRef: "If <len> is 0, it is no-op ...  If <len> is not zero,
+           <dest> should be well-defined, otherwise the behavior is
+           undefined." *)
+        | DVALUE_Poison =>
+            if (size =? 0)%Z then ret tt
+            else mub "memset with a poison destination and nonzero length."
+        | _ => merr "Unsupported arguments to memset."
+        end
+    | _ => merr "Unsupported arguments to memset."
+    end.
 
   Definition handle_malloc (args : list dvalue_base) (align : N) : memM ptr :=
     match args with
@@ -278,12 +322,37 @@ Section MemoryModel.
 
   Definition handle_free (args : list dvalue_base) : memM unit :=
     match args with
-    | [DVALUE_Pointer ptr] => free ptr
+    | [DVALUE_Pointer ptr] =>
+        (* C11 7.22.3.3: "If ptr is a null pointer, no action occurs."
+           Compare addresses only: provenance does not matter, so e.g.
+           [inttoptr 0] (which has wildcard provenance) is also null. *)
+        if (ptr_to_int ptr =? ptr_to_int null)%Z then ret tt else free ptr
+    | [DVALUE_Poison] =>
+        (* Poison could be any address, including one that is neither null
+           nor the start of a live heap block. *)
+        mub "Free of a poison pointer."
     | _ => merr "Free: invalid arguments."
     end.
 
   Definition NONE := DVALUE_Base DVALUE_None.
   
+  (** The names of the memcpy, memmove, and memset intrinsics, under both
+      the typed-pointer (`p0i8`) and opaque-pointer (`p0`) manglings. *)
+  Definition is_memcpy_name (name : string) : bool :=
+    existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
+      ["llvm.memcpy.p0i8.p0i8.i32"; "llvm.memcpy.p0i8.p0i8.i64";
+       "llvm.memcpy.p0.p0.i32"; "llvm.memcpy.p0.p0.i64"].
+
+  Definition is_memmove_name (name : string) : bool :=
+    existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
+      ["llvm.memmove.p0i8.p0i8.i32"; "llvm.memmove.p0i8.p0i8.i64";
+       "llvm.memmove.p0.p0.i32"; "llvm.memmove.p0.p0.i64"].
+
+  Definition is_memset_name (name : string) : bool :=
+    existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
+      ["llvm.memset.p0i8.i32"; "llvm.memset.p0i8.i64";
+       "llvm.memset.p0.i32"; "llvm.memset.p0.i64"].
+
   Definition handle_intrinsicM : IntrinsicE ~> memM :=
     fun T e =>
       match e with
@@ -292,14 +361,17 @@ Section MemoryModel.
           (* Pick all arguments, they should all be unique. *)
           (* TODO: add more variants to memcpy *)
           (* FIXME: use reldec typeclass? *)
-          if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i32"))
-               (Rocqlib.proj_sumbool (string_dec name "llvm.memcpy.p0i8.p0i8.i64"))
+          if is_memcpy_name name
           then
             handle_memcpy args' ;;
             ret (inr NONE)
           else
-            if orb (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i32"))
-                 (Rocqlib.proj_sumbool (string_dec name "llvm.memset.p0i8.i64"))
+          if is_memmove_name name
+          then
+            handle_memmove args' ;;
+            ret (inr NONE)
+          else
+            if is_memset_name name
             then
               handle_memset args' ;;
               ret (inr NONE)

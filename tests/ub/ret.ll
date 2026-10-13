@@ -1,0 +1,474 @@
+; UB tests for the `ret` instruction and return-value attributes.
+;
+; LangRef (Poison Values): immediate UB if poison is "The operand of a ret
+; instruction if the function or invoking call site has a noundef attribute in
+; the return value position."
+; LangRef (noundef / nonnull / align / range / dereferenceable): as for
+; parameters (see call-param-attrs.ll), these apply to return values too:
+; nonnull/align/range violations yield poison, and with noundef they are UB.
+; LangRef (dereferenceable): "on function entry for arguments or at the point
+; of the call for return values".
+;
+; For a noundef on the callee's return type, UB is attributed to the callee's
+; `ret`; for a noundef on the call site, to the call.
+
+declare ptr @malloc(i64)
+declare void @free(ptr)
+
+define noundef i32 @ret_noundef(i32 %x) {
+  ret i32 %x                                      ; <- UB @ret_noundef
+}
+
+; ASSERT UB 19: call i32 @ret_noundef(i32 poison)
+; ASSERT EQ: i32 4 = call i32 @ret_noundef(i32 4)
+
+define noundef i32 @ret_noundef_undef() {
+  ret i32 undef                                   ; <- UB @ret_noundef_undef
+}
+
+; ASSERT UB 26: call i32 @ret_noundef_undef()
+
+define noundef { i32, i32 } @ret_noundef_struct() {
+  ret { i32, i32 } { i32 1, i32 poison }          ; <- UB @ret_noundef_struct
+}
+
+; ASSERT UB 32: call { i32, i32 } @ret_noundef_struct()
+
+; Control: without noundef, returning poison is fine.
+define i32 @ret_plain(i32 %x) {
+  ret i32 %x
+}
+
+; ASSERT EQ: i32 poison = call i32 @ret_plain(i32 poison)
+
+; noundef on the call site's return position.
+define i32 @ret_noundef_callsite(i32 %x) {
+  %r = call noundef i32 @ret_plain(i32 %x)        ; <- UB @ret_noundef_callsite
+  ret i32 %r
+}
+
+; ASSERT UB 46: call i32 @ret_noundef_callsite(i32 poison)
+; ASSERT EQ: i32 4 = call i32 @ret_noundef_callsite(i32 4)
+
+; ------------------------------------------------------------- nonnull
+
+define noundef nonnull ptr @ret_nonnull_noundef_null() {
+  ret ptr null                                    ; <- UB @use_ret_nonnull_noundef
+}
+
+define i32 @use_ret_nonnull_noundef() {
+  %p = call ptr @ret_nonnull_noundef_null()
+  ret i32 0
+}
+
+; ASSERT UB 56: call i32 @use_ret_nonnull_noundef()
+
+define nonnull ptr @ret_nonnull_null() {
+  ret ptr null
+}
+
+; nonnull alone: the caller sees poison.
+define i64 @use_ret_nonnull() {
+  %p = call ptr @ret_nonnull_null()
+  %i = ptrtoint ptr %p to i64
+  ret i64 %i
+}
+
+; ASSERT EQ: i64 poison = call i64 @use_ret_nonnull()
+
+; ... and branching on it is UB.
+define i32 @use_ret_nonnull_branch() {
+entry:
+  %p = call ptr @ret_nonnull_null()
+  %c = icmp eq ptr %p, null
+  br i1 %c, label %t, label %f                    ; <- UB @use_ret_nonnull_branch
+t:
+  ret i32 1
+f:
+  ret i32 0
+}
+
+; ASSERT UB 84: call i32 @use_ret_nonnull_branch()
+
+; Call-site return attributes.
+define ptr @ret_null() {
+  ret ptr null
+}
+
+define i32 @ret_nonnull_noundef_callsite() {
+  %p = call noundef nonnull ptr @ret_null()       ; <- UB @ret_nonnull_noundef_callsite
+  ret i32 0
+}
+
+; ASSERT UB 99: call i32 @ret_nonnull_noundef_callsite()
+
+; -------------------------------------------------------------- align
+
+@buf = global [2 x i64] zeroinitializer, align 8
+
+define noundef align 8 ptr @ret_align8_noundef() {
+  %q = getelementptr i8, ptr @buf, i64 4
+  ret ptr %q                                      ; <- UB @use_ret_align8_noundef
+}
+
+define i32 @use_ret_align8_noundef() {
+  %p = call ptr @ret_align8_noundef()
+  ret i32 0
+}
+
+; ASSERT UB 111: call i32 @use_ret_align8_noundef()
+
+; -------------------------------------------------------------- range
+
+define noundef range(i32 0, 10) i32 @ret_range_noundef(i32 %x) {
+  ret i32 %x                                      ; <- UB @ret_range_noundef
+}
+
+; ASSERT UB 124: call i32 @ret_range_noundef(i32 10)
+; ASSERT EQ: i32 9 = call i32 @ret_range_noundef(i32 9)
+
+define range(i32 0, 10) i32 @ret_range(i32 %x) {
+  ret i32 %x
+}
+
+; ASSERT EQ: i32 poison = call i32 @ret_range(i32 10)
+
+; ---------------------------------------------------- dereferenceable(n)
+
+define dereferenceable(4) ptr @ret_deref_freed() {
+  %p = call ptr @malloc(i64 4)
+  call void @free(ptr %p)
+  ret ptr %p                                      ; <- UB @use_ret_deref_freed
+}
+
+define i32 @use_ret_deref_freed() {
+  %p = call ptr @ret_deref_freed()
+  ret i32 0
+}
+
+; ASSERT UB 141: call i32 @use_ret_deref_freed()
+
+define dereferenceable(4) ptr @ret_deref_null() {
+  ret ptr null                                    ; <- UB @use_ret_deref_null
+}
+
+define i32 @use_ret_deref_null() {
+  %p = call ptr @ret_deref_null()
+  ret i32 0
+}
+
+; ASSERT UB 152: call i32 @use_ret_deref_null()
+
+define dereferenceable(4) ptr @ret_deref_ok() {
+  %p = call ptr @malloc(i64 4)
+  ret ptr %p
+}
+
+define i32 @use_ret_deref_ok() {
+  %p = call ptr @ret_deref_ok()
+  call void @free(ptr %p)
+  ret i32 0
+}
+
+; ASSERT EQ: i32 0 = call i32 @use_ret_deref_ok()
+
+; ---- BEGIN executable tail generated by tests/gen.py --dispatch (do not edit) ----
+; `main N` runs case N alone, so UB in one case cannot mask another;
+; @ub_case_N is an argument-free entry point for the same call.
+
+; case 0 (line 22): ASSERT UB 19: call i32 @ret_noundef(i32 poison)
+define i32 @ub_case_0() {
+  %r = call i32 @ret_noundef(i32 poison)
+  ret i32 %r
+}
+
+; case 1 (line 23): ASSERT EQ: i32 4 = call i32 @ret_noundef(i32 4)
+define i32 @ub_case_1() {
+  %r = call i32 @ret_noundef(i32 4)
+  ret i32 %r
+}
+
+; case 2 (line 29): ASSERT UB 26: call i32 @ret_noundef_undef()
+define i32 @ub_case_2() {
+  %r = call i32 @ret_noundef_undef()
+  ret i32 %r
+}
+
+; case 3 (line 35): ASSERT UB 32: call { i32, i32 } @ret_noundef_struct()
+define { i32, i32 } @ub_case_3() {
+  %r = call { i32, i32 } @ret_noundef_struct()
+  ret { i32, i32 } %r
+}
+
+; case 4 (line 42): ASSERT EQ: i32 poison = call i32 @ret_plain(i32 poison)
+define i32 @ub_case_4() {
+  %r = call i32 @ret_plain(i32 poison)
+  ret i32 %r
+}
+
+; case 5 (line 50): ASSERT UB 46: call i32 @ret_noundef_callsite(i32 poison)
+define i32 @ub_case_5() {
+  %r = call i32 @ret_noundef_callsite(i32 poison)
+  ret i32 %r
+}
+
+; case 6 (line 51): ASSERT EQ: i32 4 = call i32 @ret_noundef_callsite(i32 4)
+define i32 @ub_case_6() {
+  %r = call i32 @ret_noundef_callsite(i32 4)
+  ret i32 %r
+}
+
+; case 7 (line 64): ASSERT UB 56: call i32 @use_ret_nonnull_noundef()
+define i32 @ub_case_7() {
+  %r = call i32 @use_ret_nonnull_noundef()
+  ret i32 %r
+}
+
+; case 8 (line 77): ASSERT EQ: i64 poison = call i64 @use_ret_nonnull()
+define i64 @ub_case_8() {
+  %r = call i64 @use_ret_nonnull()
+  ret i64 %r
+}
+
+; case 9 (line 91): ASSERT UB 84: call i32 @use_ret_nonnull_branch()
+define i32 @ub_case_9() {
+  %r = call i32 @use_ret_nonnull_branch()
+  ret i32 %r
+}
+
+; case 10 (line 103): ASSERT UB 99: call i32 @ret_nonnull_noundef_callsite()
+define i32 @ub_case_10() {
+  %r = call i32 @ret_nonnull_noundef_callsite()
+  ret i32 %r
+}
+
+; case 11 (line 119): ASSERT UB 111: call i32 @use_ret_align8_noundef()
+define i32 @ub_case_11() {
+  %r = call i32 @use_ret_align8_noundef()
+  ret i32 %r
+}
+
+; case 12 (line 127): ASSERT UB 124: call i32 @ret_range_noundef(i32 10)
+define i32 @ub_case_12() {
+  %r = call i32 @ret_range_noundef(i32 10)
+  ret i32 %r
+}
+
+; case 13 (line 128): ASSERT EQ: i32 9 = call i32 @ret_range_noundef(i32 9)
+define i32 @ub_case_13() {
+  %r = call i32 @ret_range_noundef(i32 9)
+  ret i32 %r
+}
+
+; case 14 (line 134): ASSERT EQ: i32 poison = call i32 @ret_range(i32 10)
+define i32 @ub_case_14() {
+  %r = call i32 @ret_range(i32 10)
+  ret i32 %r
+}
+
+; case 15 (line 149): ASSERT UB 141: call i32 @use_ret_deref_freed()
+define i32 @ub_case_15() {
+  %r = call i32 @use_ret_deref_freed()
+  ret i32 %r
+}
+
+; case 16 (line 160): ASSERT UB 152: call i32 @use_ret_deref_null()
+define i32 @ub_case_16() {
+  %r = call i32 @use_ret_deref_null()
+  ret i32 %r
+}
+
+; case 17 (line 173): ASSERT EQ: i32 0 = call i32 @use_ret_deref_ok()
+define i32 @ub_case_17() {
+  %r = call i32 @use_ret_deref_ok()
+  ret i32 %r
+}
+
+@ub_fmt_start = private unnamed_addr constant [16 x i8] c"case %d: start\0A\00"
+@ub_fmt_ret = private unnamed_addr constant [18 x i8] c"case %d: returned\00"
+@ub_fmt_int = private unnamed_addr constant [6 x i8] c" %lld\00"
+@ub_fmt_fp = private unnamed_addr constant [4 x i8] c" %g\00"
+@ub_fmt_nl = private unnamed_addr constant [2 x i8] c"\0A\00"
+
+declare i32 @printf(ptr, ...)
+declare i32 @atoi(ptr)
+
+define i32 @main(i32 %argc, ptr %argv) {
+entry:
+  %has_arg = icmp sge i32 %argc, 2
+  br i1 %has_arg, label %dispatch, label %bad
+dispatch:
+  %arg1_p = getelementptr ptr, ptr %argv, i64 1
+  %arg1 = load ptr, ptr %arg1_p
+  %n = call i32 @atoi(ptr %arg1)
+  switch i32 %n, label %bad [
+    i32 0, label %case0
+    i32 1, label %case1
+    i32 2, label %case2
+    i32 3, label %case3
+    i32 4, label %case4
+    i32 5, label %case5
+    i32 6, label %case6
+    i32 7, label %case7
+    i32 8, label %case8
+    i32 9, label %case9
+    i32 10, label %case10
+    i32 11, label %case11
+    i32 12, label %case12
+    i32 13, label %case13
+    i32 14, label %case14
+    i32 15, label %case15
+    i32 16, label %case16
+    i32 17, label %case17
+  ]
+case0:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 0)
+  %c0_r = call i32 @ub_case_0()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 0)
+  %c0_0 = sext i32 %c0_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c0_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case1:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 1)
+  %c1_r = call i32 @ub_case_1()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 1)
+  %c1_0 = sext i32 %c1_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c1_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case2:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 2)
+  %c2_r = call i32 @ub_case_2()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 2)
+  %c2_0 = sext i32 %c2_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c2_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case3:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 3)
+  %c3_r = call { i32, i32 } @ub_case_3()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 3)
+  %c3_0 = extractvalue { i32, i32 } %c3_r, 0
+  %c3_1 = sext i32 %c3_0 to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c3_1)
+  %c3_2 = extractvalue { i32, i32 } %c3_r, 1
+  %c3_3 = sext i32 %c3_2 to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c3_3)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case4:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 4)
+  %c4_r = call i32 @ub_case_4()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 4)
+  %c4_0 = sext i32 %c4_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c4_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case5:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 5)
+  %c5_r = call i32 @ub_case_5()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 5)
+  %c5_0 = sext i32 %c5_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c5_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case6:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 6)
+  %c6_r = call i32 @ub_case_6()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 6)
+  %c6_0 = sext i32 %c6_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c6_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case7:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 7)
+  %c7_r = call i32 @ub_case_7()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 7)
+  %c7_0 = sext i32 %c7_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c7_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case8:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 8)
+  %c8_r = call i64 @ub_case_8()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 8)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c8_r)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case9:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 9)
+  %c9_r = call i32 @ub_case_9()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 9)
+  %c9_0 = sext i32 %c9_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c9_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case10:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 10)
+  %c10_r = call i32 @ub_case_10()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 10)
+  %c10_0 = sext i32 %c10_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c10_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case11:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 11)
+  %c11_r = call i32 @ub_case_11()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 11)
+  %c11_0 = sext i32 %c11_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c11_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case12:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 12)
+  %c12_r = call i32 @ub_case_12()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 12)
+  %c12_0 = sext i32 %c12_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c12_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case13:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 13)
+  %c13_r = call i32 @ub_case_13()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 13)
+  %c13_0 = sext i32 %c13_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c13_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case14:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 14)
+  %c14_r = call i32 @ub_case_14()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 14)
+  %c14_0 = sext i32 %c14_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c14_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case15:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 15)
+  %c15_r = call i32 @ub_case_15()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 15)
+  %c15_0 = sext i32 %c15_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c15_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case16:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 16)
+  %c16_r = call i32 @ub_case_16()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 16)
+  %c16_0 = sext i32 %c16_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c16_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case17:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 17)
+  %c17_r = call i32 @ub_case_17()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 17)
+  %c17_0 = sext i32 %c17_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c17_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+bad:
+  ret i32 2
+}
+; ---- END executable tail ----

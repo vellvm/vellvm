@@ -335,15 +335,22 @@ Section withParams.
           ret.
           eapply has_post_weaken; [apply IH |].
           intros ? [|]; eauto. 
+      - (* IndirectBr: UB on a poison address, otherwise unsupported *)
+        break_match_goal.
+        bind.
+        break_match_goal; abs.
       - (* Resume *)
         break_match_goal.
         bind; abs.
       - (* Invoke *)
         break_match_goal.
-        do 3 bind.
+        (* arguments, callee, call, then the noreturn/nounwind check *)
+        do 4 bind.
         break_match_goal.
         + bind; ret.
-        + break_match_goal.
+        + (* the invoke's return-value attributes, then the result *)
+          bind.
+          break_match_goal.
           bind; ret.
           bind; ret.
     Qed.

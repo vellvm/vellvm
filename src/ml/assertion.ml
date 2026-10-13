@@ -82,7 +82,7 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
       DVALUE_Struct (false, List.map texp_to_dvalue elts)
   | TYPE_Packed_struct _, EXP_Packed_struct elts ->
       DVALUE_Struct (true, List.map texp_to_dvalue elts)
-  | TYPE_Array (sz, t), EXP_Array elts ->
+  | TYPE_Array (_sz, _t), EXP_Array elts ->
      DVALUE_Array (false, List.map texp_to_dvalue elts)
   | TYPE_Vector _, EXP_Vector elts ->
      DVALUE_Array (true, List.map texp_to_dvalue elts)
@@ -243,9 +243,16 @@ let dvalue_eq_assertion name (ty:DynamicTypes.dtyp) (expected : DV.dvalue) (got 
      | DTYPE_Base DTYPE_Iptr
      | DTYPE_Base DTYPE_Pointer ->
         (* integral comparison *)
-        let v = ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in
-        if dvalue_i1_to_bool v then () else
-          failwith msg
+        begin match result with
+        | DVALUE_Base DV.DVALUE_Poison ->
+           (* [icmp eq] against poison is poison, not a verdict: the
+              expected value is not poison (handled above), so fail. *)
+           failwith msg
+        | _ ->
+           let v = ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in
+           if dvalue_i1_to_bool v then () else
+             failwith msg
+        end
      | _ -> (* Best effort comparison of other types *)
         compare_dvalues_exn expected result msg
      end
@@ -296,7 +303,7 @@ let make_test_h run name ll_ast t : (string * Assert.assertion) option =
           let dv_str = Interpreter.string_of_dvalue dv in
           let err_str = Printf.sprintf "%s but got %s" expected_str dv_str in
           failwith err_str
-       | Error (UndefinedBehavior ans) -> ()
+       | Error (UndefinedBehavior _ans) -> ()
        | Error e -> failwith (Result.string_of_exit_condition e)
      in
      Some (expected_str, result)

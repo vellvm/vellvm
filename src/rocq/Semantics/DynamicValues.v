@@ -516,6 +516,26 @@ Section DValue.
     Lemma dvalue_is_poison_false : forall d,
         dvalue_is_poison d = false -> d <> DVALUE_Base DVALUE_Poison.
     Proof. intros d H C; subst; discriminate. Qed.
+
+    (** LangRef (Well-Defined Values): "a value is *well defined* if the
+        value does not have an undef bit and is not poison ...  An aggregate
+        value or vector is well defined if its elements are well defined."
+        ([undef] is denoted as poison.)  This is what the [noundef]
+        attribute and [!noundef] metadata require. *)
+    Definition dvalue_base_well_defined (v : dvalue_base) : bool :=
+      match v with
+      | DVALUE_Poison => false
+      (* a byte value with some poison bits *)
+      | DVALUE_B _ (BYTE_Mixed bits) => negb (existsb is_poison_bit bits)
+      | _ => true
+      end.
+
+    Fixpoint dvalue_well_defined (dv : dvalue) : bool :=
+      match dv with
+      | DVALUE_Base v => dvalue_base_well_defined v
+      | DVALUE_Struct _ fields => forallb dvalue_well_defined fields
+      | DVALUE_Array _ elts => forallb dvalue_well_defined elts
+      end.
     
     Lemma ibinop_eq_dec : forall (op1 op2:ibinop), {op1 = op2} + {op1 <> op2}.
       intros.
@@ -769,7 +789,13 @@ Section DValue.
           else
             if (msigned y =? 0)%Z
             then raise_ub "Signed mod 0."
-            else tdb <$> mmods x y
+            else
+              (* LangRef: "Overflow also leads to undefined behavior ... by
+                 taking the remainder of a 32-bit division of -2147483648 by
+                 -1", even though the remainder itself does not overflow. *)
+              if (from_option false (fmap (fun min => min =? msigned x) mmin_signed) && (msigned y =? -1))%Z
+              then raise_ub "Signed mod overflow."
+              else tdb <$> mmods x y
                            
       | And =>
           ret (tdb (mand x y))
@@ -820,16 +846,18 @@ Section DValue.
            eval_int_op iop i1 i2
        | DVALUE_Poison, _             =>
            match iop with
-           | SDiv _ =>
+           (* A poison dividend could be INT_MIN, and INT_MIN / -1 is UB for
+              both sdiv and srem. *)
+           | SDiv _ | SRem =>
                x <- match v2 with
                    | DVALUE_I sz2 i2 =>
                        ret (@Integers.signed sz2 i2)
                    | DVALUE_Iptr i2 =>
                        ret (to_Z i2)
-                   | _ => raise_error "ill_typed-iop: sdiv"
+                   | _ => raise_error "ill_typed-iop: sdiv/srem"
                    end;;
                if Z.eq_dec x (-1)
-               then raise_ub "Signed division poison overflow"
+               then raise_ub "Signed division/remainder poison overflow"
                else ret DVALUE_Poison
            | _ =>
                ret DVALUE_Poison 
