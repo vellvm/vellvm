@@ -57,7 +57,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 | `indirectbr.ll` | poison, undef, or null address; a block address not in the label list, or of another function |
 | `unreachable.ll` | executing `unreachable` |
 | `alloca.ll` | poison or undef element count; access through a zero-sized alloca |
-| `load.ll`, `store.ll` | null, poison, or undef address; out of bounds; dangling stack; use after free; overestimated `align`; `!noundef`, `!nonnull`+`!noundef`, `!align`+`!noundef` metadata; store to a `constant` global; store outside `llvm.lifetime.start`/`end` |
+| `load.ll`, `store.ll` | null, poison, or undef address; out of bounds; dangling stack; use after free; overestimated `align`; `!noundef`, `!nonnull`+`!noundef`, `!align`+`!noundef`, `!range`+`!noundef`, `!dereferenceable`, `!dereferenceable_or_null` metadata; store to a `constant` global; store outside `llvm.lifetime.start`/`end` |
 | `getelementptr.ll` | dereferencing the poison result of `inbounds`/`nuw`/`nusw` violations or a poison index |
 | `atomicrmw.ll`, `cmpxchg.ll` | null or poison address, out of bounds, misaligned |
 | `provenance.ll` | access through a pointer *based on* the wrong object (gep across objects, integer constants, stale heap or stack pointers) |
@@ -103,7 +103,10 @@ read-before-write, and lifetime. Gaps by category:
   values (call and invoke), and on the arguments and return value of a
   *defined* callee. Without `noundef`, a violation passes poison on.
 - Load metadata `!noundef`, `!nonnull`, and `!align` (inline or a numbered
-  node such as `!align !1`).
+  node such as `!align !1`); `!range` (a union of possibly wrapping ranges,
+  lane by lane for vectors); `!dereferenceable` and
+  `!dereferenceable_or_null` (checked by reading the bytes, so the UB is
+  reported with the memory model's message).
 - Intrinsics and libc: memcpy overlap and out of bounds; memcpy, memmove, and
   memset with a poison length, or poison pointers and a nonzero length (a no-op
   with length 0); memset with a poison fill value (stores poison); memmove
@@ -124,7 +127,6 @@ read-before-write, and lifetime. Gaps by category:
 - Not enforced at all: the memory part of `dereferenceable[_or_null]`,
   `memory(...)`, `readonly`/`readnone`, `captures`, `nofree`, `noalias`,
   `initializes`, `writable`, `nocreateundeforpoison`.
-- Load metadata `!range` and `!dereferenceable[_or_null]` are not handled.
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
 - Stores to `constant` globals are allowed, directly and through memcpy/memset.

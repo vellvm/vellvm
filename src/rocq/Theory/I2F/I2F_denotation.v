@@ -157,6 +157,52 @@ Proof.
   end; rstep; cbnn; try easy; eauto.
 Qed.
 
+(** Load metadata [!range]: both sides test the same integer, lane by lane
+    for vectors. *)
+Lemma I2F_value_metadata_range_base rs v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_metadata_range_base PInf rs v1) (@value_metadata_range_base PFin rs v2).
+Proof.
+  intros H; pose proof H as H'; unfold value_metadata_range_base.
+  inv H; [inv H0 | |]; cbn; auto.
+  repeat break_match_goal; auto.
+Qed.
+
+Lemma I2F_value_metadata_range r v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_metadata_range PInf r v1) (@value_metadata_range PFin r v2).
+Proof.
+  intros H.
+  destruct r as [rs|]; cbn; auto.
+  inversion H; subst; try (apply I2F_value_metadata_range_base; auto).
+  destruct v; [| apply I2F_value_metadata_range_base; auto].
+  constructor.
+  match goal with
+  | HF : Forall2 I2F_dvalue _ _ |- _ =>
+      induction HF; cbn; constructor; auto using I2F_value_metadata_range_base
+  end.
+Qed.
+
+(** Load metadata [!dereferenceable]: related pointers have the same
+    address, so both sides skip the check or both read the same bytes. *)
+Lemma I2F_assert_dereferenceable or_null n v1 v2 msg :
+  I2F_dvalue v1 v2 ->
+  I2F_refine_CFG (fun _ _ => True)
+    (@assert_dereferenceable PInf or_null n v1 msg) (@assert_dereferenceable PFin or_null n v2 msg).
+Proof.
+  intros H; pose proof H as H'; unfold I2F_refine_CFG, assert_dereferenceable.
+  inv H; [inv H0 | |]; cbn; try now (rstep; cbnn; try easy; eauto).
+  match goal with
+  | |- ruttc _ _ _ _ _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
+      assert (EQ : b1 = b2)
+        by (destruct p, p'; destruct H as [HI ->]; red in HI; subst; reflexivity);
+      rewrite EQ; destruct b2
+  end.
+  - apply ruttc_ret; auto.
+  - rbind I2F_dvalue; [unfold load; rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+    apply ruttc_ret; auto.
+Qed.
+
 (** The noreturn/nounwind check sees related call results, which are both
     returns or both unwinds. *)
 Lemma I2F_check_call_result fattrs msg r1 r2 :
@@ -287,8 +333,13 @@ Lemma I2F_denote_instr :
       bind_exp.
       rbind (fun _ _ => True); [apply I2F_assert_alignment; auto | intros _ _ _].
       rbind I2F_dvalue; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
-      (* the load's value metadata, applied like attributes *)
-      erbind; [apply I2F_apply_value_attrs; eauto | intros].
+      (* the load's value metadata: !range, then the ones applied like
+         attributes, then !dereferenceable *)
+      erbind; [apply I2F_apply_value_attrs, I2F_value_metadata_range; eauto | intros v1' v2' HV'].
+      rbind (fun (_ _ : unit) => True).
+      { destruct (load_metadata_dereferenceable _) as [[]|];
+          [apply I2F_assert_dereferenceable; auto | apply ruttc_ret; auto]. }
+      intros _ _ _.
       auto... (* [apply I2F_freeze'; auto | intros]...*)
     - destruct val,ptr, x; cbn...
       bind_exp.

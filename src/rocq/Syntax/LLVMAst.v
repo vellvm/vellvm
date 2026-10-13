@@ -923,7 +923,8 @@ Definition attr_range (a : param_attr) : option (int_syntax * int_syntax) :=
    [!noundef].  The [!align] node must be inline ([!align !{i64 N}]); a
    reference to a numbered node ([!align !1]) is replaced by the node before
    linking (see [resolve_module_refs] in ModuleRefs.v).  [!range] and
-   [!dereferenceable] are not handled yet. *)
+   [!dereferenceable] have no attribute counterpart that fits (a union of
+   ranges; a check on memory), so they are read separately below. *)
 Definition load_metadata_attr (md : metadata) : list param_attr :=
   match md with
   | METADATA_Pair (METADATA_Id (Name "nonnull")) _ => [PARAMATTR_Nonnull]
@@ -935,6 +936,36 @@ Definition load_metadata_attr (md : metadata) : list param_attr :=
 
 Definition load_metadata_attrs (mds : list metadata) : list param_attr :=
   flat_map load_metadata_attr mds.
+
+(* The [lo, hi) pairs of a [!range] node: [!range !{i8 0, i8 2, i8 3, i8 6}]
+   lists the ranges [0, 2) and [3, 6). *)
+Fixpoint metadata_range_pairs (mds : list metadata) : list (int_syntax * int_syntax) :=
+  match mds with
+  | METADATA_Const (_, EXP_Integer lo) :: METADATA_Const (_, EXP_Integer hi) :: mds' =>
+      (lo, hi) :: metadata_range_pairs mds'
+  | _ => []
+  end.
+
+(* A load's [!range] ranges, if it has a [!range] node. *)
+Definition load_metadata_range (mds : list metadata) : option (list (int_syntax * int_syntax)) :=
+  find_option (fun md =>
+                 match md with
+                 | METADATA_Pair (METADATA_Id (Name "range")) (METADATA_Node ns) =>
+                     Some (metadata_range_pairs ns)
+                 | _ => None
+                 end) mds.
+
+(* A load's [!dereferenceable !{i64 n}] or [!dereferenceable_or_null !{i64 n}]
+   node: whether null is allowed, and [n]. *)
+Definition load_metadata_dereferenceable (mds : list metadata) : option (bool * int_syntax) :=
+  find_option (fun md =>
+                 match md with
+                 | METADATA_Pair (METADATA_Id (Name "dereferenceable"))
+                                 (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) => Some (false, n)
+                 | METADATA_Pair (METADATA_Id (Name "dereferenceable_or_null"))
+                                 (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) => Some (true, n)
+                 | _ => None
+                 end) mds.
 
 (* Operand Bundles
    - Note: does not support `preallocated(%foo)` style bundles.

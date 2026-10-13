@@ -466,6 +466,49 @@ Section Denotation.
     then raiseUB msg
     else ret v.
 
+  (** ** Load metadata without an attribute counterpart *)
+
+  (** [!range]: LangRef "If the loaded or returned value is not in the
+      specified range, a poison value is returned instead. ... The loaded
+      value or the value returned is known to be in the union of the ranges
+      defined by each consecutive pair. ... For vector-typed instructions,
+      the range is applied element-wise." *)
+  Definition in_metadata_ranges (sz : positive) (x : Z) (ranges : list (int_syntax * int_syntax)) : bool :=
+    existsb (fun '(lo, hi) => in_wrapping_range sz x (denote_int_syntax lo) (denote_int_syntax hi)) ranges.
+
+  Definition value_metadata_range_base (ranges : list (int_syntax * int_syntax)) (v : dvalue) : dvalue :=
+    match v with
+    | DVALUE_Base (DVALUE_I sz x) =>
+        if in_metadata_ranges sz (unsigned x) ranges then v else DVALUE_Base DVALUE_Poison
+    | _ => v
+    end.
+
+  Definition value_metadata_range (ranges : option (list (int_syntax * int_syntax))) (v : dvalue) : dvalue :=
+    match ranges, v with
+    | None, _ => v
+    | Some rs, DVALUE_Array true elts => DVALUE_Array true (List.map (value_metadata_range_base rs) elts)
+    | Some rs, _ => value_metadata_range_base rs v
+    end.
+
+  (** [!dereferenceable n] / [!dereferenceable_or_null n]: LangRef "the value
+      loaded is known to be dereferenceable at the current program point
+      [or null], otherwise the behavior is undefined. The number of bytes
+      known to be dereferenceable is specified by the integer value in the
+      metadata node."  The [n] bytes are checked by reading them at the byte
+      type, which accepts any content: the read raises UB exactly when they
+      are not accessible through the pointer (unallocated, freed, out of
+      bounds, or another object's provenance). *)
+  Definition assert_dereferenceable (or_null : bool) (n : N) (v : dvalue) (msg : string)
+    : CFGtop unit :=
+    match v with
+    | DVALUE_Base (DVALUE_Pointer p) =>
+        if (or_null && (ptr_to_int p =? ptr_to_int null)%Z) || (n =? 0)%N
+        then ret tt
+        else _ <- load (DTYPE_Array false n (DTYPE_B 8)) v ;; ret tt
+    | DVALUE_Base DVALUE_Poison => raiseUB msg
+    | _ => raise (msg ++ " (not a pointer)")
+    end.
+
   Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : CFGtop unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
     let '(ptr_ty, ptr_val) := cpx.(c_ptr) in
@@ -680,10 +723,18 @@ Section Denotation.
       a <- denote_exp' (Some du) ptr;;
       assert_alignment a anns (err_loc tt ++ ": Load with overestimated alignment.");;
       v <- load dt a;;
-      (* the load's !nonnull / !align / !noundef metadata, which act like the
-         corresponding attributes on the loaded value *)
+      (* the load's !range, then its !nonnull / !align / !noundef metadata,
+         which act like the corresponding attributes on the loaded value (so
+         a value out of range is UB with !noundef) *)
+      let v := value_metadata_range (load_metadata_range md) v in
       v <- apply_value_attrs (load_metadata_attrs md)
              (err_loc tt ++ ": Loaded value violates !noundef.") v;;
+      match load_metadata_dereferenceable md with
+      | Some (or_null, n) =>
+          assert_dereferenceable or_null (Z.to_N (denote_int_syntax n)) v
+            (err_loc tt ++ ": Loaded value violates !dereferenceable.")
+      | None => ret tt
+      end;;
       (* v' <- freeze dt v;; *)
       lwrite id v
 
