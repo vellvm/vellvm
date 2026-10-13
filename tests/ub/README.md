@@ -101,8 +101,11 @@ pass poison on). Gaps by category:
 - Value attributes `noundef`, `nonnull`, `align`, `range`,
   `dereferenceable(n)`, and `dereferenceable_or_null(n)`: on call-site
   arguments and return values (call and invoke), and on the arguments and
-  return value of a *defined* callee. Without `noundef`, a violation passes
-  poison on. The memory part of `dereferenceable` is checked by reading the
+  return value of a *defined* callee. A direct call also gets its callee's
+  declared (or defined) parameter and return attributes, so an attribute
+  split between the declaration and the call site (e.g. `nonnull` declared,
+  `noundef` at the call) is combined, and the attributes of a declared-only
+  callee apply. Without `noundef`, a violation passes poison on. The memory part of `dereferenceable` is checked by reading the
   `n` bytes, so the UB is reported with the memory model's message.
 - Load metadata `!noundef`, `!nonnull`, and `!align` (inline or a numbered
   node such as `!align !1`); `!range` (a union of possibly wrapping ranges,
@@ -126,9 +129,6 @@ pass poison on). Gaps by category:
   base: going out of bounds of a real allocated object is not detected,
   because the memory model doesn't record object bounds. (`nusw` and `nuw`
   are enforced.)
-- Value attributes of external (declared-only) functions, and an attribute
-  split between the declaration and the call site (e.g. `nonnull` declared,
-  `noundef` at the call), which LangRef combines.
 - Not enforced at all: `memory(...)`, `readonly`/`readnone`, `captures`, `nofree`, `noalias`,
   `initializes`, `writable`, `nocreateundeforpoison`.
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects

@@ -156,6 +156,27 @@ define i32 @nonnull_decl_noundef_callsite() {
 
 ; ASSERT UB 153: call i32 @nonnull_decl_noundef_callsite()
 
+; The same split with a callee that is only declared here (strlen is
+; provided by libll, and by libc natively): its declaration's attributes
+; apply at the call too.
+declare i64 @strlen(ptr nonnull)
+
+define i64 @strlen_nonnull_decl_noundef_callsite() {
+  %r = call i64 @strlen(ptr noundef null)         ; <- UB @strlen_nonnull_decl_noundef_callsite
+  ret i64 %r
+}
+
+; ASSERT UB 165: call i64 @strlen_nonnull_decl_noundef_callsite()
+
+define i64 @strlen_nonnull_decl_ok() {
+  %s = alloca [3 x i8]
+  store [3 x i8] c"hi\00", ptr %s
+  %r = call i64 @strlen(ptr noundef %s)
+  ret i64 %r
+}
+
+; ASSERT EQ: i64 2 = call i64 @strlen_nonnull_decl_ok()
+
 ; nonnull without noundef: the callee receives poison.  Merely receiving it
 ; is fine ...
 define i32 @nonnull_only_unused() {
@@ -194,7 +215,7 @@ define i32 @nonnull_only_branch() {
   ret i32 %r
 }
 
-; ASSERT UB 185: call i32 @nonnull_only_branch()
+; ASSERT UB 206: call i32 @nonnull_only_branch()
 
 ; ------------------------------------------------------------------ align
 
@@ -209,7 +230,7 @@ define i32 @align_noundef_misaligned() {
   ret i32 %r
 }
 
-; ASSERT UB 208: call i32 @align_noundef_misaligned()
+; ASSERT UB 229: call i32 @align_noundef_misaligned()
 
 define i32 @align_noundef_ok() {
   %a = alloca [2 x i64], align 8
@@ -248,14 +269,14 @@ define i32 @deref_null() {
   ret i32 %r
 }
 
-; ASSERT UB 247: call i32 @deref_null()
+; ASSERT UB 268: call i32 @deref_null()
 
 define i32 @deref_poison(ptr %p) {
   %r = call i32 @take_deref4(ptr %p)              ; <- UB @deref_poison
   ret i32 %r
 }
 
-; ASSERT UB 254: call i32 @deref_poison(ptr poison)
+; ASSERT UB 275: call i32 @deref_poison(ptr poison)
 
 ; Too small an object.
 define i32 @deref_too_small() {
@@ -264,7 +285,7 @@ define i32 @deref_too_small() {
   ret i32 %r
 }
 
-; ASSERT UB 263: call i32 @deref_too_small()
+; ASSERT UB 284: call i32 @deref_too_small()
 
 ; Freed object.
 define i32 @deref_freed() {
@@ -274,7 +295,7 @@ define i32 @deref_freed() {
   ret i32 %r
 }
 
-; ASSERT UB 273: call i32 @deref_freed()
+; ASSERT UB 294: call i32 @deref_freed()
 
 ; Dangling stack pointer.
 define ptr @escape_local() {
@@ -288,7 +309,7 @@ define i32 @deref_dangling() {
   ret i32 %r
 }
 
-; ASSERT UB 287: call i32 @deref_dangling()
+; ASSERT UB 308: call i32 @deref_dangling()
 
 ; One past the end of an object: nonnull, but not dereferenceable.
 define i32 @deref_one_past_end() {
@@ -298,7 +319,7 @@ define i32 @deref_one_past_end() {
   ret i32 %r
 }
 
-; ASSERT UB 297: call i32 @deref_one_past_end()
+; ASSERT UB 318: call i32 @deref_one_past_end()
 
 define i32 @deref_ok() {
   %a = alloca i32
@@ -315,7 +336,7 @@ define i32 @deref_callsite() {
   ret i32 %r
 }
 
-; ASSERT UB 314: call i32 @deref_callsite()
+; ASSERT UB 335: call i32 @deref_callsite()
 
 ; ----------------------------------------------- dereferenceable_or_null(n)
 
@@ -336,7 +357,7 @@ define i32 @deref_or_null_too_small() {
   ret i32 %r
 }
 
-; ASSERT UB 335: call i32 @deref_or_null_too_small()
+; ASSERT UB 356: call i32 @deref_or_null_too_small()
 
 ; ------------------------------------------------------------------ range
 
@@ -349,8 +370,8 @@ define i32 @range_noundef(i32 %x) {
   ret i32 %r
 }
 
-; ASSERT UB 348: call i32 @range_noundef(i32 10)
-; ASSERT UB 348: call i32 @range_noundef(i32 -1)
+; ASSERT UB 369: call i32 @range_noundef(i32 10)
+; ASSERT UB 369: call i32 @range_noundef(i32 -1)
 ; ASSERT EQ: i32 0 = call i32 @range_noundef(i32 9)
 
 ; A wrapping range [250, 5) on i8.
@@ -363,7 +384,7 @@ define i32 @range_wrap(i8 %x) {
   ret i32 %r
 }
 
-; ASSERT UB 362: call i32 @range_wrap(i8 5)
+; ASSERT UB 383: call i32 @range_wrap(i8 5)
 ; ASSERT EQ: i32 0 = call i32 @range_wrap(i8 -6)
 ; ASSERT EQ: i32 0 = call i32 @range_wrap(i8 4)
 
@@ -471,146 +492,158 @@ define i32 @ub_case_13() {
   ret i32 %r
 }
 
-; case 14 (line 166): ASSERT EQ: i32 0 = call i32 @nonnull_only_unused()
-define i32 @ub_case_14() {
+; case 14 (line 169): ASSERT UB 165: call i64 @strlen_nonnull_decl_noundef_callsite()
+define i64 @ub_case_14() {
+  %r = call i64 @strlen_nonnull_decl_noundef_callsite()
+  ret i64 %r
+}
+
+; case 15 (line 178): ASSERT EQ: i64 2 = call i64 @strlen_nonnull_decl_ok()
+define i64 @ub_case_15() {
+  %r = call i64 @strlen_nonnull_decl_ok()
+  ret i64 %r
+}
+
+; case 16 (line 187): ASSERT EQ: i32 0 = call i32 @nonnull_only_unused()
+define i32 @ub_case_16() {
   %r = call i32 @nonnull_only_unused()
   ret i32 %r
 }
 
-; case 15 (line 179): ASSERT EQ: i64 poison = call i64 @nonnull_only_observed()
-define i64 @ub_case_15() {
+; case 17 (line 200): ASSERT EQ: i64 poison = call i64 @nonnull_only_observed()
+define i64 @ub_case_17() {
   %r = call i64 @nonnull_only_observed()
   ret i64 %r
 }
 
-; case 16 (line 197): ASSERT UB 185: call i32 @nonnull_only_branch()
-define i32 @ub_case_16() {
+; case 18 (line 218): ASSERT UB 206: call i32 @nonnull_only_branch()
+define i32 @ub_case_18() {
   %r = call i32 @nonnull_only_branch()
   ret i32 %r
 }
 
-; case 17 (line 212): ASSERT UB 208: call i32 @align_noundef_misaligned()
-define i32 @ub_case_17() {
+; case 19 (line 233): ASSERT UB 229: call i32 @align_noundef_misaligned()
+define i32 @ub_case_19() {
   %r = call i32 @align_noundef_misaligned()
   ret i32 %r
 }
 
-; case 18 (line 221): ASSERT EQ: i32 0 = call i32 @align_noundef_ok()
-define i32 @ub_case_18() {
+; case 20 (line 242): ASSERT EQ: i32 0 = call i32 @align_noundef_ok()
+define i32 @ub_case_20() {
   %r = call i32 @align_noundef_ok()
   ret i32 %r
 }
 
-; case 19 (line 236): ASSERT EQ: i64 poison = call i64 @align_only_misaligned()
-define i64 @ub_case_19() {
+; case 21 (line 257): ASSERT EQ: i64 poison = call i64 @align_only_misaligned()
+define i64 @ub_case_21() {
   %r = call i64 @align_only_misaligned()
   ret i64 %r
 }
 
-; case 20 (line 251): ASSERT UB 247: call i32 @deref_null()
-define i32 @ub_case_20() {
+; case 22 (line 272): ASSERT UB 268: call i32 @deref_null()
+define i32 @ub_case_22() {
   %r = call i32 @deref_null()
   ret i32 %r
 }
 
-; case 21 (line 258): ASSERT UB 254: call i32 @deref_poison(ptr poison)
-define i32 @ub_case_21() {
+; case 23 (line 279): ASSERT UB 275: call i32 @deref_poison(ptr poison)
+define i32 @ub_case_23() {
   %r = call i32 @deref_poison(ptr poison)
   ret i32 %r
 }
 
-; case 22 (line 267): ASSERT UB 263: call i32 @deref_too_small()
-define i32 @ub_case_22() {
+; case 24 (line 288): ASSERT UB 284: call i32 @deref_too_small()
+define i32 @ub_case_24() {
   %r = call i32 @deref_too_small()
   ret i32 %r
 }
 
-; case 23 (line 277): ASSERT UB 273: call i32 @deref_freed()
-define i32 @ub_case_23() {
+; case 25 (line 298): ASSERT UB 294: call i32 @deref_freed()
+define i32 @ub_case_25() {
   %r = call i32 @deref_freed()
   ret i32 %r
 }
 
-; case 24 (line 291): ASSERT UB 287: call i32 @deref_dangling()
-define i32 @ub_case_24() {
+; case 26 (line 312): ASSERT UB 308: call i32 @deref_dangling()
+define i32 @ub_case_26() {
   %r = call i32 @deref_dangling()
   ret i32 %r
 }
 
-; case 25 (line 301): ASSERT UB 297: call i32 @deref_one_past_end()
-define i32 @ub_case_25() {
+; case 27 (line 322): ASSERT UB 318: call i32 @deref_one_past_end()
+define i32 @ub_case_27() {
   %r = call i32 @deref_one_past_end()
   ret i32 %r
 }
 
-; case 26 (line 309): ASSERT EQ: i32 0 = call i32 @deref_ok()
-define i32 @ub_case_26() {
+; case 28 (line 330): ASSERT EQ: i32 0 = call i32 @deref_ok()
+define i32 @ub_case_28() {
   %r = call i32 @deref_ok()
   ret i32 %r
 }
 
-; case 27 (line 318): ASSERT UB 314: call i32 @deref_callsite()
-define i32 @ub_case_27() {
+; case 29 (line 339): ASSERT UB 335: call i32 @deref_callsite()
+define i32 @ub_case_29() {
   %r = call i32 @deref_callsite()
   ret i32 %r
 }
 
-; case 28 (line 331): ASSERT EQ: i32 0 = call i32 @deref_or_null_null_ok()
-define i32 @ub_case_28() {
+; case 30 (line 352): ASSERT EQ: i32 0 = call i32 @deref_or_null_null_ok()
+define i32 @ub_case_30() {
   %r = call i32 @deref_or_null_null_ok()
   ret i32 %r
 }
 
-; case 29 (line 339): ASSERT UB 335: call i32 @deref_or_null_too_small()
-define i32 @ub_case_29() {
+; case 31 (line 360): ASSERT UB 356: call i32 @deref_or_null_too_small()
+define i32 @ub_case_31() {
   %r = call i32 @deref_or_null_too_small()
   ret i32 %r
 }
 
-; case 30 (line 352): ASSERT UB 348: call i32 @range_noundef(i32 10)
-define i32 @ub_case_30() {
+; case 32 (line 373): ASSERT UB 369: call i32 @range_noundef(i32 10)
+define i32 @ub_case_32() {
   %r = call i32 @range_noundef(i32 10)
   ret i32 %r
 }
 
-; case 31 (line 353): ASSERT UB 348: call i32 @range_noundef(i32 -1)
-define i32 @ub_case_31() {
+; case 33 (line 374): ASSERT UB 369: call i32 @range_noundef(i32 -1)
+define i32 @ub_case_33() {
   %r = call i32 @range_noundef(i32 -1)
   ret i32 %r
 }
 
-; case 32 (line 354): ASSERT EQ: i32 0 = call i32 @range_noundef(i32 9)
-define i32 @ub_case_32() {
+; case 34 (line 375): ASSERT EQ: i32 0 = call i32 @range_noundef(i32 9)
+define i32 @ub_case_34() {
   %r = call i32 @range_noundef(i32 9)
   ret i32 %r
 }
 
-; case 33 (line 366): ASSERT UB 362: call i32 @range_wrap(i8 5)
-define i32 @ub_case_33() {
+; case 35 (line 387): ASSERT UB 383: call i32 @range_wrap(i8 5)
+define i32 @ub_case_35() {
   %r = call i32 @range_wrap(i8 5)
   ret i32 %r
 }
 
-; case 34 (line 367): ASSERT EQ: i32 0 = call i32 @range_wrap(i8 -6)
-define i32 @ub_case_34() {
+; case 36 (line 388): ASSERT EQ: i32 0 = call i32 @range_wrap(i8 -6)
+define i32 @ub_case_36() {
   %r = call i32 @range_wrap(i8 -6)
   ret i32 %r
 }
 
-; case 35 (line 368): ASSERT EQ: i32 0 = call i32 @range_wrap(i8 4)
-define i32 @ub_case_35() {
+; case 37 (line 389): ASSERT EQ: i32 0 = call i32 @range_wrap(i8 4)
+define i32 @ub_case_37() {
   %r = call i32 @range_wrap(i8 4)
   ret i32 %r
 }
 
-; case 36 (line 380): ASSERT EQ: i32 poison = call i32 @range_only(i32 10)
-define i32 @ub_case_36() {
+; case 38 (line 401): ASSERT EQ: i32 poison = call i32 @range_only(i32 10)
+define i32 @ub_case_38() {
   %r = call i32 @range_only(i32 10)
   ret i32 %r
 }
 
-; case 37 (line 381): ASSERT EQ: i32 3 = call i32 @range_only(i32 3)
-define i32 @ub_case_37() {
+; case 39 (line 402): ASSERT EQ: i32 3 = call i32 @range_only(i32 3)
+define i32 @ub_case_39() {
   %r = call i32 @range_only(i32 3)
   ret i32 %r
 }
@@ -671,6 +704,8 @@ dispatch:
     i32 35, label %case35
     i32 36, label %case36
     i32 37, label %case37
+    i32 38, label %case38
+    i32 39, label %case39
   ]
 case0:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 0)
@@ -786,10 +821,9 @@ case13:
   ret i32 0
 case14:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 14)
-  %c14_r = call i32 @ub_case_14()
+  %c14_r = call i64 @ub_case_14()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 14)
-  %c14_0 = sext i32 %c14_r to i64
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c14_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c14_r)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case15:
@@ -809,10 +843,9 @@ case16:
   ret i32 0
 case17:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 17)
-  %c17_r = call i32 @ub_case_17()
+  %c17_r = call i64 @ub_case_17()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 17)
-  %c17_0 = sext i32 %c17_r to i64
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c17_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c17_r)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case18:
@@ -825,9 +858,10 @@ case18:
   ret i32 0
 case19:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 19)
-  %c19_r = call i64 @ub_case_19()
+  %c19_r = call i32 @ub_case_19()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 19)
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c19_r)
+  %c19_0 = sext i32 %c19_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c19_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case20:
@@ -840,10 +874,9 @@ case20:
   ret i32 0
 case21:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 21)
-  %c21_r = call i32 @ub_case_21()
+  %c21_r = call i64 @ub_case_21()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 21)
-  %c21_0 = sext i32 %c21_r to i64
-  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c21_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c21_r)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 case22:
@@ -972,6 +1005,22 @@ case37:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 37)
   %c37_0 = sext i32 %c37_r to i64
   call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c37_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case38:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 38)
+  %c38_r = call i32 @ub_case_38()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 38)
+  %c38_0 = sext i32 %c38_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c38_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case39:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 39)
+  %c39_r = call i32 @ub_case_39()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 39)
+  %c39_0 = sext i32 %c39_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c39_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 bad:
