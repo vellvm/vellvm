@@ -1474,6 +1474,7 @@ conversion_pure:
   | KW_TRUNC KW_NSW          { Trunc(false, true)   }
   | KW_TRUNC KW_NUW          { Trunc(true, false)   }
   | KW_TRUNC KW_NUW KW_NSW   { Trunc(true, true)    }
+  | KW_TRUNC KW_NSW KW_NUW   { Trunc(true, true)    }
   | KW_ZEXT n=KW_NNEG?       { Zext(match n with None -> false | Some _ -> true) }
   | KW_SEXT                  { Sext     }
   | KW_FPTRUNC f=fast_math*  { Fptrunc f }
@@ -1541,14 +1542,14 @@ instr_op:
   | KW_FNEG f=fast_math* t=typ o=exp 
      { OP_Fneg(f, (t,o)) }
 
-  | KW_FCMP op=fcmp t=typ o1=exp COMMA o2=exp 
-    { OP_FCmp (op, t, o1, o2) }
+  | KW_FCMP f=fast_math* op=fcmp t=typ o1=exp COMMA o2=exp 
+    { OP_FCmp (op, f, t, o1, o2) }
 
   | c=conversion t1=typ v=exp KW_TO t2=typ
     { OP_Conversion (c, t1, v, t2) }
 
-  | KW_SELECT if_=texp COMMA then_=texp COMMA else_= texp
-    { OP_Select (if_, then_, else_) }
+  | KW_SELECT f=fast_math* if_=texp COMMA then_=texp COMMA else_= texp
+    { OP_Select (f, if_, then_, else_) }
 
   | KW_FREEZE v=texp
     { OP_Freeze v }
@@ -1578,7 +1579,7 @@ expr_op:
      { OP_Fneg(f, (t, o)) }
 
   | KW_FCMP op=fcmp LPAREN t=typ o1=exp COMMA typ o2=exp RPAREN
-    { OP_FCmp (op, t, o1, o2) }
+    { OP_FCmp (op, [], t, o1, o2) }
 
   | c=conversion LPAREN t1=typ v=exp KW_TO t2=typ RPAREN
     { OP_Conversion (c, t1, v, t2) }
@@ -1588,7 +1589,7 @@ expr_op:
     { OP_GetElementPtr (gep_flags_of fl, t, ptr, idx) }
 
   | KW_SELECT LPAREN if_=texp COMMA then_=texp COMMA else_= texp RPAREN
-    { OP_Select (if_, then_, else_) }
+    { OP_Select ([], if_, then_, else_) }
 
   | KW_FREEZE LPAREN v=texp RPAREN
     { OP_Freeze v }

@@ -116,8 +116,8 @@ Section Endo.
           OP_FBinop (endo fop) fm (endo t) (f_exp v1) (f_exp v2)
       | OP_Fneg flags v =>
           OP_Fneg flags (endo (fst v), f_exp (snd v))
-      | OP_FCmp cmp t v1 v2 =>
-          OP_FCmp (endo cmp) (endo t) (f_exp v1) (f_exp v2)
+      | OP_FCmp cmp fm t v1 v2 =>
+          OP_FCmp (endo cmp) fm (endo t) (f_exp v1) (f_exp v2)
       | OP_Conversion conv t_from v t_to =>
           OP_Conversion conv (endo t_from) (f_exp v) (endo t_to)
       | OP_GetElementPtr flags t ptrval idxs =>
@@ -141,8 +141,8 @@ Section Endo.
           OP_InsertValue (endo (fst vec), f_exp (snd vec))
             (endo (fst elt), f_exp (snd elt))
             idxs
-      | OP_Select cnd v1 v2 =>
-          OP_Select (endo (fst cnd), f_exp (snd cnd))
+      | OP_Select fm cnd v1 v2 =>
+          OP_Select fm (endo (fst cnd), f_exp (snd cnd))
             (endo (fst v1), f_exp (snd v1))
             (endo (fst v2), f_exp (snd v2))
       | OP_Freeze v =>
@@ -540,7 +540,7 @@ Section TFunctor.
         | OP_ICmp s cmp t v1 v2              => OP_ICmp s (endo cmp) (f t) (ft_exp f v1) (ft_exp f v2)
         | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (ft_exp f v1) (ft_exp f v2)
         | OP_Fneg flags v                    => OP_Fneg flags (ftexp v)
-        | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (ft_exp f v1) (ft_exp f v2)
+        | OP_FCmp cmp fm t v1 v2             => OP_FCmp (endo cmp) fm (f t) (ft_exp f v1) (ft_exp f v2)
         | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (ft_exp f  v) (f t_to)
         | OP_GetElementPtr fl t ptr idxs     => OP_GetElementPtr fl (f t) (ftexp ptr) (tfmap ftexp idxs)
         | OP_ExtractElement vec idx          => OP_ExtractElement (ftexp vec) (ftexp idx)
@@ -548,7 +548,7 @@ Section TFunctor.
         | OP_ShuffleVector vec1 vec2 idxmask => OP_ShuffleVector (ftexp vec1) (ftexp vec2) (ftexp  idxmask)
         | OP_ExtractValue vec idxs           => OP_ExtractValue (ftexp vec) idxs
         | OP_InsertValue vec elt idxs        => OP_InsertValue (ftexp vec) (ftexp elt) idxs
-        | OP_Select cnd v1 v2                => OP_Select (ftexp cnd) (ftexp v1) (ftexp v2)
+        | OP_Select fm cnd v1 v2             => OP_Select fm (ftexp cnd) (ftexp v1) (ftexp v2)
         | OP_Freeze v                        => OP_Freeze (ftexp v)
         | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
             EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints

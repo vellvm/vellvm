@@ -238,7 +238,7 @@ Section REGISTER_OPERATIONS.
                       | OP_IBinop _ _ e1 e2
                       | OP_ICmp _ _ _ e1 e2
                       | OP_FBinop _ _ _ e1 e2
-                      | OP_FCmp _ _ e1 e2
+                      | OP_FCmp _ _ _ e1 e2
                       | OP_ExtractElement (_,e1) (_,e2)
                       | OP_InsertValue (_,e1) (_,e2) _
                         => f e1 +++ f e2
@@ -246,7 +246,7 @@ Section REGISTER_OPERATIONS.
                             
                       | OP_InsertElement (_,e1) (_,e2) (_,e3)
                       | OP_ShuffleVector (_,e1) (_,e2) (_,e3)
-                      | OP_Select (_,e1) (_,e2) (_,e3)
+                      | OP_Select _ (_,e1) (_,e2) (_,e3)
                         => f e1 +++ f e2 +++ f e3
 
                       | EXP_Struct l

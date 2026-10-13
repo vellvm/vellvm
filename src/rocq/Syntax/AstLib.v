@@ -341,7 +341,7 @@ Section ExpIndFull.
   Hypothesis IH_Fneg    : forall (flags:list fast_math) (v:(T*exp T)), P(snd v) -> P (OP_Fneg flags v).
   Hypothesis IH_ICmp    : forall (samesign:bool) (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp samesign cmp t v1 v2)).
   Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
-  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
+  Hypothesis IH_FCmp    : forall (cmp:fcmp) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp fm t v1 v2)).
   Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:T) (v:exp T) (t_to:T), P v -> P ((OP_Conversion conv t_from v t_to)).
   Hypothesis IH_GetElementPtr : forall (flags:gep_flags) (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)),
       P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr flags t ptrval idxs)).
@@ -352,7 +352,7 @@ Section ExpIndFull.
       P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector vec1 vec2 idxmask)).
   Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int_syntax), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
   Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int_syntax), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
-  Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
+  Hypothesis IH_Select        : forall (fm:list fast_math) (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select fm cnd v1 v2)).
   Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
 
   Hypothesis IH_Asm           : forall (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string), P(EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints).
@@ -391,7 +391,7 @@ refine(
   | OP_ICmp cmp s t v1 v2 => IH_ICmp cmp s t (F v1) (F v2)
   | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t (F v1) (F v2)
   | OP_Fneg flags v => IH_Fneg flags v (F (snd v))
-  | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t (F v1) (F v2)
+  | OP_FCmp cmp fm t v1 v2 => IH_FCmp cmp fm t (F v1) (F v2)
   | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from t_to (F v) 
   | OP_GetElementPtr flags t ptrval idxs => _
   | OP_ExtractElement vec idx => IH_ExtractElement vec idx (F (snd vec)) (F (snd idx))
@@ -399,7 +399,7 @@ refine(
   | OP_ShuffleVector vec1 vec2 idxmask => IH_ShuffleVector vec1 vec2 idxmask (F (snd vec1))  (F (snd vec2)) (F (snd idxmask))
   | OP_ExtractValue vec idxs => IH_ExtractValue vec idxs (F (snd vec))
   | OP_InsertValue vec elt idxs => IH_InsertValue vec elt idxs (F (snd vec)) (F (snd elt))
-  | OP_Select cnd v1 v2 => IH_Select cnd v1 v2 (F (snd cnd)) (F (snd v1)) (F (snd v2))
+  | OP_Select fm cnd v1 v2 => IH_Select fm cnd v1 v2 (F (snd cnd)) (F (snd v1)) (F (snd v2))
   | OP_Freeze v => IH_Freeze v (F (snd v))
   | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
       IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
@@ -478,7 +478,7 @@ refine(
   | OP_ICmp s cmp t v1 v2 => IH_ICmp s cmp t (F v1) (F v2)
   | OP_FBinop fop fm t v1 v2 => IH_FBinop fop fm t (F v1) (F v2)
   | OP_Fneg flags v => IH_Fneg flags v (F (snd v))
-  | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t (F v1) (F v2)
+  | OP_FCmp cmp fm t v1 v2 => IH_FCmp cmp fm t (F v1) (F v2)
   | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from t_to (F v) 
   | OP_GetElementPtr flags t ptrval idxs => _
   | OP_ExtractElement vec idx => IH_ExtractElement vec idx (F (snd vec)) (F (snd idx))
@@ -486,7 +486,7 @@ refine(
   | OP_ShuffleVector vec1 vec2 idxmask => IH_ShuffleVector vec1 vec2 idxmask (F (snd vec1))  (F (snd vec2)) (F (snd idxmask))
   | OP_ExtractValue vec idxs => IH_ExtractValue vec idxs (F (snd vec))
   | OP_InsertValue vec elt idxs => IH_InsertValue vec elt idxs (F (snd vec)) (F (snd elt))
-  | OP_Select cnd v1 v2 => IH_Select cnd v1 v2 (F (snd cnd)) (F (snd v1)) (F (snd v2))
+  | OP_Select fm cnd v1 v2 => IH_Select fm cnd v1 v2 (F (snd cnd)) (F (snd v1)) (F (snd v2))
   | OP_Freeze v => IH_Freeze v (F (snd v))
   | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
       IH_Asm sideffect alignstack inteldialect unwind template operand_constraints
@@ -572,7 +572,7 @@ Section ExpInd.
   Hypothesis IH_Fneg    : forall (flags:list fast_math) (v:(T*exp T)), P(snd v) -> P (OP_Fneg flags v).
   Hypothesis IH_ICmp    : forall (samesign:bool) (cmp:icmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_ICmp samesign cmp t v1 v2)).
   Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
-  Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
+  Hypothesis IH_FCmp    : forall (cmp:fcmp) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp fm t v1 v2)).
   Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:T) (v:exp T) (t_to:T), P v -> P ((OP_Conversion conv t_from v t_to)).
   Hypothesis IH_GetElementPtr : forall (flags:gep_flags) (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)),
       P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr flags t ptrval idxs)).
@@ -583,7 +583,7 @@ Section ExpInd.
       P (snd vec1) -> P (snd vec2 ) -> P (snd idxmask) -> P ((OP_ShuffleVector vec1 vec2 idxmask)).
   Hypothesis IH_ExtractValue  : forall (vec:(T * exp T)) (idxs:list int_syntax), P (snd vec) -> P ((OP_ExtractValue vec idxs)).
   Hypothesis IH_InsertValue   : forall (vec:(T * exp T)) (elt:(T * exp T)) (idxs:list int_syntax), P (snd vec) -> P (snd elt) -> P ((OP_InsertValue vec elt idxs)).
-  Hypothesis IH_Select        : forall (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select cnd v1 v2)).
+  Hypothesis IH_Select        : forall (fm:list fast_math) (cnd:(T * exp T)) (v1:(T * exp T)) (v2:(T * exp T)), P (snd cnd) -> P (snd v1) -> P (snd v2) -> P ((OP_Select fm cnd v1 v2)).
   Hypothesis IH_Freeze        : forall (v:(T * exp T)), P (snd v) -> P ((OP_Freeze v)).
 
   Hypothesis IH_Asm           : forall (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string), P(EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints).

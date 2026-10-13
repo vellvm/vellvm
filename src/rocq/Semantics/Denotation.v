@@ -304,7 +304,7 @@ Section Denotation.
         v <- denote_exp (Some dt) op ;;
         lift (eval_fneg v)
              
-    | OP_FCmp fcmp dt op1 op2 =>
+    | OP_FCmp fcmp _ dt op1 op2 =>
         v1 <- denote_exp (Some dt) op1 ;;
         v2 <- denote_exp (Some dt) op2 ;;
         lift (eval_fcmp fcmp v1 v2)
@@ -344,7 +344,7 @@ Section Denotation.
         elt <- denote_exp (Some dt_elt) eltop ;;
         lift (insert_value dt_str str elt (List.map denote_int_syntax idxs))
 
-    | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
+    | OP_Select _ (dt, cnd) (dt1, op1) (dt2, op2) =>
         dcond <- denote_exp (Some dt) cnd ;;
         v1    <- denote_exp (Some dt1) op1 ;;
         v2    <- denote_exp (Some dt2) op2 ;;

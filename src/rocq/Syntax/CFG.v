@@ -290,11 +290,11 @@ Section CFG.
       => exp_block_addresses e
 
     | OP_IBinop _ _ e1 e2 | OP_ICmp _ _ _ e1 e2 | OP_FBinop _ _ _ e1 e2
-    | OP_FCmp _ _ e1 e2 | OP_ExtractElement (_,e1) (_,e2) | OP_InsertValue (_,e1) (_,e2) _
+    | OP_FCmp _ _ _ e1 e2 | OP_ExtractElement (_,e1) (_,e2) | OP_InsertValue (_,e1) (_,e2) _
       => exp_block_addresses e1 ++ exp_block_addresses e2
 
     | OP_InsertElement (_,e1) (_,e2) (_,e3) | OP_ShuffleVector (_,e1) (_,e2) (_,e3)
-    | OP_Select (_,e1) (_,e2) (_,e3)
+    | OP_Select _ (_,e1) (_,e2) (_,e3)
       => exp_block_addresses e1 ++ exp_block_addresses e2 ++ exp_block_addresses e3
 
     | OP_GetElementPtr _ _ (_,e) l

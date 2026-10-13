@@ -787,8 +787,9 @@ Section ShowInstances.
         list_to_DString ["fneg" ; " "] @@ add_parens b (fmath_string @@ dshow t @@ sd " " @@  dshow_exp true exp)
 
                         
-    | OP_FCmp cmp t v1 v2 =>
-        sd "fcmp " @@ add_parens b (list_to_DString [show cmp ; " "] @@ dshow t @@ sd " " @@ dshow_exp true v1 @@
+    | OP_FCmp cmp fmath t v1 v2 =>
+        let fmath_string := fast_math_list_to_dstring fmath in
+        sd "fcmp" @@ fmath_string @@ add_parens b (list_to_DString [show cmp ; " "] @@ dshow t @@ sd " " @@ dshow_exp true v1 @@
                                                  sd ", " @@ dshow_exp true v2)
 
     | OP_Conversion conv t_from v t_to => list_to_DString [show conv ; " "] @@ add_parens b (dshow t_from @@ sd " " @@ dshow_exp true v @@
@@ -830,8 +831,9 @@ Section ShowInstances.
         sd "insertvalue " @@ add_parens b (dshow tptr @@ sd " " @@ dshow_exp false exp @@ sd ", " @@ dshow telt @@ sd " " @@
                                                             dshow_exp false eexp @@ sd ", " @@ concat_DString (sd ", ") (map (fun x => sd (show x)) idxs))
 
-    | OP_Select (tc, cnd) (t1, v1) (t2, v2) =>
-        sd "select "  @@ add_parens b (dshow tc @@ sd " " @@ dshow_exp true cnd @@ sd ", " @@ dshow t1 @@ sd " " @@
+    | OP_Select fmath (tc, cnd) (t1, v1) (t2, v2) =>
+        let fmath_string := fast_math_list_to_dstring fmath in
+        sd "select" @@ fmath_string @@ add_parens b (dshow tc @@ sd " " @@ dshow_exp true cnd @@ sd ", " @@ dshow t1 @@ sd " " @@
                                                     dshow_exp true v1  @@ sd ", " @@ dshow t2 @@ sd " " @@  dshow_exp true v2)
 
     | OP_Freeze (ty, ex) => sd "freeze " @@ add_parens b (dshow ty @@ sd " " @@ dshow_exp true ex)

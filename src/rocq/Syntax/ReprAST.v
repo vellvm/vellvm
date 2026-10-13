@@ -461,8 +461,9 @@ Section ReprInstances.
                       "] " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_Fneg fm v =>
         "(OP_Fneg [" ++ (contents id (List.map repr_fast_math fm)) ++ "] " ++ texp v ++")"
-    | OP_FCmp cmp t v1 v2 =>
-        "(OP_FCmp " ++ repr cmp ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
+    | OP_FCmp cmp fm t v1 v2 =>
+        "(OP_FCmp " ++ repr cmp ++ " [" ++ (contents id (List.map repr_fast_math fm)) ++
+                    "] " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_Conversion c from v to =>
         "(OP_Conversion " ++ repr c ++ " " ++ repr from ++ " " ++ repr_exp v ++ " " ++ repr to ++ ")"
     | OP_GetElementPtr flags t ptrval idxs =>
@@ -479,8 +480,9 @@ Section ReprInstances.
         "(OP_ExtractValue " ++ texp v ++ " [" ++ (contents id (List.map show idxs)) ++ "])"
     | OP_InsertValue v e idxs =>
         "(OP_ExtractValue " ++ texp v ++ " " ++ texp e ++ " [" ++ (contents id (List.map show idxs)) ++ "])"
-    | OP_Select cnd v1 v2 =>
-        "(OP_Select " ++ texp cnd ++ " " ++ texp v1 ++ " " ++ texp v2 ++ ")"
+    | OP_Select fm cnd v1 v2 =>
+        "(OP_Select [" ++ (contents id (List.map repr_fast_math fm)) ++
+                     "] " ++ texp cnd ++ " " ++ texp v1 ++ " " ++ texp v2 ++ ")"
     | OP_Freeze v =>
         "(OP_Freeze " ++ texp v ++")"
     | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
