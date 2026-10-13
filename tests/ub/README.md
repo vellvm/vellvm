@@ -95,7 +95,9 @@ pass poison on). Gaps by category:
   count. (Allocas without `align` get their type's natural alignment, vectors
   included.)
 - Calls: through poison, `undef`, or null (including `inttoptr 0`) function
-  pointers; `noreturn` functions that return and `nounwind` functions that
+  pointers; a calling convention that doesn't match the callee's definition
+  (checked on entry, so it covers calls through function pointers; `cc N`
+  matches by LLVM's number, so `cc 8` is `fastcc`); `noreturn` functions that return and `nounwind` functions that
   unwind (on a definition or call site, directly or through an attribute
   group `#N`); `nocreateundeforpoison` functions that return undef or poison
   for well-defined arguments (checked before the return attributes).
@@ -136,7 +138,6 @@ pass poison on). Gaps by category:
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
 - Stores to `constant` globals are allowed, directly and through memcpy/memset.
-- Calling-convention mismatches aren't detected.
 
 **Wrong kind of error (fails instead of UB):**
 - Calls through data pointers become an uninterpreted external call.

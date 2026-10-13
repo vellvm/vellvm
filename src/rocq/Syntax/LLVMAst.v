@@ -165,6 +165,28 @@ Variant cconv : Set :=
 | CC_cfguard_checkcc
 .
 
+(* LLVM's number for a calling convention (llvm/IR/CallingConv.h), so that
+   [cc 8] and [fastcc] are the same convention. *)
+Definition cconv_number (c : cconv) : Z :=
+  match c with
+  | CC_Ccc => 0
+  | CC_Fastcc => 8
+  | CC_Coldcc => 9
+  | CC_Cc n => BinIntDef.Z.of_num_int n
+  | CC_Webkit_jscc => 12
+  | CC_Anyregcc => 13
+  | CC_Preserve_mostcc => 14
+  | CC_Preserve_allcc => 15
+  | CC_Swiftcc => 16
+  | CC_Cxx_fast_tlscc => 17
+  | CC_Tailcc => 18
+  | CC_cfguard_checkcc => 19
+  | CC_Swifttailcc => 20
+  end.
+
+Definition cconv_eqb (c1 c2 : cconv) : bool :=
+  Z.eqb (cconv_number c1) (cconv_number c2).
+
 Variant param_attr : Set :=
 | PARAMATTR_Zeroext
 | PARAMATTR_Signext
@@ -1140,6 +1162,15 @@ Definition dc_align (d:declaration) : option int_syntax :=
 
 Definition dc_cconv (d:declaration) : option cconv :=
   find_option ann_cconv (dc_annotations d).
+
+(* The calling convention of a call site's or declaration's annotations;
+   LangRef: "If no calling convention is specified, the "ccc" (C) calling
+   convention is used." *)
+Definition anns_cconv (anns : list annotation) : cconv :=
+  match find_option ann_cconv anns with
+  | Some c => c
+  | None => CC_Ccc
+  end.
 
 Definition dc_gc (d:declaration) : option string :=
   find_option ann_gc (dc_annotations d).

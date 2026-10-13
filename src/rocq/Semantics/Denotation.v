@@ -971,7 +971,7 @@ Section Denotation.
                 
           | None =>
               fv <- denote_exp' None f;;
-              res <- call dt fv vs;;
+              res <- call dt (anns_cconv anns) fv vs;;
               check_call_result (ann_fun_attributes anns) (err_loc tt) vs res ;;
               match res with
               | inl exc => raiseLLVM exc
@@ -1112,7 +1112,7 @@ Section Denotation.
       uvs <- denote_call_args args (err_loc tt ++ ": Invoke argument violates noundef.") ;;
       denote_operand_bundles (err_loc tt) fnptrval obs ;;
       fv <- denote_exp' None fnptrval ;;
-      rv <- call dt fv uvs ;;
+      rv <- call dt (anns_cconv anns) fv uvs ;;
       check_call_result (ann_fun_attributes anns) (err_loc tt) uvs rv ;;
       (* branch to to_label *)
       match rv with
@@ -1280,8 +1280,10 @@ Section Denotation.
   (* The denotation of an itree function is a rocq function that takes a list of
      dvalues and returns the appropriate semantics: a function either returns
      normally with a [dvalue] or unwinds with an exception [exc]. *)
+  (* A function's denotation takes the calling convention of the call site
+     and the arguments. *)
   Definition function_denotation : Type :=
-    list dvalue -> CFGtop (exc + dvalue).
+    cconv -> list dvalue -> CFGtop (exc + dvalue).
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOU (list (A * B) * list B) :=
     match l1, l2 with
@@ -1348,7 +1350,13 @@ Section Denotation.
        (e.g. [noundef], [nonnull]) apply on entry and on a normal return. *)
     let '(ret_attrs, args_attrs) := dc_param_attrs (df_prototype df) in
     let fname := show_raw_id (dc_name (df_prototype df)) in
-    fun (args : list dvalue) =>
+    let fcc := anns_cconv (dc_annotations (df_prototype df)) in
+    fun (cc : cconv) (args : list dvalue) =>
+      (* LangRef (Calling Conventions): "The calling convention of any pair
+         of dynamic caller/callee must match, or the behavior of the program
+         is undefined."  Checked on entry, so it is reported at the call. *)
+      (if cconv_eqb cc fcc then ret tt
+       else raiseUB ("Call to " ++ fname ++ " with a calling convention that does not match its definition.")) ;;
       args <- apply_args_attrs args_attrs
                ("Argument of " ++ fname ++ " violates noundef.") args;;
       varg <- push_call_frame df args;;
@@ -1385,7 +1393,7 @@ Section Denotation.
     @mrec CallE (ExternalCallE +' _)
       (fun T call =>
          match call with
-         | Call dt fv args =>
+         | Call dt cc fv args =>
              match fv with
              | DVALUE_Base DVALUE_Poison => raiseUB "call via poison function pointer"
              | DVALUE_Base (DVALUE_Pointer addr) =>
@@ -1398,11 +1406,11 @@ Section Denotation.
                  | Some f_den => (* If the call is internal *)
                      (* [f_den] already produces [exc + dvalue] (see [denote_function]),
                         so the callee's unwind crosses the [mrec] knot as this value. *)
-                     f_den args
+                     f_den cc args
                  | None => inr <$> external_call dt fv args
                  end
              | _ => raise "function call to non-pointer value"
              end
-         end) _ (Call dt f_value args).
+         end) _ (Call dt CC_Ccc f_value args).
   
 End Denotation.

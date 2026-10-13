@@ -217,8 +217,8 @@ Section Refinement.
       two instantiations, hence required equal. *)
 
   Equations I2FE_Call : prerel (@CallE PInf) (@CallE PFin) :=
-    I2FE_Call (@Call PInf τ1 f1 args1) (@Call PFin τ2 f2 args2) :=
-      τ1 = τ2 /\ I2F_dvalue f1 f2 /\ Forall2 I2F_dvalue args1 args2.
+    I2FE_Call (@Call PInf τ1 cc1 f1 args1) (@Call PFin τ2 cc2 f2 args2) :=
+      τ1 = τ2 /\ cc1 = cc2 /\ I2F_dvalue f1 f2 /\ Forall2 I2F_dvalue args1 args2.
 
   Equations I2FE_ExternalCall : prerel (@ExternalCallE PInf) (@ExternalCallE PFin) :=
     I2FE_ExternalCall (@ExternalCall PInf τ1 f1 args1) (@ExternalCall PFin τ2 f2 args2) :=
@@ -301,7 +301,7 @@ Section Refinement.
       never answer). *)
 
   Equations I2FA_Call : postrel (@CallE PInf) (@CallE PFin) :=
-    I2FA_Call (@Call PInf τ1 f1 args1) r1 (@Call PFin τ2 f2 args2) r2 := I2F_exc_dvalue r1 r2.
+    I2FA_Call (@Call PInf τ1 cc1 f1 args1) r1 (@Call PFin τ2 cc2 f2 args2) r2 := I2F_exc_dvalue r1 r2.
 
   Equations I2FA_ExternalCall : postrel (@ExternalCallE PInf) (@ExternalCallE PFin) :=
     I2FA_ExternalCall (@ExternalCall PInf τ1 f1 args1) dv1 (@ExternalCall PFin τ2 f2 args2) dv2 := I2F_dvalue dv1 dv2;

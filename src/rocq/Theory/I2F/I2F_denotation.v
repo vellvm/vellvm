@@ -776,9 +776,9 @@ Qed.
 Definition I2F_function_denotation
   (ctx1 : @function_denotation PInf)
   (ctx2 : @function_denotation PFin) : Prop :=
-  forall args1 args2,
+  forall cc args1 args2,
     Forall2 I2F_dvalue args1 args2 ->
-    I2F_refine_CFG (sum_rel I2F_dvalue I2F_dvalue) (ctx1 args1) (ctx2 args2).
+    I2F_refine_CFG (sum_rel I2F_dvalue I2F_dvalue) (ctx1 cc args1) (ctx2 cc args2).
 
 Lemma I2F_combine_lists_varargs : 
   forall (d : definition dtyp (cfg dtyp)) y1 y2,
@@ -934,7 +934,11 @@ Lemma I2F_denote_function d :
 Proof with try now (rstep; cbnn; try (easy); eauto).
   unfold denote_function.
   destruct (dc_param_attrs (df_prototype d)) as [ret_attrs args_attrs].
-  intros ???.
+  intros cc ???.
+  (* the calling-convention check, the same on both sides *)
+  rbind (fun (_ _ : unit) => True).
+  { destruct (cconv_eqb _ _); [apply ruttc_ret; auto | rstep; cbnn; try easy; eauto]. }
+  intros _ _ _.
   (* the callee's declared argument attributes, on entry *)
   rbind (Forall2 I2F_dvalue); [apply I2F_apply_args_attrs; auto | intros args1' args2' Hargs'].
   rbind I2F_Addr; [apply I2F_push_call_frame; auto | intros].
@@ -983,8 +987,8 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   { eapply ruttc_mrec with (RCall := I2FE_Call) (RCall' := I2FA_Call).
     2: { simp I2FE_Call; repeat split; auto. }
     (* the bodies: related calls dispatch through related contexts *)
-    intros A B [dt fv1 fas1] [dt' fv2 fas2] HC.
-    simp I2FE_Call in HC; destruct HC as (<- & HFv & HAs).
+    intros A B [dt cc fv1 fas1] [dt' cc' fv2 fas2] HC.
+    simp I2FE_Call in HC; destruct HC as (<- & <- & HFv & HAs).
     (* transport the CFG-level relations to the structural ones
        demanded by [ruttc_mrec] *)
     eapply ruttc_weaken with (RR := sum_rel I2F_dvalue I2F_dvalue).

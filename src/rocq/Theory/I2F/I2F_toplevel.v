@@ -282,7 +282,7 @@ Qed.
 Lemma I2F_putchar_denotation :
   I2F_function_denotation (@putchar_denotation PInf) (@putchar_denotation PFin).
 Proof.
-  intros args1 args2 Hargs.
+  intros cc args1 args2 Hargs.
   unfold putchar_denotation; cbn.
   destruct Hargs as [| u1 u2 args1 args2 Hu Hargs]; [apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto|].
   destruct Hargs; cbn; [ | unfold raise; apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto].
@@ -329,7 +329,7 @@ Qed.
 Lemma I2F_puts_denotation :
   I2F_function_denotation (@puts_denotation PInf) (@puts_denotation PFin).
 Proof.
-  intros args1 args2 Hargs.
+  intros cc args1 args2 Hargs.
   unfold puts_denotation.
   destruct Hargs as [| u1 u2 args1 args2 Hu Hargs];
     [apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto|].
