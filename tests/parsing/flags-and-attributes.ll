@@ -1,6 +1,6 @@
 ; Parsing (and, through make test-full, pretty-printing) of flags,
 ; attributes, and metadata forms:
-; - fast-math flags on fcmp and select;
+; - fast-math flags on fcmp, select, and phi;
 ; - trunc nuw/nsw in either order;
 ; - getelementptr inbounds/nusw/nuw in any order;
 ; - nofpclass, nofreeobj, dead_on_return, captures(ret: ...);
@@ -17,6 +17,22 @@ define double @fast_math(double %x, double %y, i1 %c) {
 }
 
 ; ASSERT EQ: double 1.0 = call double @fast_math(double 1.0, double 2.0, i1 1)
+
+define double @fast_math_phi(i1 %c) {
+entry:
+  br i1 %c, label %a, label %b
+a:
+  br label %join
+b:
+  br label %join
+join:
+  %r = phi nnan nsz double [ 1.0, %a ], [ 2.0, %b ]
+  %s = phi double [ 10.0, %a ], [ 20.0, %b ]
+  %t = fadd double %r, %s
+  ret double %t
+}
+
+; ASSERT EQ: double 22.0 = call double @fast_math_phi(i1 0)
 
 define i32 @trunc_flags() {
   %a = trunc nuw nsw i64 7 to i32

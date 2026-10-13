@@ -123,7 +123,7 @@ Section LABELS_OPERATIONS.
     not (In id (inputs cfg)).
 
   Definition phi_sources (φ : phi T) : list block_id :=
-    let '(Phi _ l) := φ in map fst l.
+    let '(Phi _ _ l) := φ in map fst l.
 
   (* Over a closed graph, phi nodes should expect exactly jumps from their predecessors:
      - For any block [bk] in the graph
@@ -319,7 +319,7 @@ Section REGISTER_OPERATIONS.
       |}.
 
     #[global] Instance phi_use_sites {T} : Use_sites (phi T) :=
-      {| use_sites := fun '(Phi _ l) => set_flat_map (fun x => use_sites (snd x)) l |}.
+      {| use_sites := fun '(Phi _ _ l) => set_flat_map (fun x => use_sites (snd x)) l |}.
 
     #[global] Instance block_use_sites {T} : Use_sites (block T) :=
       {| use_sites := fun bk => set_flat_map (fun x => use_sites (snd (fst x))) bk.(blk_phis) +++ use_sites bk.(blk_code) +++ use_sites (snd (fst bk.(blk_term))) |}.

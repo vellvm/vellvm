@@ -1032,8 +1032,8 @@ Section ReprInstances.
 
   Definition repr_phi (p : phi typ) : string
     := match p with
-       | Phi t args =>
-         "(Phi " ++ repr t ++ repr args ++ ")"
+       | Phi fm t args =>
+         "(Phi [" ++ (contents id (List.map repr_fast_math fm)) ++ "] " ++ repr t ++ repr args ++ ")"
        end.
 
   #[global]

@@ -914,7 +914,7 @@ Section Denotation.
     loop_monad (fun i => denote_instr i varargs) c.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : CFGtop (local_id * dvalue) :=
-    let '(id, Phi dt args, md) := id_p in
+    let '(id, Phi _ dt args, md) := id_p in
     (* Same lazy-location scheme as [denote_instr]. *)
     let bogus := set_loc (get_file_info md) in
     let err_loc := fun (_:unit) => bogus ++ location_error_string md in

@@ -882,8 +882,8 @@ Section ShowInstances.
 
   #[global] Instance dshowPhi : DShow (phi T)
     := {| dshow p :=
-         let '(Phi t phis) := p in
-         DList_join [sd "phi " ; dshow t ; sd " "] @@
+         let '(Phi fm t phis) := p in
+         DList_join [sd "phi" ; fast_math_list_to_dstring fm ; dshow t ; sd " "] @@
            concat_DString (sd ", ") (map show_phi_block phis)
        |}.
 

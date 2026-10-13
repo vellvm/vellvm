@@ -330,7 +330,7 @@ Section CFG.
     end.
 
   Definition block_block_addresses (b : block T) : list (function_id * block_id) :=
-    flat_map (fun '(_, Phi _ args, _) => flat_map (fun x => exp_block_addresses (snd x)) args) (blk_phis b)
+    flat_map (fun '(_, Phi _ _ args, _) => flat_map (fun x => exp_block_addresses (snd x)) args) (blk_phis b)
     ++ flat_map (fun '(_, i, _) => instr_block_addresses i) (blk_code b)
     ++ (let '(_, t, _) := blk_term b in term_block_addresses t).
 

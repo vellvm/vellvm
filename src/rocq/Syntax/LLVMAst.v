@@ -573,7 +573,7 @@ Variant instr_id : Set :=
 .
 
 Variant phi : Set :=
-  | Phi  (t:T) (args:list (block_id * exp))
+  | Phi  (fm:list fast_math) (t:T) (args:list (block_id * exp))
 .
 
 Variant ordering : Set :=

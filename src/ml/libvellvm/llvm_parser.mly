@@ -1124,10 +1124,10 @@ block_instrs_and_term:
 
 
 phi:
-  | KW_PHI t=typ ps=phi_suffix
+  | KW_PHI f=fast_math* t=typ ps=phi_suffix
     { let (table, md) = ps in
       let f_info = metadata_file_info $startpos $endpos in
-      (Phi (t, table), f_info::md) }
+      (Phi (f, t, table), f_info::md) }
 
 phi_suffix:
   | te=phi_table_entry COMMA ps=phi_suffix

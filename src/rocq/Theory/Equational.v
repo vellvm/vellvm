@@ -91,17 +91,17 @@ Section withParams.
   (** [denote_phi] *)
   (* TODO: make a choice about it and move *)
   Arguments assoc : simpl never.
-  Lemma denote_phi_hd : forall bid e id τ tl,
-      ⟦ (id, Phi τ ((bid,e)::tl), []) ⟧Φ bid
+  Lemma denote_phi_hd : forall bid e id fm τ tl,
+      ⟦ (id, Phi fm τ ((bid,e)::tl), []) ⟧Φ bid
      ≈ uv <- ⟦ e at τ ⟧e';; Ret (id,uv).
   Proof with solve.
     intros; cbn.
     rewrite assoc_hd...
   Qed.
 
-  Lemma denote_phi_tl : forall bid bid' e id τ tl,
+  Lemma denote_phi_tl : forall bid bid' e id fm τ tl,
       bid <> bid' ->
-      ⟦ (id, Phi τ ((bid',e)::tl), []) ⟧Φ bid ≈ ⟦ (id, Phi τ tl, []) ⟧Φ bid.
+      ⟦ (id, Phi fm τ ((bid',e)::tl), []) ⟧Φ bid ≈ ⟦ (id, Phi fm τ tl, []) ⟧Φ bid.
   Proof with solve.
     intros; cbn.
     rewrite assoc_tl...

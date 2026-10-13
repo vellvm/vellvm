@@ -974,7 +974,7 @@ Module VIR_Notations.
   Notation "{ p }" := p
     (in custom vir_phi at level 0, p constr, only printing).
 
-  Notation "x '=' 'phi' t a" := (x, Phi t a, _)
+  Notation "x '=' 'phi' t a" := (x, Phi _ t a, _)
     (in custom vir_phi at level 30,
      x constr at level 0,
      t custom vir_typ at level 99,
@@ -1483,7 +1483,7 @@ Section SurfaceSyntaxTest.
             {| blk_id := Name "merge";
                blk_phis := [
                  (Name "r",
-                  Phi (TYPE_I 32%positive)
+                  Phi [] (TYPE_I 32%positive)
                       [(Name "neg", EXP_Ident (ID_Local (Name "c")));
                        (Name "pos", EXP_Ident (ID_Local (Name "c")))],
                   [])

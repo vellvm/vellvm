@@ -294,7 +294,7 @@ Section Endo.
            `{Endo (exp T)}
       : Endo (phi T) | 50 :=
       fun p => match p with
-            | Phi t args => Phi (endo t) (endo args)
+            | Phi fm t args => Phi fm (endo t) (endo args)
             end.
 
     #[global] Instance Endo_block
@@ -713,8 +713,8 @@ Section TFunctor.
            `{Endo raw_id}
            `{TFunctor exp}
       : TFunctor phi | 50 :=
-      fun U V f '(Phi t args) =>
-        Phi (f t) (tfmap (fun '(id,e) => (endo id, tfmap f e)) args).
+      fun U V f '(Phi fm t args) =>
+        Phi fm (f t) (tfmap (fun '(id,e) => (endo id, tfmap f e)) args).
 
     #[global] Instance TFunctor_code
            `{Endo raw_id}
