@@ -30,6 +30,7 @@
 ./rocq/Syntax/AstLib.v
 ./rocq/Syntax/RawIdMaps.v
 ./rocq/Syntax/CFG.v
+./rocq/Syntax/ModuleRefs.v
 ./rocq/Syntax/DynamicTypes.v
 ./rocq/Syntax/Traversal.v
 ./rocq/Syntax/TypToDtyp.v

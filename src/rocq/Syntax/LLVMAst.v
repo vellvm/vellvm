@@ -919,8 +919,9 @@ Definition attr_range (a : param_attr) : option (int_syntax * int_syntax) :=
 (* The value-constraining metadata of a load, as the parameter attributes
    LangRef defines them by analogy with: [!nonnull] ("analogous to the nonnull
    attribute"), [!align] ("analogous to the 'align' attribute"), and
-   [!noundef].  Only an inline [!align] node ([!align !{i64 N}]) is read:
-   named metadata nodes ([!align !1]) are not kept in the mcfg.  [!range] and
+   [!noundef].  The [!align] node must be inline ([!align !{i64 N}]); a
+   reference to a numbered node ([!align !1]) is replaced by the node before
+   linking (see [resolve_module_refs] in ModuleRefs.v).  [!range] and
    [!dereferenceable] are not handled yet. *)
 Definition load_metadata_attr (md : metadata) : list param_attr :=
   match md with

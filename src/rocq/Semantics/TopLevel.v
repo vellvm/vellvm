@@ -110,10 +110,14 @@ Section withParams.
       let userprog'      := filter (negb ∘ predefined) userprog
         in List.app predefs userprog'.
 
+  (** Numbered metadata ([!N]) and attribute group ([#N]) references are
+      local to a module, so each module's are resolved before linking (see
+      [resolve_module_refs]). *)
   Definition link_all
     (linked_files  : list ll_toplevel_entities)
     (userprog : ll_toplevel_entities) : ll_toplevel_entities :=
-    fold_left (fun prog linked => link linked prog) linked_files userprog.
+    fold_left (fun prog linked => link (resolve_module_refs linked) prog) linked_files
+              (resolve_module_refs userprog).
 
   (** * Initialization
 

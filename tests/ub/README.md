@@ -95,12 +95,14 @@ read-before-write, and lifetime. Gaps by category:
   included.)
 - Calls: through poison, `undef`, or null (including `inttoptr 0`) function
   pointers; `noreturn` functions that return and `nounwind` functions that
-  unwind (when written directly on a definition or call site).
+  unwind (on a definition or call site, directly or through an attribute
+  group `#N`).
 - Value attributes `noundef`, `nonnull`, `align`, `range`, and the
   nonnull/noundef part of `dereferenceable`: on call-site arguments and return
   values (call and invoke), and on the arguments and return value of a
   *defined* callee. Without `noundef`, a violation passes poison on.
-- Load metadata `!noundef`, `!nonnull`, and `!align` (inline node only).
+- Load metadata `!noundef`, `!nonnull`, and `!align` (inline or a numbered
+  node such as `!align !1`).
 - Intrinsics and libc: memcpy overlap and out of bounds; memcpy, memmove, and
   memset with a poison length, or poison pointers and a nonzero length (a no-op
   with length 0); memset with a poison fill value (stores poison); memmove
@@ -118,14 +120,10 @@ read-before-write, and lifetime. Gaps by category:
 - Value attributes of external (declared-only) functions, and an attribute
   split between the declaration and the call site (e.g. `nonnull` declared,
   `noundef` at the call), which LangRef combines.
-- Attribute groups (`#0`, as clang emits) are not resolved, so `noreturn` /
-  `nounwind` given that way are not checked.
 - Not enforced at all: the memory part of `dereferenceable[_or_null]`,
   `memory(...)`, `readonly`/`readnone`, `captures`, `nofree`, `noalias`,
   `initializes`, `writable`, `nocreateundeforpoison`.
-- Load metadata given as a named node (`!align !1`, as clang emits) is not
-  read, because the module's metadata definitions are not kept in the mcfg;
-  `!range` is not handled.
+- Load metadata `!range` and `!dereferenceable[_or_null]` are not handled.
 - `llvm.lifetime.start`/`end` are no-ops in `libll`, so dead stack objects
   aren't modeled.
 - Stores to `constant` globals are allowed, directly and through memcpy/memset.
