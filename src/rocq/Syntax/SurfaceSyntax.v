@@ -642,7 +642,7 @@ Module VIR_Notations.
         [vir_idx_list]; in real goals it is non-empty, so the bare-cons
         rule handles it. *)
   Notation "'getelementptr' t ',' τp p ',' idxs" :=
-    (OP_GetElementPtr t (τp, p) idxs)
+    (OP_GetElementPtr gep_no_flags t (τp, p) idxs)
     (in custom vir_exp at level 20,
      t custom vir_typ at level 99,
      τp custom vir_typ at level 99,

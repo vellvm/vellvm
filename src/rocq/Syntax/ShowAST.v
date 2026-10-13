@@ -307,7 +307,8 @@ Section ShowInstances.
     match p with
     | ([], []) => sd "none"
     | (l, []) => (dconcat (sd ", ") (List.map sd l))
-    | (l, r) => (dconcat (sd ", ") (List.map sd l)) @@ (sd " ret:") @@
+    | ([], r) => sd "ret: " @@ (dconcat (sd ", ") (List.map sd r))
+    | (l, r) => (dconcat (sd ", ") (List.map sd l)) @@ (sd ", ret: ") @@
                  (dconcat (sd ", ") (List.map sd r))
     end.
   
@@ -336,6 +337,8 @@ Section ShowInstances.
     | PARAMATTR_Swifterror => sd "swifterror"
     | PARAMATTR_Immarg => sd "immarg"
     | PARAMATTR_Noundef => sd "noundef"
+    | PARAMATTR_Nofpclass mask => sd "nofpclass(" @@ dconcat (sd " ") (List.map sd (nofpclass_words mask)) @@ sd ")"
+    | PARAMATTR_Nofreeobj => sd "nofreeobj"
     | PARAMATTR_Alignstack a => sd "alignstack(" @@ sd (show a)  @@ sd ")"
     | PARAMATTR_Allocalign => sd "allocalign"
     | PARAMATTR_Allocptr => sd "allocptr"
@@ -344,6 +347,8 @@ Section ShowInstances.
     | PARAMATTR_Writeonly => sd "writeonly"
     | PARAMATTR_Writable => sd "writable"
     | PARAMATTR_Dead_on_unwind => sd "dead_on_unwind"
+    | PARAMATTR_Dead_on_return None => sd "dead_on_return"
+    | PARAMATTR_Dead_on_return (Some n) => sd "dead_on_return(" @@ sd (show n) @@ sd ")"
     | PARAMATTR_Range t a b => sd "range(" @@ sd (show t)
                                           @@ sd " "
                                           @@ sd (show a) @@ sd ", " 
@@ -573,6 +578,13 @@ Section ShowInstances.
   (* #[global] Instance Show_Int {sz} : Show (@bit_int sz) *)
   (*   := {| show := show_int|}. *)
 
+  (* LLVM's canonical order; [inbounds] implies [nusw], so [nusw] is not
+     printed next to it.  Each flag is followed by a space. *)
+  Definition show_gep_flags (f : gep_flags) : string :=
+    (if gep_inbounds f then "inbounds "
+     else if gep_nusw f then "nusw " else "")
+    ++ (if gep_nuw f then "nuw " else "").
+
   Definition show_fast_math (fm : fast_math) : string
     := match fm with
        | Nnan => "nnan"
@@ -782,9 +794,9 @@ Section ShowInstances.
     | OP_Conversion conv t_from v t_to => list_to_DString [show conv ; " "] @@ add_parens b (dshow t_from @@ sd " " @@ dshow_exp true v @@
                                                                                              sd " to " @@ dshow t_to)
 
-    | OP_GetElementPtr t ptrval idxs =>
+    | OP_GetElementPtr flags t ptrval idxs =>
         let (tptr, exp) := ptrval in
-        sd "getelementptr " @@ add_parens b (dshow t @@ sd ", " @@ dshow tptr @@ sd " " @@ dshow_exp true exp @@
+        sd "getelementptr " @@ sd (show_gep_flags flags) @@ add_parens b (dshow t @@ sd ", " @@ dshow tptr @@ sd " " @@ dshow_exp true exp @@
                                                               fold_left (fun str '(ty, ex) => str @@ sd ", " @@ dshow ty @@ sd " " @@ dshow_exp true ex) idxs DList_empty)
 
     | OP_ExtractElement vec idx =>
@@ -1098,6 +1110,28 @@ tag ::= string constant
     | _::_ => sd "[" @@ concat_DString (sd ", ") (map show_operand_bundle obs) @@ sd "]"
     end.
   
+  (* What a call or invoke prints between its keyword and its argument list:
+     fast-math flags, calling convention, return attributes, address space,
+     and the callee, separated by spaces. *)
+  Definition dshow_callee {C A} `{Show C} `{Show A} (fast_math_flags : list fast_math)
+             (cconv : option C) (ret_attrs : list param_attr) (addrspace : option A)
+             (fn : texp T) : DString :=
+    concat_DString (sd " ")
+      (map (fun x => sd (show_fast_math x)) fast_math_flags
+       ++ map sd (show_opt_list cconv)
+       ++ map show_param_attr ret_attrs
+       ++ map sd (show_opt_list addrspace)
+       ++ [dshow_texp fn]).
+
+  (* What a call or invoke prints after its argument list: function
+     attributes and operand bundles, each preceded by a space. *)
+  Definition dshow_call_suffix (fn_attrs : list fn_attr) (obs : list (@operand_bundle T)) : DString :=
+    DList_join (map (fun x => sd " " @@ sd (show_fn_attr x)) fn_attrs) @@
+    match obs with
+    | nil => DList_empty
+    | _::_ => sd " " @@ dshow_operand_bundles obs
+    end.
+
   Definition dshow_instr (i : instr T) : DString
     := match i with
        | INSTR_Comment s => sd "; " @@  sd (s ++ "\n") (* include the newline *) 
@@ -1113,21 +1147,11 @@ tag ::= string constant
            let fn_attrs := filter_option ann_fun_attribute anns in
            sd (show_opt_prefix "" tail) @@ sd (show_opt_space tail)
              @@ sd "call " @@
-             concat_DString (sd " ") (map (fun x => sd (show_fast_math x)) fast_math_flags)
-             @@
-             list_to_DString (show_opt_list cconv)
-             @@
-             DList_join (map show_param_attr ret_attrs)
-             @@
-             list_to_DString (show_opt_list addrspace) 
-
-             @@ sd " " @@
-             dshow_texp fn @@ sd "(" @@
+             dshow_callee fast_math_flags cconv ret_attrs addrspace fn
+             @@ sd "(" @@
              concat_DString (sd ", ") (map show_call_arg args) @@
-             sd ") " @@
-             concat_DString (sd " ") (map (fun x => sd (show_fn_attr x)) fn_attrs)
-             @@
-             dshow_operand_bundles obs 
+             sd ")" @@
+             dshow_call_suffix fn_attrs obs
              
        | INSTR_Alloca t anns =>
            let inalloca := ann_str anns ann_inalloca (fun _ => "inalloca") in 
@@ -1262,8 +1286,9 @@ tag ::= string constant
                                       fold_left (fun str '(x, y) => str @@ list_to_DString [show x; ", label %"] @@
                                                                    dshow y @@ sd " ") brs DList_empty @@ sd "]"
 
-       | TERM_IndirectBr v brs => sd "indirectbr " @@ dshow_texp v @@
-                                   dshow brs
+       | TERM_IndirectBr v brs => sd "indirectbr " @@ dshow_texp v @@ sd ", [" @@
+                                   concat_DString (sd ", ") (map (fun b => sd "label %" @@ dshow b) brs) @@
+                                   sd "]"
 
        | TERM_Resume v => sd "resume " @@ dshow_texp v
 
@@ -1276,24 +1301,13 @@ tag ::= string constant
            let fn_attrs := filter_option ann_fun_attribute anns in
              sd "invoke "
              @@
-             concat_DString (sd " ") (map (fun x => sd (show_fast_math x)) fast_math_flags)
-             @@
-             list_to_DString (show_opt_list cconv)
-             @@
-             DList_join (map show_param_attr ret_attrs)
-             @@
-             list_to_DString (show_opt_list addrspace) 
-             
-             @@ sd " " @@
-             dshow_texp fn @@ sd "(" @@
+             dshow_callee fast_math_flags cconv ret_attrs addrspace fn
+             @@ sd "(" @@
              concat_DString (sd ", ") (map show_call_arg args) @@
-             sd ") " @@
-             concat_DString (sd " ") (map (fun x => sd (show_fn_attr x)) fn_attrs)
-             @@
-             sd "to label %" @@ dshow to_label @@ sd " " @@
+             sd ")" @@
+             dshow_call_suffix fn_attrs obs @@
+             sd " to label %" @@ dshow to_label @@ sd " " @@
              sd "unwind label %" @@ dshow unwind_label
-             @@
-             dshow_operand_bundles obs 
 
              
        | TERM_Unreachable => sd "unreachable"

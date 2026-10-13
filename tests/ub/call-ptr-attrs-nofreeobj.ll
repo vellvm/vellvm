@@ -7,8 +7,8 @@
 ; underlying object must happen-before the function returns, otherwise the
 ; behavior is undefined."
 ;
-; NOTE: neither Vellvm's parser nor LLVM 23.1 accepts `nofreeobj` yet (it is
-; newer than that release), so this file only runs once support lands.
+; NOTE: Vellvm parses `nofreeobj` but does not enforce it yet.  LLVM 23.1
+; does not accept it (it is newer than that release).
 
 declare ptr @malloc(i64)
 declare void @free(ptr)

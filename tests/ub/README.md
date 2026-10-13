@@ -63,13 +63,13 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 | `provenance.ll` | access through a pointer *based on* the wrong object (gep across objects, integer constants, stale heap or stack pointers) |
 | `call.ll` | poison, undef, null, or data-pointer callee; calling-convention mismatch |
 | `call-param-attrs.ll` | `noundef`; `nonnull`, `align`, `range` combined with `noundef`; `dereferenceable(n)`, `dereferenceable_or_null(n)`; on the declaration or the call site |
-| `call-param-nofpclass.ll` | `nofpclass` + `noundef` *(does not parse yet)* |
+| `call-param-nofpclass.ll` | `nofpclass` + `noundef` |
 | `ret.ll` | return-value `noundef`, `nonnull`, `align`, `range`, `dereferenceable` |
 | `call-fn-attrs.ll` | `noreturn` that returns, writes that violate `memory(...)`, `nocreateundeforpoison` |
 | `call-fn-attrs-unwind.ll` | `nounwind` that unwinds *(uses Vellvm's throw intrinsic, so it runs only under Vellvm)* |
 | `call-ptr-attrs.ll` | `readonly`, `readnone`, `captures(...)`, `nofree`, `noalias`, `initializes`, `writable` |
-| `call-ptr-attrs-unparsed.ll` | `captures(ret: …)`, `!captures` store metadata *(does not parse in Vellvm yet)* |
-| `call-ptr-attrs-nofreeobj.ll` | `nofreeobj` *(parsed by neither Vellvm nor LLVM 23.1)* |
+| `call-ptr-attrs-unparsed.ll` | `captures(ret: …)`, `!captures` store metadata *(parses now, but neither is enforced)* |
+| `call-ptr-attrs-nofreeobj.ll` | `nofreeobj` *(LLVM 23.1 does not parse it)* |
 | `intrinsics/memcpy.ll`, `memmove.ll`, `memset.ll` | poison or undef length; null or poison pointers with nonzero length; overlap (memcpy only); out of bounds; writing to a constant |
 | `intrinsics/assume.ll`, `assume-bundles.ll` | a false or poison condition; violated `"nonnull"`, `"align"`, `"dereferenceable"` bundles |
 | `libc/free.ll` | double free; freeing a stack, global, interior, or poison pointer |
@@ -111,8 +111,10 @@ read-before-write, and lifetime. Gaps by category:
 **Missing UB (Vellvm returns a value instead):**
 - Accesses with no `align` are not checked (LangRef: load/store then have the
   type's ABI alignment, atomics the value's size).
-- `getelementptr` `inbounds`/`nuw`/`nusw` never produce poison (the parser does
-  not record these flags).
+- `getelementptr inbounds` is checked only for its `nusw` part and for a null
+  base: going out of bounds of a real allocated object is not detected,
+  because the memory model doesn't record object bounds. (`nusw` and `nuw`
+  are enforced.)
 - Value attributes of external (declared-only) functions, and an attribute
   split between the declaration and the call site (e.g. `nonnull` declared,
   `noundef` at the call), which LangRef combines.
@@ -142,10 +144,9 @@ read-before-write, and lifetime. Gaps by category:
   LangRef doesn't list that case.
 
 **Unsupported:**
-- The parser rejects `blockaddress`, `nofpclass`, `nofreeobj`, `dead_on_return`,
-  `captures(ret: …)`, `!captures` store metadata, and `!dereferenceable` /
-  `!dereferenceable_or_null` load metadata (`dereferenceable` is lexed as a
-  keyword).
+- The parser rejects `blockaddress`. (`nofpclass`, `nofreeobj`,
+  `dead_on_return`, `captures(ret: …)`, and metadata whose name is a keyword,
+  such as `!captures` and `!dereferenceable`, parse but are not enforced.)
 
 ## Not covered
 

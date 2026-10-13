@@ -189,7 +189,8 @@ Variant param_attr : Set :=
 | PARAMATTR_Swifterror
 | PARAMATTR_Immarg
 | PARAMATTR_Noundef
-(* | PARAMATTR_Nofpclass (* MISSING: floating point class *) *) 
+| PARAMATTR_Nofpclass (mask : int_ast) (* see [nofpclass_names] *)
+| PARAMATTR_Nofreeobj
 | PARAMATTR_Alignstack (a : int_syntax)
 | PARAMATTR_Allocalign
 | PARAMATTR_Allocptr
@@ -198,10 +199,42 @@ Variant param_attr : Set :=
 | PARAMATTR_Writeonly
 | PARAMATTR_Writable
 | PARAMATTR_Dead_on_unwind      
+| PARAMATTR_Dead_on_return (size : option int_syntax)
 | PARAMATTR_Range (t : typ) (a b : int_syntax)
 | PARAMATTR_Initializes (l : list (int_syntax * int_syntax))
 | PARAMATTR_Captures (p : (list string) * (list string))
 .
+
+(* The floating-point classes of [nofpclass(...)], as LLVM's [FPClassTest]
+   bits: snan 1, qnan 2, ninf 4, nnorm 8, nsub 16, nzero 32, pzero 64,
+   psub 128, pnorm 256, pinf 512.  The order is LLVM's printing order: the
+   printer names the bits of a mask greedily, so compound names come first. *)
+Definition nofpclass_names : list (string * int_ast) :=
+  [("all", 1023); ("nan", 3); ("snan", 1); ("qnan", 2);
+   ("inf", 516); ("ninf", 4); ("pinf", 512);
+   ("zero", 96); ("nzero", 32); ("pzero", 64);
+   ("sub", 144); ("nsub", 16); ("psub", 128);
+   ("norm", 264); ("nnorm", 8); ("pnorm", 256)]%Z.
+
+(* The mask of [nofpclass(w1 w2 ...)], or [None] if a word is not a class
+   name. *)
+Definition nofpclass_mask (words : list string) : option int_ast :=
+  fold_left (fun acc w =>
+               match acc, find (fun '(n, _) => String.eqb n w) nofpclass_names with
+               | Some m, Some (_, bits) => Some (Z.lor m bits)
+               | _, _ => None
+               end) words (Some 0%Z).
+
+(* LLVM rejects an empty mask and bits outside the ten classes. *)
+Definition nofpclass_mask_valid (mask : int_ast) : bool :=
+  (0 <? mask)%Z && (mask <=? 1023)%Z.
+
+(* The class names that [nofpclass] prints for a mask. *)
+Definition nofpclass_words (mask : int_ast) : list string :=
+  snd (fold_left (fun '(m, ws) '(n, bits) =>
+                    if Z.eqb (Z.land m bits) bits
+                    then (Z.ldiff m bits, ws ++ [n])
+                    else (m, ws)) nofpclass_names (mask, [])).
 
 Variant frame_pointer_val : Set :=
 | FRAMEPTR_None
@@ -382,6 +415,17 @@ Variant conversion_type : Set :=
   | CONV_Pure (c : pure_conversion)
   | CONV_Impure (c : impure_conversion)
 .
+
+(* The no-wrap flags of [getelementptr], as written.  LLVM's [inbounds]
+   implies [nusw]; the semantics, not the syntax, accounts for that. *)
+Record gep_flags : Set :=
+  mk_gep_flags {
+      gep_inbounds : bool;
+      gep_nusw     : bool;
+      gep_nuw      : bool;
+    }.
+
+Definition gep_no_flags : gep_flags := mk_gep_flags false false false.
                 
 Section TypedSyntax.
 
@@ -460,7 +504,7 @@ Inductive exp : Set :=
 | OP_Fneg             (flags:list fast_math) (v:(T * exp))
 | OP_FCmp             (cmp:fcmp)   (t:T) (v1:exp) (v2:exp)
 | OP_Conversion       (conv:conversion_type) (t_from:T) (v:exp) (t_to:T)
-| OP_GetElementPtr    (t:T) (ptrval:(T * exp)) (idxs:list (T * exp))
+| OP_GetElementPtr    (flags:gep_flags) (t:T) (ptrval:(T * exp)) (idxs:list (T * exp))
 | OP_ExtractElement   (vec:(T * exp)) (idx:(T * exp))
 | OP_InsertElement    (vec:(T * exp)) (elt:(T * exp)) (idx:(T * exp))
 | OP_ShuffleVector    (vec1:(T * exp)) (vec2:(T * exp)) (idxmask:(T * exp))

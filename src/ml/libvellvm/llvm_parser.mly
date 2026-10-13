@@ -101,6 +101,11 @@ let ann_linkage_opt (m : linkage option) : (typ annotation) option =
   | None -> None
   | Some l -> Some (ANN_linkage l)
 
+(* Each parsed getelementptr flag sets its field. *)
+let gep_flags_of (fl : (gep_flags -> gep_flags) list) : gep_flags =
+  List.fold_left (fun f set -> set f)
+    { gep_inbounds = false; gep_nusw = false; gep_nuw = false } fl
+
 let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
   match m with
   | None -> []
@@ -273,6 +278,9 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_WRITEONLY
 %token KW_WRITABLE
 %token KW_DEADONUNWIND
+%token KW_DEADONRETURN
+%token KW_NOFPCLASS
+%token KW_NOFREEOBJ
 %token KW_ARGMEMONLY
 %token KW_RETURNS_TWICE
 %token KW_SAFESTACK
@@ -321,6 +329,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token KW_ARGMEM_COLON
 %token KW_INACCESSIBLEMEM_COLON
 %token KW_ERRNOMEM_COLON
+%token KW_RET_COLON
 
 %token KW_DSO_PREEMPTABLE
 %token KW_DSO_LOCAL
@@ -491,6 +500,7 @@ let mk_metadata (m : ('a metadata list option)) : 'a metadata list =
 %token<(string * string)> METADATA_DEBUG
 
 %token BANG
+%token<string> METADATA_NAME
 
 (* ASM *)
 %token KW_ASM
@@ -524,7 +534,7 @@ toplevel_entity:
    *)
   | i=lident EQ KW_TYPE t=typ           { TLE_Type_decl (ID_Local i, t)  }
   | g=global_decl                       { TLE_Global g                   }
-  | BANG i=metadata_id EQ d=KW_DISTINCT? m=tle_metadata
+  | i=bang_metadata_id EQ d=KW_DISTINCT? m=tle_metadata
                                         { TLE_Metadata (i, opt_bool d, m)}
   | KW_ATTRIBUTES i=ATTR_GRP_ID EQ LCURLY a=fn_attr* RCURLY
     { TLE_Attribute_group (i, a)     }
@@ -542,15 +552,15 @@ tle_metadata:
 (* integer literal syntax *)
 
 
+(* The part of a metadata reference after the "!", for the references the
+   lexer does not produce as a single METADATA_NAME token. *)
 metadata_id:
-  | KW_NOALIAS                   { METADATA_Id (Name (str "noalias")) }
-  | KW_NONNULL                   { METADATA_Id (Name (str "nonnull")) }
-  | KW_NOUNDEF                   { METADATA_Id (Name (str "noundef")) }
-  | KW_ALIGN                     { METADATA_Id (Name (str "align")) }
-  | KW_RANGE                     { METADATA_Id (Name (str "range")) }
   | s=STRING                     { METADATA_Id (Name (str ("\"" ^ s ^ "\""))) } (* preserve quotes *)
   | mid=INTEGER                  { METADATA_Id (Anon (BinIntDef.Z.of_num_int mid)) }
-  | mid=KW_UNKNOWN               { METADATA_Id (Name (str mid)) }
+
+bang_metadata_id:
+  | BANG mid=metadata_id         { mid }
+  | s=METADATA_NAME              { METADATA_Id (Name (str s)) }
 
 
 metadata_node:
@@ -563,7 +573,7 @@ tconst_or_metadata_value:
   | m=metadata_value            { m } 
 
 metadata_value:
-  | BANG mid=metadata_id        { mid }
+  | mid=bang_metadata_id        { mid }
   | BANG mn=metadata_node       { mn  }
   | db=METADATA_DEBUG           { METADATA_Debug(str (fst db), str (snd db)) }
 
@@ -690,7 +700,7 @@ c_sanitize_address_dyninit:
   | l=c_global_metadata { l }
 
 c_global_metadata:
- |  csep BANG m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
+ |  csep m1=bang_metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
  | (* empty *) { [] }
 
 global_post_annotations:
@@ -784,7 +794,7 @@ align_ann:
 
 
 global_metadata:
- |  BANG m1=metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
+ |  m1=bang_metadata_id m2=metadata_value l=c_global_metadata { (ANN_metadata [m1; m2]) :: l }
  | (* empty *) { [] }
 
 %inline
@@ -1076,6 +1086,9 @@ block_label:
   | KW_ERRNOMEM_COLON
     { Some "errnomem" }
 
+  | KW_RET_COLON
+    { Some "ret" }
+
   | str=STRING COLON
     { Some ("\"" ^ str ^ "\"")}
 
@@ -1215,6 +1228,16 @@ param_attr:
   | KW_SWIFTERROR                        { PARAMATTR_Swifterror                }
   | KW_IMMARG                            { PARAMATTR_Immarg                    }
   | KW_NOUNDEF                           { PARAMATTR_Noundef                   }
+  | KW_NOFPCLASS LPAREN ws=nofpclass_word+ RPAREN
+    { match nofpclass_mask (List.map str ws) with
+      | Some m -> PARAMATTR_Nofpclass m
+      | None -> failwith (Printf.sprintf "line %d: nofpclass: expected a floating-point class name, got '%s'"
+                            $startpos.pos_lnum (String.concat " " ws)) }
+  | KW_NOFPCLASS LPAREN n=INTEGER RPAREN
+    { let m = BinIntDef.Z.of_num_int n in
+      if nofpclass_mask_valid m then PARAMATTR_Nofpclass m
+      else failwith (Printf.sprintf "line %d: invalid mask value for nofpclass" $startpos.pos_lnum) }
+  | KW_NOFREEOBJ                         { PARAMATTR_Nofreeobj                 }
   | KW_ALIGNSTACK LPAREN n=INTEGER RPAREN
                                          { PARAMATTR_Alignstack n              }
   | KW_ALLOCALIGN                        { PARAMATTR_Allocalign                }
@@ -1224,13 +1247,37 @@ param_attr:
   | KW_WRITEONLY                         { PARAMATTR_Writeonly                 }
   | KW_WRITABLE                          { PARAMATTR_Writable                  }
   | KW_DEADONUNWIND                      { PARAMATTR_Dead_on_unwind            }
+  | KW_DEADONRETURN                      { PARAMATTR_Dead_on_return None       }
+  | KW_DEADONRETURN LPAREN n=INTEGER RPAREN { PARAMATTR_Dead_on_return (Some n) }
   | KW_RANGE LPAREN t=typ a=INTEGER COMMA b=INTEGER RPAREN { PARAMATTR_Range(t, a, b) }
   | KW_INITIALIZES LPAREN l=separated_list(csep, int_pair) RPAREN { PARAMATTR_Initializes(l) }
   | KW_CAPTURES LPAREN l=capture_group RPAREN { PARAMATTR_Captures(l) }
 
+(* The no-wrap flags of getelementptr, which LLVM accepts in any order and
+   with repeats. *)
+gep_flag:
+  | KW_INBOUNDS { fun f -> { f with gep_inbounds = true } }
+  | KW_NUSW     { fun f -> { f with gep_nusw = true } }
+  | KW_NUW      { fun f -> { f with gep_nuw = true } }
+
+(* The class names of nofpclass(...).  "ninf" and "sub" are also keywords
+   (a fast-math flag and an instruction). *)
+nofpclass_word:
+  | w=KW_UNKNOWN { w }
+  | KW_NINF      { "ninf" }
+  | KW_SUB       { "sub" }
+
+(* captures(none), captures(c, ..., c), captures(ret: c, ..., c), or
+   captures(c, ..., c, ret: c, ..., c) *)
 capture_group:
   | KW_NONE { ([], []) }
-  | l=separated_list(csep, capture_component) r=capture_group_ret { (l, r) }
+  | c=capture_component r=capture_group_tail { (c :: fst r, snd r) }
+  | r=capture_group_ret { ([], r) }
+
+capture_group_tail:
+  | (* empty *) { ([], []) }
+  | csep c=capture_component r=capture_group_tail { (c :: fst r, snd r) }
+  | csep r=capture_group_ret { ([], r) }
 
 capture_component:
   | KW_ADDRESS { str "address" }
@@ -1239,8 +1286,7 @@ capture_component:
   | KW_READ_PROVENANCE { str "read_provenance" }
 
 capture_group_ret:
-  | (* empty *) { [] }
-  | KW_RET COLON l=separated_list(csep, capture_component) { l }
+  | KW_RET_COLON l=separated_nonempty_list(csep, capture_component) { l }
 
 int_pair:
   | LPAREN i1=INTEGER COMMA i2=INTEGER RPAREN { (i1, i2) }
@@ -1537,8 +1583,8 @@ expr_op:
     { OP_Conversion (c, t1, v, t2) }
 
     (* SAZ: TODO - record the inbounds, nuw, nusw flags, also allow inrange(S,E) *) 
-  | KW_GETELEMENTPTR KW_INBOUNDS? KW_NUSW? KW_NUW? LPAREN t=typ COMMA ptr=texp idx=preceded(COMMA, texp)* RPAREN
-    { OP_GetElementPtr (t, ptr, idx) }
+  | KW_GETELEMENTPTR fl=gep_flag* LPAREN t=typ COMMA ptr=texp idx=preceded(COMMA, texp)* RPAREN
+    { OP_GetElementPtr (gep_flags_of fl, t, ptr, idx) }
 
   | KW_SELECT LPAREN if_=texp COMMA then_=texp COMMA else_= texp RPAREN
     { OP_Select (if_, then_, else_) }
@@ -1572,11 +1618,11 @@ instr_path:
       let (idx, md) = im in
       (INSTR_Op (OP_InsertValue (agg, new_val, idx)), f_info::md) }
 
-    (* SAZ: TODO - record the inbounds, nuw, nusw flags, also allow inrange(S,E) *) 
-  | KW_GETELEMENTPTR KW_INBOUNDS? KW_NUSW? KW_NUW? t=typ COMMA ptr=texp im=comma_path_with_instr_metadata(texp)
+    (* SAZ: TODO - allow inrange(S,E) *) 
+  | KW_GETELEMENTPTR fl=gep_flag* t=typ COMMA ptr=texp im=comma_path_with_instr_metadata(texp)
     { let f_info = metadata_file_info $startpos $endpos in
       let (idx, md) = im in
-      (INSTR_Op(OP_GetElementPtr (t, ptr, idx)), f_info::md) }
+      (INSTR_Op(OP_GetElementPtr (gep_flags_of fl, t, ptr, idx)), f_info::md) }
 
 
 expr_val:

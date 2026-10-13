@@ -343,8 +343,8 @@ Section ExpIndFull.
   Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
   Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
   Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:T) (v:exp T) (t_to:T), P v -> P ((OP_Conversion conv t_from v t_to)).
-  Hypothesis IH_GetElementPtr : forall (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)),
-      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr t ptrval idxs)).
+  Hypothesis IH_GetElementPtr : forall (flags:gep_flags) (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)),
+      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr flags t ptrval idxs)).
   Hypothesis IH_ExtractElement: forall (vec:(T * exp T)) (idx:(T * exp T)), P (snd vec) -> P (snd idx) -> P ((OP_ExtractElement vec idx)).
   Hypothesis IH_InsertElement : forall (vec:(T * exp T)) (elt:(T * exp T)) (idx:(T * exp T)),
       P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement vec elt idx)).
@@ -392,7 +392,7 @@ refine(
   | OP_Fneg flags v => IH_Fneg flags v (F (snd v))
   | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t (F v1) (F v2)
   | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from t_to (F v) 
-  | OP_GetElementPtr t ptrval idxs => _
+  | OP_GetElementPtr flags t ptrval idxs => _
   | OP_ExtractElement vec idx => IH_ExtractElement vec idx (F (snd vec)) (F (snd idx))
   | OP_InsertElement vec elt idx => IH_InsertElement vec elt idx (F (snd vec)) (F (snd elt)) (F (snd idx))
   | OP_ShuffleVector vec1 vec2 idxmask => IH_ShuffleVector vec1 vec2 idxmask (F (snd vec1))  (F (snd vec2)) (F (snd idxmask))
@@ -478,7 +478,7 @@ refine(
   | OP_Fneg flags v => IH_Fneg flags v (F (snd v))
   | OP_FCmp cmp t v1 v2 => IH_FCmp cmp t (F v1) (F v2)
   | OP_Conversion conv t_from v t_to => IH_Conversion conv t_from t_to (F v) 
-  | OP_GetElementPtr t ptrval idxs => _
+  | OP_GetElementPtr flags t ptrval idxs => _
   | OP_ExtractElement vec idx => IH_ExtractElement vec idx (F (snd vec)) (F (snd idx))
   | OP_InsertElement vec elt idx => IH_InsertElement vec elt idx (F (snd vec)) (F (snd elt)) (F (snd idx))
   | OP_ShuffleVector vec1 vec2 idxmask => IH_ShuffleVector vec1 vec2 idxmask (F (snd vec1))  (F (snd vec2)) (F (snd idxmask))
@@ -571,8 +571,8 @@ Section ExpInd.
   Hypothesis IH_FBinop  : forall (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FBinop fop fm t v1 v2)).
   Hypothesis IH_FCmp    : forall (cmp:fcmp)   (t:T) (v1:exp T) (v2:exp T), P v1 -> P v2 -> P ((OP_FCmp cmp t v1 v2)).
   Hypothesis IH_Conversion : forall (conv:conversion_type) (t_from:T) (v:exp T) (t_to:T), P v -> P ((OP_Conversion conv t_from v t_to)).
-  Hypothesis IH_GetElementPtr : forall (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)),
-      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr t ptrval idxs)).
+  Hypothesis IH_GetElementPtr : forall (flags:gep_flags) (t:T) (ptrval:(T * exp T)) (idxs:list (T * exp T)),
+      P (snd ptrval) -> (forall p, In p idxs -> P (snd p)) -> P ((OP_GetElementPtr flags t ptrval idxs)).
   Hypothesis IH_ExtractElement: forall (vec:(T * exp T)) (idx:(T * exp T)), P (snd vec) -> P (snd idx) -> P ((OP_ExtractElement vec idx)).
   Hypothesis IH_InsertElement : forall (vec:(T * exp T)) (elt:(T * exp T)) (idx:(T * exp T)),
       P (snd vec) -> P (snd elt) -> P (snd idx) -> P ((OP_InsertElement vec elt idx)).

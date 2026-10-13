@@ -280,10 +280,10 @@ Section Denotation.
         v <- denote_exp (Some dt_from) op ;;
         convert ct dt_from v dt_to
              
-    | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
+    | OP_GetElementPtr flags dt1 (dt2, ptrval) idxs =>
         vptr <- denote_exp (Some dt2) ptrval ;;
         vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
-        lift (eval_gep dt1 vptr vs)
+        lift (eval_gep flags dt1 vptr vs)
 
      | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
@@ -709,7 +709,7 @@ Section Denotation.
         args <- load DTYPE_Pointer ptr_to_args;;
         retv <- load argty args;;
         ix <- lift (from_Z 1);;
-        args' <- lift (eval_gep argty args [DVALUE_Base (DVALUE_Iptr ix)]);;
+        args' <- lift (eval_gep gep_no_flags argty args [DVALUE_Base (DVALUE_Iptr ix)]);;
         store DTYPE_Pointer ptr_to_args args';;
         match pt with
         | IVoid _ => ret tt

@@ -6,8 +6,8 @@
 ; representation contains any undefined or poison bits, the behavior is
 ; undefined") the violation is immediate UB.
 ;
-; NOTE: Vellvm's parser does not currently accept `nofpclass`, so this whole
-; file fails to parse.
+; NOTE: Vellvm parses `nofpclass` but does not enforce it yet; only the
+; control passes.
 
 define i32 @take_nonan_noundef(double noundef nofpclass(nan) %x) {
   ret i32 0

@@ -188,6 +188,10 @@ Section ReprInstances.
    Instance reprIBinop : Repr ibinop
     := {| repr := repr_ibinop |}.
 
+  Definition repr_gep_flags (f : gep_flags) : string :=
+    "(mk_gep_flags " ++ repr (gep_inbounds f) ++ " " ++ repr (gep_nusw f) ++ " "
+      ++ repr (gep_nuw f) ++ ")".
+
   Definition repr_icmp (cmp : icmp) : string
     := match cmp with
        | Eq  => "Eq"
@@ -461,8 +465,8 @@ Section ReprInstances.
         "(OP_FCmp " ++ repr cmp ++ " " ++ repr t ++ " " ++ repr_exp v1 ++ " " ++ repr_exp v2 ++ ")"
     | OP_Conversion c from v to =>
         "(OP_Conversion " ++ repr c ++ " " ++ repr from ++ " " ++ repr_exp v ++ " " ++ repr to ++ ")"
-    | OP_GetElementPtr t ptrval idxs =>
-        "(OP_GetElementPtr " ++ repr t ++
+    | OP_GetElementPtr flags t ptrval idxs =>
+        "(OP_GetElementPtr " ++ repr_gep_flags flags ++ " " ++ repr t ++
                              "(" ++ texp ptrval ++  ") ["
                              ++ (contents id (List.map texp idxs)) ++ "])"
     | OP_ExtractElement v i =>
@@ -559,6 +563,8 @@ Section ReprInstances.
     | PARAMATTR_Swifterror => "PARAMATTR_Swifterror"
     | PARAMATTR_Immarg => "PARAMATTR_Immarg"
     | PARAMATTR_Noundef => "PARAMATTR_Noundef"
+    | PARAMATTR_Nofpclass mask => "(PARAMATTR_Nofpclass " ++ repr mask ++ ")"
+    | PARAMATTR_Nofreeobj => "PARAMATTR_Nofreeobj"
     | PARAMATTR_Alignstack (a) => "PARAMATTR_Alignstack " ++ repr a
     | PARAMATTR_Allocalign =>  "PARAMATTR_Allocalign"
     | PARAMATTR_Allocptr => "PARAMATTR_Allocptr"
@@ -567,6 +573,7 @@ Section ReprInstances.
     | PARAMATTR_Writeonly => "PARAMATTR_Writeonly"
     | PARAMATTR_Writable => "PARAMATTR_Writable"
     | PARAMATTR_Dead_on_unwind => "PARAMATTR_Dead_on_unwind"
+    | PARAMATTR_Dead_on_return size => "(PARAMATTR_Dead_on_return " ++ repr size ++ ")"
     | PARAMATTR_Range t a b => "(PARAMATTR_Range " ++ repr t ++ " " ++ repr a ++ " " ++ repr b ++ ")"
     | PARAMATTR_Initializes l => "(PARAMATTR_Initializes " ++ repr l ++ ")"
     | PARAMATTR_Captures p => "(PARAMATTR_Captures " ++ repr p ++ ")"

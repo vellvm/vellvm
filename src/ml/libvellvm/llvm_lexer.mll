@@ -260,6 +260,9 @@
   ("writeonly"                    , KW_WRITEONLY);
   ("writable"                     , KW_WRITABLE);
   ("dead_on_unwind"               , KW_DEADONUNWIND);    
+  ("dead_on_return"               , KW_DEADONRETURN);
+  ("nofpclass"                    , KW_NOFPCLASS);
+  ("nofreeobj"                    , KW_NOFREEOBJ);
   ("argmemonly"                   , KW_ARGMEMONLY);
   ("returns_twice"                , KW_RETURNS_TWICE);
   ("safestack"                    , KW_SAFESTACK);
@@ -510,6 +513,7 @@
     | "argmem" -> KW_ARGMEM_COLON
     | "inaccessiblemem" -> KW_INACCESSIBLEMEM_COLON
     | "errnomem" -> KW_ERRNOMEM_COLON
+    | "ret" -> KW_RET_COLON
     | _ -> LABEL str
     end	
 
@@ -563,6 +567,11 @@ rule token = parse
   (* Strip out LTI Module Summarries *)
   | '^' (alphanum|ws)*'='(alphanum|ws)*':' { gobble_module lexbuf }
 
+  (* A named metadata reference ([!noundef], [!llvm.loop], [!captures]) is a
+     single token, as in LLVM's lexer, so that a name that is also a keyword
+     ([!align], [!dereferenceable]) is not lexed as that keyword.  "!DI..(" is
+     matched by the longer rule above. *)
+  | '!' (ident_fst ident_nxt* as s) { METADATA_NAME s }
   (* FIXME: support metadata strings and struct. Parsed as identifier here. *)
   | "!"  { BANG }
   | '#' (digit+ as i) { ATTR_GRP_ID (coq_of_int (int_of_string i)) }

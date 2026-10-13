@@ -2562,10 +2562,68 @@ Proof.
   i2f_in_range_case; unfold I2F_Iptr; apply in_bounds_case; auto.
 Qed.
 
-Lemma I2F_eval_gep t a1 a2 b1 b2 :
+(** The steps the no-wrap flags are checked against are parameter-free, like
+      [handle_gep_h]. *)
+Lemma I2F_gep_steps_h : forall vs vs',
+    Forall2 I2F_dvalue vs vs' ->
+    forall t,
+      @gep_steps_h PInf t vs = @gep_steps_h PFin t vs'.
+Proof.
+  intros vs vs' F; induction F; intros t; cbn; auto.
+  match goal with
+  | HC : I2F_dvalue ?c ?c' |- _ =>
+      induction HC; cbn; auto
+  end;
+  try (match goal with
+       | HB : I2F_dvalue_base _ _ |- _ =>
+           induction HB; cbn; auto
+       end);
+  try (match goal with
+       | HI : I2F_Iptr _ _ |- _ => red in HI; subst
+       end);
+  repeat (break_goal_fast; cbn); auto;
+  repeat match goal with
+         | IH : forall t, @gep_steps_h PInf t _ = @gep_steps_h PFin t _ |- _ =>
+             rewrite IH
+         end; auto.
+Qed.
+
+Lemma I2F_gep_steps : forall t vs vs',
+    Forall2 I2F_dvalue vs vs' ->
+    @gep_steps PInf t vs = @gep_steps PFin t vs'.
+Proof.
+  intros t vs vs' F.
+  destruct F as [|v v' vs vs' HV F]; cbn; auto.
+  inversion HV; subst; cbn; auto.
+  match goal with
+  | HB : I2F_dvalue_base _ _ |- _ =>
+      inversion HB; subst; cbn; auto
+  end;
+  try (match goal with
+       | HI : I2F_Iptr _ _ |- _ => red in HI; subst
+       end);
+  repeat (break_goal_fast; cbn); auto;
+  erewrite I2F_gep_steps_h by eauto; reflexivity.
+Qed.
+
+(** Related pointers have the same address, so the flags are violated on
+      both sides or on neither. *)
+Lemma I2F_gep_flags_violated : forall flags t a a' vs vs',
+    I2F_Addr a a' ->
+    Forall2 I2F_dvalue vs vs' ->
+    @gep_flags_violated PInf flags t (@ptr_to_int _ _ (@P2I PInf) a) vs =
+      @gep_flags_violated PFin flags t (@ptr_to_int _ _ (@P2I PFin) a') vs'.
+Proof.
+  intros flags t [z pr] [i pr'] vs vs' [HI ->] F; red in HI; subst.
+  unfold gep_flags_violated.
+  erewrite I2F_gep_steps by eauto.
+  reflexivity.
+Qed.
+
+Lemma I2F_eval_gep flags t a1 a2 b1 b2 :
   I2F_dvalue a1 b1 ->
   Forall2 I2F_dvalue a2 b2 ->
-  I2F_EOU I2F_dvalue (eval_gep t a1 a2) (eval_gep t b1 b2).
+  I2F_EOU I2F_dvalue (eval_gep flags t a1 a2) (eval_gep flags t b1 b2).
 Proof.
   intros R F.
   inversion R; subst; cbn; try (repeat constructor).
@@ -2573,9 +2631,14 @@ Proof.
   | HB : I2F_dvalue_base _ _ |- _ =>
       inversion HB; subst; cbn; try (repeat constructor)
   end.
-  (* Pointer: [catch_pois] turns a poisoned offset into a poison value *)
+  (* Pointer: the flags give poison on both sides or on neither; otherwise
+     [catch_pois] turns a poisoned offset into a poison value *)
   match goal with
-  | HA : I2F_Addr _ _ |- _ =>
+  | HA : I2F_Addr ?a ?a' |- _ =>
+      let E := fresh "E" in
+      pose proof (@I2F_gep_flags_violated flags t a a' _ _ HA F) as E;
+      cbn in E; rewrite E;
+      destruct (@gep_flags_violated PFin flags t _ _); [repeat constructor|];
       destruct (I2F_handle_gep_ptr t _ _ HA F); cbn; repeat constructor; auto
   end.
 Qed.
