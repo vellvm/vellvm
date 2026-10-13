@@ -76,11 +76,15 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 
 ## Status
 
-As of 2026-10-13 (`ub-tests-parser` at 4018304f), `make interp` gives
-**291/336** assertions passing (the whole `make test` suite: 832/877). Every
-file parses. The 3 failing controls are all accounted for below: `initializes`
-read-before-write, lifetime, and `nofpclass` without `noundef` (which should
-pass poison on). Gaps by category:
+As of 2026-10-13 (`ub-tests-parser` at 245511e1), `make interp` gives
+**328/363** assertions passing (the whole `make test` suite: 871/906). Every
+file parses. The 2 failing controls are accounted for below: `initializes`
+read-before-write and lifetime. Of the 33 UB cases Vellvm misses, all but the
+two `getelementptr inbounds` ones (which need object bounds) are about what a
+pointer may access: the pointer-capability attributes, `memory(...)`,
+lifetime, writes to constants, calls through data pointers, `captures`,
+`nofreeobj`, and `separate_storage`, which we expect a provenance model with
+access permissions to cover. Gaps by category:
 
 **Already handled.**
 - Arithmetic: division and remainder, including `INT_MIN / -1` and
@@ -147,8 +151,9 @@ pass poison on). Gaps by category:
   LangRef doesn't list that case.
 
 **Unsupported:**
-- `nofreeobj`, `dead_on_return`, `captures(ret: …)`, and
-  `!captures` store metadata parse but are not enforced.
+- `nofreeobj`, `dead_on_return`, `captures(ret: …)`, `!captures` store
+  metadata, and the `"separate_storage"` assume bundle parse but are not
+  enforced.
 - A block address is a pointer to a 1-byte object, so a load or store
   through it is not detected as UB (LangRef allows only `indirectbr` and
   comparison against null).
@@ -206,36 +211,37 @@ The Vellvm and llubi cells are marked ✓ (agrees with the assertion), ~ (UB, bu
 on a different line), or ✗. The native columns are not marked, because they
 aren't UB detectors. They show what the UB turns into.
 
-### Latest run (2026-10-13, `ub-tests-parser` at 4018304f)
+### Latest run (2026-10-13, `ub-tests-parser` at 245511e1)
 
-Out of 209 UB cases and 127 controls:
+Out of 220 UB cases and 143 controls:
 
 | | Vellvm | llubi | O0 | O1–O3 | ASan |
 |---|---|---|---|---|---|
-| UB cases reported as UB | 167 | 152 | – | – | – |
-| … on the asserted line | 165 | 146 | – | – | – |
-| UB cases that trap or fail an ASan check | – | – | 45 | 38 | 57 |
+| UB cases reported as UB | 187 | 160 | – | – | – |
+| … on the asserted line | 187 | 153 | – | – | – |
+| UB cases that trap or fail an ASan check | – | – | 46 | 39 | 58 |
 | controls flagged | 0 | 0 | 0 | 0 | 0 |
-| errors (unsupported, build/parse failures) | 1 | 14 | 5 | 5 | 5 |
+| errors (unsupported, build/parse failures) | 1 | 15 | 5 | 5 | 5 |
 
 Only Vellvm reports UB for `undef` in UB positions (division and remainder,
 `br`, `switch`, `alloca` count, `noundef`; llubi picks a value),
 `atomicrmw`/`cmpxchg` (which llubi does not implement), `noreturn`/`nounwind`
-(also through attribute groups), `dereferenceable` on a freed or dangling
-pointer (as an attribute or as load metadata), and a call-site `noundef` on a
-call or invoke result that violates `!range` (29 cases). Only llubi reports UB
-for `getelementptr inbounds` out of bounds of a real object, lifetime, writes
-to `constant` globals (directly and through memcpy/memset), assume bundles,
-`nofpclass`, calls through data pointers, and an attribute split between
-declaration and call site (14 cases). Neither catches `memory(...)`,
-`nocreateundeforpoison`, the pointer-capability attributes (`readonly`,
-`readnone`, `captures`, `nofree`, `noalias`, `initializes`, `writable`),
-`nofreeobj`, `captures(ret: …)` and `!captures`, or calling-convention
-mismatches (28 cases).
+(also through attribute groups), `nocreateundeforpoison`, calling-convention
+mismatches, `dereferenceable` on a freed or dangling pointer (as an attribute
+or as load metadata), the `"noundef"` assume bundle, and a call-site
+`noundef` on a call or invoke result that violates `!range` (35 cases). Only
+llubi reports UB for `getelementptr inbounds` out of bounds of a real object,
+lifetime, writes to `constant` globals (directly and through memcpy/memset),
+and calls through data pointers (8 cases). Neither catches `memory(...)`, the
+pointer-capability attributes (`readonly`, `readnone`, `captures`, `nofree`,
+`noalias`, `initializes`, `writable`), `nofreeobj`, or `captures(ret: …)` and
+`!captures` (25 cases). Vellvm's one error is the call through a data
+pointer, which becomes an uninterpreted external call.
 
-The 2026-10-09 run (`ub-tests` at 775c9b35, 198 UB cases) had Vellvm at 144
-reported (142 on the asserted line) with 12 errors, mostly files that did not
-parse; the cases added since cover the newly supported syntax.
+Earlier on 2026-10-13 (`ub-tests-parser` at 4018304f, 209 UB cases) Vellvm
+reported 167 (165 on the asserted line); on 2026-10-09 (`ub-tests` at
+775c9b35, 198 UB cases) it reported 144 (142 on the line), with 12 errors,
+mostly files that did not parse.
 
 ### First run (2026-10-08, macOS arm64, Homebrew clang/llubi 23.1.2)
 
