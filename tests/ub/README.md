@@ -64,7 +64,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 | `call.ll` | poison, undef, null, or data-pointer callee; calling-convention mismatch |
 | `call-param-attrs.ll` | `noundef`; `nonnull`, `align`, `range` combined with `noundef`; `dereferenceable(n)`, `dereferenceable_or_null(n)`; on the declaration or the call site |
 | `call-param-nofpclass.ll` | `nofpclass` + `noundef` |
-| `ret.ll` | return-value `noundef`, `nonnull`, `align`, `range`, `dereferenceable` |
+| `ret.ll` | return-value `noundef`, `nonnull`, `align`, `range`, `dereferenceable`; `!range` on call and invoke results |
 | `call-fn-attrs.ll` | `noreturn` that returns, writes that violate `memory(...)`, `nocreateundeforpoison` |
 | `call-fn-attrs-unwind.ll` | `nounwind` that unwinds *(uses Vellvm's throw intrinsic, so it runs only under Vellvm)* |
 | `call-ptr-attrs.ll` | `readonly`, `readnone`, `captures(...)`, `nofree`, `noalias`, `initializes`, `writable` |
@@ -106,7 +106,7 @@ read-before-write, and lifetime. Gaps by category:
   `n` bytes, so the UB is reported with the memory model's message.
 - Load metadata `!noundef`, `!nonnull`, and `!align` (inline or a numbered
   node such as `!align !1`); `!range` (a union of possibly wrapping ranges,
-  lane by lane for vectors); `!dereferenceable` and
+  lane by lane for vectors; also on call and invoke results); `!dereferenceable` and
   `!dereferenceable_or_null` (checked by reading the bytes, so the UB is
   reported with the memory model's message).
 - Intrinsics and libc: memcpy overlap and out of bounds; memcpy, memmove, and

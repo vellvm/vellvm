@@ -739,7 +739,7 @@ Section Denotation.
       (* the load's !range, then its !nonnull / !align / !noundef metadata,
          which act like the corresponding attributes on the loaded value (so
          a value out of range is UB with !noundef) *)
-      let v := value_metadata_range (load_metadata_range md) v in
+      let v := value_metadata_range (metadata_range md) v in
       v <- apply_value_attrs (load_metadata_attrs md)
              (err_loc tt ++ ": Loaded value violates !noundef.") v;;
       match load_metadata_dereferenceable md with
@@ -788,10 +788,11 @@ Section Denotation.
               end
           end
         ;;
-        (* the call site's return-value attributes *)
+        (* the call's !range metadata, then the call site's return-value
+           attributes *)
         returned_value <- apply_value_attrs (ann_ret_attributes anns)
                             (err_loc tt ++ ": Call return value violates noundef.")
-                            returned_value ;;
+                            (value_metadata_range (metadata_range md) returned_value) ;;
         match pt with
         | IVoid _ =>
             ret tt
@@ -929,10 +930,10 @@ Section Denotation.
           stack_raise exn ;;
           ret (inl unwind_label)
       | inr returned_value =>
-          (* the invoke's return-value attributes *)
+          (* the invoke's !range metadata, then its return-value attributes *)
           returned_value <- apply_value_attrs (ann_ret_attributes anns)
                               (err_loc tt ++ ": Invoke return value violates noundef.")
-                              returned_value ;;
+                              (value_metadata_range (metadata_range md) returned_value) ;;
           match iid with
           | IVoid _ => ret tt
           | IId id  => lwrite id returned_value

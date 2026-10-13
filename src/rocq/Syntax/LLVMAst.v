@@ -955,8 +955,8 @@ Fixpoint metadata_range_pairs (mds : list metadata) : list (int_syntax * int_syn
   | _ => []
   end.
 
-(* A load's [!range] ranges, if it has a [!range] node. *)
-Definition load_metadata_range (mds : list metadata) : option (list (int_syntax * int_syntax)) :=
+(* The ranges of a load's, call's, or invoke's [!range] node, if it has one. *)
+Definition metadata_range (mds : list metadata) : option (list (int_syntax * int_syntax)) :=
   find_option (fun md =>
                  match md with
                  | METADATA_Pair (METADATA_Id (Name "range")) (METADATA_Node ns) =>

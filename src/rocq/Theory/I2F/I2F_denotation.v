@@ -271,7 +271,7 @@ Lemma I2F_denote_instr :
           intros ?? [].
           rewrite 2 Eqit.bind_ret_l.
           (* the call site's return-value attributes *)
-          rbind I2F_dvalue; [apply I2F_apply_value_attrs; auto | intros]...
+          rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
         * intros.
           rewrite 2 Eqit.bind_bind.
           bind_exp.
@@ -285,7 +285,7 @@ Lemma I2F_denote_instr :
           intros ?? [].
           rewrite 2 Eqit.bind_ret_l.
           (* the call site's return-value attributes *)
-          rbind I2F_dvalue; [apply I2F_apply_value_attrs; auto | intros]...
+          rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
       + cbn.
         rbind (Forall2 I2F_dvalue).
         { apply I2F_denote_call_args. }
@@ -302,7 +302,7 @@ Lemma I2F_denote_instr :
           intros ?? [].
           rewrite 2 Eqit.bind_ret_l.
           (* the call site's return-value attributes *)
-          rbind I2F_dvalue; [apply I2F_apply_value_attrs; auto | intros]...
+          rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
         * intros.
           rewrite 2 Eqit.bind_bind.
           bind_exp.
@@ -316,7 +316,7 @@ Lemma I2F_denote_instr :
           intros ?? [].
           rewrite 2 Eqit.bind_ret_l.
           (* the call site's return-value attributes *)
-          rbind I2F_dvalue; [apply I2F_apply_value_attrs; auto | intros]...
+          rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
         
     - destruct x; cbn[denote_instr].
       2: rstep; constructor.
@@ -543,7 +543,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     rbind TT...
     intros...
     (* the invoke's return-value attributes, on the normal path *)
-    rbind I2F_dvalue; [apply I2F_apply_value_attrs; auto | intros].
+    rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros].
     break_goal_fast...
     rbind TT...
     intros...
