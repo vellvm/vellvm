@@ -651,7 +651,7 @@ Section ReprInstances.
   Definition repr_mem_loc loc : string :=
     match loc with
     | LOC_Default => "LOC_Default"
-    | LOC_Argmem => "LOC_Armem"
+    | LOC_Argmem => "LOC_Argmem"
     | LOC_Inaccessiblemem  => "LOC_Inaccessiblemem"
     | LOC_Errnomem => "LOC_Errnomem"
     end.
