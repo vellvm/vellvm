@@ -387,20 +387,23 @@ define i1 @llvm.expect.i1(i1 %x, i1 %y) {
 
 ; Inspiration: https://github.com/rust-lang/rust/blob/master/library/alloc/src/alloc.rs
 
-; Ignore alignment for now
+; Alignment is ignored: these allocators return @malloc's memory, which Vellvm
+; aligns to 8 bytes.  A larger %align is not honored, so an access relying on
+; it (e.g. `load ..., align 16`) is reported as UB (overestimated alignment)
+; although real Rust would be fine.
 define noalias i8* @__rust_alloc_zeroed(i64 %size, i64 %align) {
   %ptr = call i8* @malloc(i64 %size)
   call void @llvm.memset.p0i8.i64(i8* %ptr, i8 0, i64 %size, i1 false)
   ret i8* %ptr
 }
 
-; Ignore alignment for now
+; Alignment is ignored (see @__rust_alloc_zeroed).
 define noalias i8* @__rust_alloc(i64 %size, i64 %align) {
   %ptr = call i8* @malloc(i64 %size)
   ret i8* %ptr
 }
 
-; Ignore alignment for now
+; Alignment is ignored (see @__rust_alloc_zeroed).
 define noalias i8* @__rust_realloc(i8* %old, i64 %old_size, i64 %align, i64 %new_size) {
   ; TODO: this realloc implementation can never return the same pointer. Fix that.
   %ptr = call i8* @malloc(i64 %new_size)

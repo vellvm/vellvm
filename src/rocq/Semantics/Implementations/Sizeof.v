@@ -73,7 +73,7 @@ Definition Dtyp_base_alignment (dt : dtyp_base) : alignment :=
                   else Build_alignment 4 8
   end.  
 
-(* Default alignment matching LLVMs defaults *)
+(* The component-wise maximum of two alignments (used for structs). *)
 Definition max_alignment (a b : alignment) : alignment :=
   Build_alignment
     (N.max (abi_alignment a) (abi_alignment b))
@@ -99,13 +99,13 @@ Fixpoint Dtyp_alignment (dt : dtyp) : alignment :=
   | DTYPE_Struct false fields =>
       fold_left (fun acc f => max_alignment acc (Dtyp_alignment f)) fields
         (Build_alignment 1 1)
+  (* Vectors: see [vector_alignment]. *)
+  | DTYPE_Array true sz (DTYPE_Base t) => vector_alignment sz t
   (* "An array uses the same alignment as its elements, except that a local or global array variable
      of length at least 16 bytes or a C99 variable-length array variable always has alignment of at
      least 16 bytes."
-     Exception not implemented. *)
-  | DTYPE_Array true sz (DTYPE_Base t) => vector_alignment sz t
-  (* Vector elements are scalars in well-formed IR; anything else keeps its
-     element's alignment, like an array. *)
+     Exception not implemented.  Vector elements are scalars in well-formed
+     IR; a vector of anything else also keeps its element's alignment. *)
   | DTYPE_Array _v _sz t => Dtyp_alignment t
   end.
 

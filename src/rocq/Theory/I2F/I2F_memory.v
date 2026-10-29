@@ -945,7 +945,6 @@ Lemma I2F_memset : forall (dst1 : @ptr (@PROV PInf) (@PTR PInf)) (dst2 : @ptr (@
       (memset dst1 byte1 len volatile) (memset dst2 byte2 len volatile).
 Proof.
   intros dst1 dst2 Hdst byte1 byte2 Hbyte len volatile; unfold memset.
-  destruct (Z.ltb len 0); [constructor |].
   apply I2F_write_bytes; auto.
   apply Forall2_repeatN; auto.
 Qed.
@@ -1023,8 +1022,8 @@ Proof.
     - destruct (Pos.eqb szval 8); [repeat constructor | apply I2F_Merr].
     - constructor; apply I2F_poison_memory_byte. }
   intros byte1 byte2 Hbyte.
-  (* The length: the same [Z] on both sides, UB for poison, or an error. *)
-  eapply I2F_memS_bind with (RX := fun (z1 z2 : Z) => z1 = z2).
+  (* The length: the same [N] on both sides, UB for poison, or an error. *)
+  eapply I2F_memS_bind with (RX := fun (n1 n2 : N) => n1 = n2).
   { destruct Hlen as [ | szlen ln1 | | | | | | ]; try apply I2F_Merr.
     - constructor; reflexivity.
     - apply I2F_Mub_l. }
@@ -1033,7 +1032,7 @@ Proof.
      side, and with length 0 a no-op on both. *)
   destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
   - apply I2F_memset; auto.
-  - destruct (size =? 0)%Z; [constructor; auto | apply I2F_Mub_l].
+  - destruct (size =? 0)%N; [constructor; auto | apply I2F_Mub_l].
 Qed.
 
 Lemma I2F_handle_malloc : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),

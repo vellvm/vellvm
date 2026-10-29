@@ -237,12 +237,8 @@ Section MemoryModel.
 
   (** memset spec *)
   Definition memset
-    (dst : ptr) (byte : memory_byte) (len : Z) (volatile : bool) : memM unit :=
-    if Z.ltb len 0
-    then
-      mub "memset given negative length."
-    else
-      write_bytes dst (repeatN (Z.to_N len) byte).
+    (dst : ptr) (byte : memory_byte) (len : N) (volatile : bool) : memM unit :=
+    write_bytes dst (repeatN len byte).
   
   (** The shared argument handling of memcpy and memmove: [overlap_ok] is
       true for memmove (overlapping ranges allowed) and false for memcpy. *)
@@ -293,7 +289,7 @@ Section MemoryModel.
                | _ => merr "Unsupported arguments to memset."
                end;;
         size <- match len with
-               | DVALUE_I _ len => ret (unsigned len)
+               | DVALUE_I _ len => ret (Z.to_N (unsigned len))
                (* LangRef: "If <len> is not a well-defined value, the
                   behavior is undefined." *)
                | DVALUE_Poison => mub "memset with poison length."
@@ -305,7 +301,7 @@ Section MemoryModel.
            <dest> should be well-defined, otherwise the behavior is
            undefined." *)
         | DVALUE_Poison =>
-            if (size =? 0)%Z then ret tt
+            if (size =? 0)%N then ret tt
             else mub "memset with a poison destination and nonzero length."
         | _ => merr "Unsupported arguments to memset."
         end

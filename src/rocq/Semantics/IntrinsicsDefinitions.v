@@ -254,7 +254,7 @@ Section Intrinsics.
 
    - each intrinsic should "morally" be a total function: assuming the LLVM program
      is well formed, the intrisnic should always produce an LLVM value (which itself
-     might be poison or undef)
+     might be poison)
 
    - error should be returned only in the case that the LLVM program is ill-formed
      (e.g. if the wrong number and/or type of arguments is given to the intrinsic)

@@ -28,7 +28,7 @@ that a single function might be called more than once or multiple similar
 functions might be run.
 
 A valid test file is an LLVM `.ll` file some of whose comments are interpreted
-as assertions.  The test infrastructure supports three shape of assertions
+as assertions.  The test infrastructure supports four shapes of assertions
 
 ## ASSERT EQ
 
@@ -43,6 +43,10 @@ The `lit` and `lit_1` ... `lit_n` are LLVM IR literal values.  The legal LLVM IR
 literals that can appear in the assertions correspond to a subset of Vellvm
 DVALUEs that can be interpreted without needing any program context
 (i.e. variables, globals, or pointers).
+
+`lit` may be `poison`, in which case the call must return poison.  Otherwise
+a poison result fails the assertion (comparing against poison does not give a
+verdict).
 
 ## ASSERT SUCCEEDS
 
@@ -61,6 +65,18 @@ This represents a test case asserting that the result of calling function
 
 This represents a test case asserting that the result of calling function
 `@function_name` with the given inputs fails.
+
+## ASSERT UB
+
+```
+; ASSERT UB <line>: call <typ> <@function_name> (<typ_1> <lit_1>, ..., <typ_n> <lit_n>)
+```
+
+This represents a test case asserting that calling function `@function_name`
+with the given inputs has undefined behavior, which `<line>` documents as
+coming from that line of the file.  The harness checks only that the call
+raises UB, not where; `tests/ub/compare.py` also checks that `<line>` falls in
+the source span reported with the UB.
 
 ## Example
 

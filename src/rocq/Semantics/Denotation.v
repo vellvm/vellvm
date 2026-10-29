@@ -57,39 +57,34 @@ Definition fast_mode_object : fast_mode :=
     This file implements step 1: to a [mcfg], and to every internal syntactic constructs of _VIR_, we associate
     an uninterpreted interaction tree.
 
-    The interface of events used for this denotation is defined in LLVMEvents.v. Roughly speaking, they include:
-     - Internal Calls                                 (CallE)
-     - External Calls                                 (ExtrernalCallE)
-     - Calls to Intrinsics                            (IntrinsicE and MemoryIntrinsicE)
-     - Manipulation of the global environment         (LLVMGEnvE)
-     - Manipulation of the local environment          (LLVMEnvE)
-     - Manipulation of the stack of local environment (LLVMStackE)
+    The events used for this denotation are defined in LLVMEvents.v:
+     - Internal calls                                 (CallE)
+     - External calls                                 (ExternalCallE)
+     - Calls to intrinsics                            (IntrinsicE)
+     - Manipulation of the global environment         (GlobalE)
+     - Manipulation of the local environment          (LocalE)
+     - Manipulation of the stack of local environments (StackE)
      - Manipulation of the memory                     (MemoryE)
-     - Determination of freeze                        (DrawE)
+     - Choice of a value for [freeze]                 (DrawE)
+     - Running out of memory                          (OOME)
+     - LLVM exceptions (unwinding)                    (LLVMExcE)
      - Undefined behavior                             (UBE)
-     - Failure                                        (FailureE)
      - Debugging                                      (DebugE)
+     - Failure                                        (FailureE)
 
+    Two signatures are used:
+    - [MCFGEtop] (trees of type [MCFGtop]) has every event except [CallE].  It is
+      the signature of whole programs, where internal calls are resolved by tying
+      the mutually recursive knot with [mrec] (see [denote_mcfg]), and of
+      expressions, which are also denoted at the [mcfg] level to initialize
+      globals.
+    - [CFGEtop] (trees of type [CFGtop]) adds [CallE].  It is the signature of
+      instructions, blocks and functions; [withCall] injects an expression's
+      [MCFGtop] tree into it (see [denote_exp']).
 
-    The exact interface used by each denotation function depends slightly on the object of consideration.
-    Most specifically, three interfaces are used.
-    - At the top level, in order to denote whole _VIR_ programs, we use the interface:
-      L0 ::=  ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
-      Noticeable:
-      * there are no more internal calls, they are resolved through the itree combinator
-        for mutual recursiion [mrec].
-    - For individual [cfg] (i.e. VIR functions) and most of their internal components:
-      [instr_E ::= CallE +' IntrinsicE +' LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE].
-      Noticeable:
-      * there are no external calls: the distinction between internal and external is only made once we
-        tie the mutually recursive knot.
-      * there are no manipulation of the stack: internally to a function, the denotation only sees the
-        current local stack. The stack discipline is handled when tying the knot.
-    - For expressions [exp], we specialize further the interface:
-      [exp_E ::= LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE].
-      The rationale for this restriction is that we need to denote expressions both internally to cfgs
-      of course, but also at the [mcfg] level to perform the initialization of the memory.
-      We therefore need to be able to inject their signature into both [L0] and [instr_E].
+    Checks that annotations impose on values (alignments, parameter and
+    return-value attributes, [noreturn]/[nounwind]) are pure functions in
+    Attributes.v, lifted here where LangRef applies them.
 
     The effect of each event used through this first phase is defined by the corresponding [handler] in
     the Handlers repository. These handlers are chained together to form the interpretation of the
@@ -223,7 +218,7 @@ Section Denotation.
       vs <- map_monad eval_texp es ;;
       ret (DVALUE_Array false vs)
 
-    (* [undef] is treated semantically as [poison] on this branch. *)
+    (* [undef] is denoted as [poison] (see [EXP_Undef] in LLVMAst.v). *)
     | EXP_Undef => ret (DVALUE_Base DVALUE_Poison)
 
     | EXP_Poison => ret (DVALUE_Base DVALUE_Poison)
@@ -532,7 +527,6 @@ Section Denotation.
          corresponding attributes on the loaded value *)
       v <- lift (apply_value_attrs (load_metadata_attrs md)
                    (err_loc tt ++ ": Loaded value violates !noundef.") v);;
-      (* v' <- freeze dt v;; *)
       lwrite id v
 
     (* Store *)
