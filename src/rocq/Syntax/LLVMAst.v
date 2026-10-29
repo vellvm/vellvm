@@ -913,24 +913,7 @@ Definition ann_ordering (a:annotation) : option ordering :=
   | _ => None
   end.
 
-(* Parameter and return-value attributes ([param_attr]): tests and projections
-   used by the semantics of value attributes.  [dereferenceable(n)] counts as
-   [nonnull] and [noundef], which LangRef says it implies (in addrspace 0). *)
-Definition has_param_attr (p : param_attr -> bool) (attrs : list param_attr) : bool :=
-  existsb p attrs.
-
-Definition attr_is_nonnull (a : param_attr) : bool :=
-  match a with
-  | PARAMATTR_Nonnull | PARAMATTR_Dereferenceable _ => true
-  | _ => false
-  end.
-
-Definition attr_is_noundef (a : param_attr) : bool :=
-  match a with
-  | PARAMATTR_Noundef | PARAMATTR_Dereferenceable _ => true
-  | _ => false
-  end.
-
+(* Projections of parameter and return-value attributes ([param_attr]). *)
 Definition attr_align (a : param_attr) : option int_syntax :=
   match a with
   | PARAMATTR_Align n => Some n

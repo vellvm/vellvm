@@ -26,7 +26,8 @@ From Vellvm Require Import
 From Vellvm Require Import
   Utils.rutt_cutoff
   Theory.I2F.Refinement
-  Theory.I2F.I2F_exp.
+  Theory.I2F.I2F_exp
+  Theory.I2F.I2F_attributes.
 
 From Paco Require Import paco.
 
@@ -66,113 +67,16 @@ Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R
   I2F_refine_CFG RR (EOU_to_itree m1) (EOU_to_itree m2).
 Proof. intros H; unfold I2F_refine_CFG; apply (I2F_refine_lift_gen I2FE_CFG_Throw); exact H. Qed.
 
-(** The explicit-alignment checks: related pointers are aligned alike
-    ([I2F_Addr_ptr_aligned_to]), so both sides continue, or the infinite
-    side raises UB. *)
-Lemma I2F_assert_aligned_to a1 a2 align msg :
-  I2F_dvalue a1 a2 ->
-  I2F_refine_CFG (fun _ _ => True)
-    (@assert_aligned_to PInf a1 align msg) (@assert_aligned_to PFin a2 align msg).
-Proof.
-  intros H; unfold I2F_refine_CFG, assert_aligned_to.
-  inv H; [inv H0 | |]; cbn; try now (rstep; cbnn; try easy; eauto).
-  break_match_goal; [ | rstep; cbnn; easy].
-  (* The two conditions differ in hidden instance arguments, so equate
-     them by [apply] (up to conversion) rather than rewriting. *)
-  match goal with
-  | |- ruttc _ _ _ _ _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
-      assert (EQ : b1 = b2) by (apply I2F_Addr_ptr_aligned_to; exact H);
-      rewrite EQ; destruct b2
-  end; rstep; cbnn; try easy; eauto.
-Qed.
+(** ** The checks of [Attributes.v] that read memory ([MemoryChecks])
 
-Lemma I2F_assert_alignment a1 a2 anns msg :
-  I2F_dvalue a1 a2 ->
-  I2F_refine_CFG (fun _ _ => True)
-    (@assert_alignment PInf a1 anns msg) (@assert_alignment PFin a2 anns msg).
-Proof. apply I2F_assert_aligned_to. Qed.
-
-(** Value attributes.  Each poison-producing stage keeps related values
-    related: both sides test the same address or the same integer. *)
-Lemma I2F_value_attr_nonnull attrs v1 v2 :
-  I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_attr_nonnull PInf attrs v1) (@value_attr_nonnull PFin attrs v2).
-Proof.
-  intros H; pose proof H as H'; unfold value_attr_nonnull.
-  inv H; [inv H0 | |]; cbn; auto.
-  match goal with
-  | |- I2F_dvalue (if ?b1 then _ else _) (if ?b2 then _ else _) =>
-      assert (EQ : b1 = b2)
-        by (f_equal; destruct p, p'; destruct H as [HI ->]; red in HI; subst; reflexivity);
-      rewrite EQ; destruct b2; auto
-  end.
-Qed.
-
-Lemma I2F_value_attr_align attrs v1 v2 :
-  I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_attr_align PInf attrs v1) (@value_attr_align PFin attrs v2).
-Proof.
-  intros H; pose proof H as H'; unfold value_attr_align.
-  inv H; [inv H0 | |]; cbn; auto.
-  break_match_goal; auto.
-  match goal with
-  | |- I2F_dvalue (if ?b1 then _ else _) (if ?b2 then _ else _) =>
-      assert (EQ : b1 = b2) by (apply I2F_Addr_ptr_aligned_to; exact H);
-      rewrite EQ; destruct b2; auto
-  end.
-Qed.
-
-Lemma I2F_value_attr_range attrs v1 v2 :
-  I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_attr_range PInf attrs v1) (@value_attr_range PFin attrs v2).
-Proof.
-  intros H; pose proof H as H'; unfold value_attr_range.
-  inv H; [inv H0 | |]; cbn; auto.
-  repeat break_match_goal; auto.
-Qed.
-
-(** [nofpclass]: related floats are equal, so both sides test the same
-    class, element by element. *)
-Lemma I2F_fp_class b1 b2 :
-  I2F_dvalue_base b1 b2 -> @fp_class PInf b1 = @fp_class PFin b2.
-Proof. intros H; inversion H; subst; cbn; auto. Qed.
-
-Lemma I2F_value_nofpclass mask v1 v2 :
-  I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_nofpclass PInf mask v1) (@value_nofpclass PFin mask v2).
-Proof.
-  induction 1 as [b1 b2 HB | p s1 s2 F IH | vec s1 s2 F IH] using I2F_dvalue_ind; cbn.
-  - rewrite (I2F_fp_class HB).
-    destruct (@fp_class PFin b2); [| constructor; auto].
-    destruct (Z.land mask z =? 0)%Z; repeat constructor; auto.
-  - constructor; induction IH; cbn; constructor; auto; inv F; auto.
-  - constructor; induction IH; cbn; constructor; auto; inv F; auto.
-Qed.
-
-Lemma I2F_value_attr_nofpclass attrs v1 v2 :
-  I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_attr_nofpclass PInf attrs v1) (@value_attr_nofpclass PFin attrs v2).
-Proof.
-  intros H; unfold value_attr_nofpclass.
-  destruct (find_option attr_nofpclass attrs); auto using I2F_value_nofpclass.
-Qed.
-
-Lemma I2F_value_attrs_poison attrs v1 v2 :
-  I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_attrs_poison PInf attrs v1) (@value_attrs_poison PFin attrs v2).
-Proof.
-  intros H; unfold value_attrs_poison.
-  apply I2F_value_attr_nofpclass, I2F_value_attr_range, I2F_value_attr_align,
-    I2F_value_attr_nonnull, H.
-Qed.
-
-(** [!dereferenceable] metadata and the [dereferenceable] attributes:
+    [!dereferenceable] metadata and the [dereferenceable] attributes:
     related pointers have the same address, so both sides skip the check or
     both read the same bytes. *)
 Lemma I2F_assert_dereferenceable or_null n v1 v2 msg :
   I2F_dvalue v1 v2 ->
   I2F_refine_CFG (fun _ _ => True)
-    (@assert_dereferenceable PInf or_null n v1 msg) (@assert_dereferenceable PFin or_null n v2 msg).
+    (assert_dereferenceable (Pa := PInf) or_null n v1 msg)
+    (assert_dereferenceable (Pa := PFin) or_null n v2 msg).
 Proof.
   intros H; pose proof H as H'; unfold I2F_refine_CFG, assert_dereferenceable.
   inv H; [inv H0 | |]; cbn; try now (rstep; cbnn; try easy; eauto).
@@ -190,7 +94,8 @@ Qed.
 Lemma I2F_assert_attrs_dereferenceable attrs v1 v2 msg :
   I2F_dvalue v1 v2 ->
   I2F_refine_CFG (fun _ _ => True)
-    (@assert_attrs_dereferenceable PInf attrs v1 msg) (@assert_attrs_dereferenceable PFin attrs v2 msg).
+    (assert_attrs_dereferenceable (Pa := PInf) attrs v1 msg)
+    (assert_attrs_dereferenceable (Pa := PFin) attrs v2 msg).
 Proof.
   intros H; unfold I2F_refine_CFG, assert_attrs_dereferenceable.
   destruct (find_option attr_dereferenceable attrs) as [[]|];
@@ -198,20 +103,63 @@ Proof.
     apply I2F_assert_dereferenceable; repeat constructor; auto.
 Qed.
 
-(** Related pointers have the same address. *)
-Lemma I2F_dvalue_ptr_address : forall v1 v2,
-    I2F_dvalue v1 v2 ->
-    @dvalue_ptr_address PInf v1 = @dvalue_ptr_address PFin v2.
+Lemma I2F_assert_load_dereferenceable md v1 v2 msg :
+  I2F_dvalue v1 v2 ->
+  I2F_refine_CFG (fun _ _ => True)
+    (assert_load_dereferenceable (Pa := PInf) md v1 msg)
+    (assert_load_dereferenceable (Pa := PFin) md v2 msg).
 Proof.
-  intros v1 v2 R.
-  inversion R; subst; cbn; auto.
-  match goal with
-  | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto
-  end.
-  match goal with
-  | HA : I2F_Addr ?a ?a' |- _ => destruct a, a'; destruct HA as [HI ->]; red in HI; subst
-  end.
-  reflexivity.
+  intros H; unfold I2F_refine_CFG, assert_load_dereferenceable.
+  destruct (load_metadata_dereferenceable md) as [[]|];
+    [apply I2F_assert_dereferenceable; auto | apply ruttc_ret; auto].
+Qed.
+
+(** All of a value's attributes: the pure part ([I2F_apply_value_attrs]),
+    then the memory part of [dereferenceable]. *)
+Lemma I2F_apply_attrs attrs msg v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_refine_CFG I2F_dvalue
+    (apply_attrs (Pa := PInf) attrs msg v1) (apply_attrs (Pa := PFin) attrs msg v2).
+Proof.
+  intros H; unfold I2F_refine_CFG, apply_attrs.
+  rbind I2F_dvalue; [apply I2F_refine_lift', I2F_apply_value_attrs; auto | intros v1' v2' Hv].
+  rbind (fun (_ _ : unit) => True); [apply I2F_assert_attrs_dereferenceable; auto | intros _ _ _].
+  apply ruttc_ret; auto.
+Qed.
+
+(** Per-argument attributes applied to related argument lists. *)
+Lemma I2F_apply_args_attrs attrss msg args1 args2 :
+  Forall2 I2F_dvalue args1 args2 ->
+  I2F_refine_CFG (Forall2 I2F_dvalue)
+    (apply_args_attrs (Pa := PInf) attrss msg args1)
+    (apply_args_attrs (Pa := PFin) attrss msg args2).
+Proof.
+  intros H; revert attrss; induction H as [| v1 v2 vs1 vs2 Hv _ IH]; intros attrss;
+    cbn [apply_args_attrs].
+  - unfold I2F_refine_CFG; rstep; cbnn; auto.
+  - destruct attrss as [| attrs rest]; cbv beta iota;
+      (erbind; [apply I2F_apply_attrs; eauto | intros v1' v2' Hv'];
+       erbind; [apply IH | intros vs1' vs2' Hvs'];
+       unfold I2F_refine_CFG; rstep; cbnn; auto).
+Qed.
+
+(** How a call ends: the function attributes see related results and
+    arguments ([I2F_check_call_result]); a normal return then goes through
+    [!range] and the return-value attributes. *)
+Lemma I2F_check_call_return fattrs ret_attrs ranges loc args1 args2 r1 r2 :
+  Forall2 I2F_dvalue args1 args2 ->
+  sum_rel I2F_dvalue I2F_dvalue r1 r2 ->
+  I2F_refine_CFG (sum_rel I2F_dvalue I2F_dvalue)
+    (check_call_return (Pa := PInf) fattrs ret_attrs ranges loc args1 r1)
+    (check_call_return (Pa := PFin) fattrs ret_attrs ranges loc args2 r2).
+Proof.
+  intros HA H; unfold I2F_refine_CFG, check_call_return.
+  rbind (fun (_ _ : unit) => True);
+    [apply I2F_refine_lift', I2F_check_call_result; auto | intros _ _ _].
+  destruct H; cbv beta iota.
+  - apply ruttc_ret; constructor; auto.
+  - rbind I2F_dvalue; [apply I2F_apply_attrs, I2F_value_metadata_range; auto | intros].
+    apply ruttc_ret; constructor; auto.
 Qed.
 
 (** ** Operand bundles
@@ -220,21 +168,9 @@ Qed.
     operands on both sides (address, integer value, well-definedness), so
     both sides take the same branch; a ["dereferenceable"] bundle reads the
     same bytes. *)
-Lemma I2F_bundle_uint v1 v2 :
-  I2F_dvalue v1 v2 -> @bundle_uint PInf v1 = @bundle_uint PFin v2.
-Proof.
-  intros R; inversion R; subst; cbn; auto.
-  match goal with HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto end.
-Qed.
-
-Lemma I2F_bundle_sint v1 v2 :
-  I2F_dvalue v1 v2 -> @bundle_sint PInf v1 = @bundle_sint PFin v2.
-Proof.
-  intros R; inversion R; subst; cbn; auto.
-  match goal with HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto end.
-Qed.
-
-Definition I2F_assume_bundle_check (c1 : @assume_bundle_check PInf) (c2 : @assume_bundle_check PFin) : Prop :=
+Definition I2F_assume_bundle_check
+  (c1 : @assume_bundle_check PInf (@CFGEtop PInf))
+  (c2 : @assume_bundle_check PFin (@CFGEtop PFin)) : Prop :=
   forall loc vs1 vs2, Forall2 I2F_dvalue vs1 vs2 ->
     I2F_refine_CFG (fun _ _ => True) (c1 loc vs1) (c2 loc vs2).
 
@@ -260,24 +196,29 @@ Ltac i2f_assume_check :=
   try (apply ruttc_ret; auto);
   unfold assume_violated, assume_malformed; rstep; cbnn; try easy; eauto.
 
-Lemma I2F_assume_nonnull : I2F_assume_bundle_check (@assume_nonnull PInf) (@assume_nonnull PFin).
+Lemma I2F_assume_nonnull :
+  I2F_assume_bundle_check (assume_nonnull (Pa := PInf)) (assume_nonnull (Pa := PFin)).
 Proof. intros loc vs1 vs2 F; unfold I2F_refine_CFG, assume_nonnull; i2f_assume_check. Qed.
 
-Lemma I2F_assume_noundef : I2F_assume_bundle_check (@assume_noundef PInf) (@assume_noundef PFin).
+Lemma I2F_assume_noundef :
+  I2F_assume_bundle_check (assume_noundef (Pa := PInf)) (assume_noundef (Pa := PFin)).
 Proof. intros loc vs1 vs2 F; unfold I2F_refine_CFG, assume_noundef; i2f_assume_check. Qed.
 
-Lemma I2F_assume_align : I2F_assume_bundle_check (@assume_align PInf) (@assume_align PFin).
+Lemma I2F_assume_align :
+  I2F_assume_bundle_check (assume_align (Pa := PInf)) (assume_align (Pa := PFin)).
 Proof. intros loc vs1 vs2 F; unfold I2F_refine_CFG, assume_align; i2f_assume_check. Qed.
 
 Lemma I2F_assume_dereferenceable or_null :
-  I2F_assume_bundle_check (@assume_dereferenceable PInf or_null) (@assume_dereferenceable PFin or_null).
+  I2F_assume_bundle_check
+    (assume_dereferenceable (Pa := PInf) or_null) (assume_dereferenceable (Pa := PFin) or_null).
 Proof. intros loc vs1 vs2 F; unfold I2F_refine_CFG, assume_dereferenceable; i2f_assume_check. Qed.
 
 (** The two sides' tables of [llvm.assume] checks agree tag by tag.  A new
     entry in [assume_bundle_checks] needs its lemma here. *)
 Lemma I2F_assume_bundle_checks :
   Forall2 (fun '(t1, c1) '(t2, c2) => t1 = t2 /\ I2F_assume_bundle_check c1 c2)
-    (@assume_bundle_checks PInf) (@assume_bundle_checks PFin).
+    (assume_bundle_checks (Pa := PInf) (E := @CFGEtop PInf))
+    (assume_bundle_checks (Pa := PFin) (E := @CFGEtop PFin)).
 Proof.
   unfold assume_bundle_checks.
   repeat (apply Forall2_cons; [cbn; split; [reflexivity |] |]); [..| apply Forall2_nil].
@@ -302,7 +243,8 @@ Proof.
 Qed.
 
 Lemma I2F_bundle_check f tag :
-  match @bundle_check PInf f tag, @bundle_check PFin f tag with
+  match bundle_check (Pa := PInf) (E := @CFGEtop PInf) f tag,
+        bundle_check (Pa := PFin) (E := @CFGEtop PFin) f tag with
   | Some c1, Some c2 => I2F_assume_bundle_check c1 c2
   | None, None => True
   | _, _ => False
@@ -325,79 +267,9 @@ Proof.
     + apply ruttc_ret; repeat constructor.
   - intros vs1 vs2 HV.
     pose proof (I2F_bundle_check f (ob_tag ob)) as HC.
-    destruct (@bundle_check PInf f (ob_tag ob)), (@bundle_check PFin f (ob_tag ob));
+    destruct (bundle_check (Pa := PInf) (E := @CFGEtop PInf) f (ob_tag ob)),
+             (bundle_check (Pa := PFin) (E := @CFGEtop PFin) f (ob_tag ob));
       try contradiction; [apply HC; auto | apply ruttc_ret; auto].
-Qed.
-
-(** Applying value attributes: related values give the same [noundef]
-    verdict ([I2F_dvalue_well_defined]), so both sides pass on related
-    values, or the infinite side raises UB. *)
-Lemma I2F_apply_value_attrs attrs msg v1 v2 :
-  I2F_dvalue v1 v2 ->
-  I2F_refine_CFG I2F_dvalue
-    (@apply_value_attrs PInf attrs msg v1) (@apply_value_attrs PFin attrs msg v2).
-Proof.
-  intros H; unfold I2F_refine_CFG, apply_value_attrs.
-  pose proof (I2F_value_attrs_poison attrs H) as HP.
-  match goal with
-  | |- ruttc _ _ _ _ _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
-      assert (EQ : b1 = b2)
-        by (f_equal; f_equal; apply I2F_dvalue_well_defined; exact HP);
-      rewrite EQ; destruct b2
-  end; [rstep; cbnn; easy |].
-  rbind (fun (_ _ : unit) => True); [apply I2F_assert_attrs_dereferenceable; auto | intros _ _ _].
-  apply ruttc_ret; auto.
-Qed.
-
-(** Load metadata [!range]: both sides test the same integer, lane by lane
-    for vectors. *)
-Lemma I2F_value_metadata_range_base rs v1 v2 :
-  I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_metadata_range_base PInf rs v1) (@value_metadata_range_base PFin rs v2).
-Proof.
-  intros H; pose proof H as H'; unfold value_metadata_range_base.
-  inv H; [inv H0 | |]; cbn; auto.
-  repeat break_match_goal; auto.
-Qed.
-
-Lemma I2F_value_metadata_range r v1 v2 :
-  I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_metadata_range PInf r v1) (@value_metadata_range PFin r v2).
-Proof.
-  intros H.
-  destruct r as [rs|]; cbn; auto.
-  inversion H; subst; try (apply I2F_value_metadata_range_base; auto).
-  destruct v; [| apply I2F_value_metadata_range_base; auto].
-  constructor.
-  match goal with
-  | HF : Forall2 I2F_dvalue _ _ |- _ =>
-      induction HF; cbn; constructor; auto using I2F_value_metadata_range_base
-  end.
-Qed.
-
-
-Lemma I2F_forallb_well_defined vs1 vs2 :
-  Forall2 I2F_dvalue vs1 vs2 ->
-  forallb (@dvalue_well_defined PInf) vs1 = forallb (@dvalue_well_defined PFin) vs2.
-Proof.
-  induction 1 as [|v1 v2 vs1 vs2 H F IH]; cbn; auto.
-  rewrite (I2F_dvalue_well_defined H), IH; reflexivity.
-Qed.
-
-(** The noreturn/nounwind/nocreateundeforpoison check sees related call
-    results, which are both returns or both unwinds, and related arguments:
-    both sides agree on which are well defined. *)
-Lemma I2F_check_call_result fattrs msg args1 args2 r1 r2 :
-  Forall2 I2F_dvalue args1 args2 ->
-  sum_rel I2F_dvalue I2F_dvalue r1 r2 ->
-  I2F_refine_CFG (fun _ _ => True)
-    (@check_call_result PInf fattrs msg args1 r1) (@check_call_result PFin fattrs msg args2 r2).
-Proof.
-  intros HA H; unfold I2F_refine_CFG, check_call_result.
-  rewrite (I2F_forallb_well_defined HA).
-  destruct H as [e1 e2 He | v1 v2 Hv];
-    [| rewrite (I2F_dvalue_well_defined Hv)];
-    repeat break_match_goal; rstep; cbnn; try easy; eauto.
 Qed.
 
 (** Call arguments: each is evaluated and passed through its attributes on
@@ -409,7 +281,7 @@ Proof.
   unfold I2F_refine_CFG, denote_call_args.
   apply ruttc_map_monad.
   intros [[t op] attrs] _.
-  erbind; [apply I2F_denote_exp' | intros; apply I2F_apply_value_attrs; auto].
+  erbind; [apply I2F_denote_exp' | intros; apply I2F_apply_attrs; auto].
 Qed.
 
 Lemma I2F_denote_instr :
@@ -426,73 +298,19 @@ Lemma I2F_denote_instr :
       bind_exp.
       rbind TT...
       intros ???...
-    - destruct x, fn.
-      + cbn.
-        rbind (Forall2 I2F_dvalue).
-        { apply I2F_denote_call_args. }
-        break_match...
-        * intros.
-          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _].
-          rewrite 2 Eqit.bind_bind.
-          rbind (sum_rel I2F_dvalue I2F_dvalue)...
-          intros * HR'.
-          rewrite 2 Eqit.bind_bind.
-          rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
-          inv HR'.
-          rbind (fun _ _ => False)...
-          intros ?? [].
-          rewrite 2 Eqit.bind_ret_l.
-          (* the call site's return-value attributes *)
-          rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
-        * intros.
-          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _].
-          rewrite 2 Eqit.bind_bind.
-          bind_exp.
-          rewrite 2 Eqit.bind_bind.
-          rbind (sum_rel I2F_dvalue I2F_dvalue)...
-          intros * HR'.
-          rewrite 2 Eqit.bind_bind.
-          rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
-          inv HR'.
-          rbind (fun _ _ => False)...
-          intros ?? [].
-          rewrite 2 Eqit.bind_ret_l.
-          (* the call site's return-value attributes *)
-          rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
-      + cbn.
-        rbind (Forall2 I2F_dvalue).
-        { apply I2F_denote_call_args. }
-        intros.
-        break_match...
-        * intros.
-          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _].
-          rewrite 2 Eqit.bind_bind.
-          rbind (sum_rel I2F_dvalue I2F_dvalue)...
-          intros * HR'.
-          rewrite 2 Eqit.bind_bind.
-          rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
-          inv HR'.
-          rbind (fun _ _ => False)...
-          intros ?? [].
-          rewrite 2 Eqit.bind_ret_l.
-          (* the call site's return-value attributes *)
-          rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
-        * intros.
-          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _].
-          rewrite 2 Eqit.bind_bind.
-          bind_exp.
-          rewrite 2 Eqit.bind_bind.
-          rbind (sum_rel I2F_dvalue I2F_dvalue)...
-          intros * HR'.
-          rewrite 2 Eqit.bind_bind.
-          rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
-          inv HR'.
-          rbind (fun _ _ => False)...
-          intros ?? [].
-          rewrite 2 Eqit.bind_ret_l.
-          (* the call site's return-value attributes *)
-          rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros]...
-        
+    - destruct x, fn; cbn;
+        (rbind (Forall2 I2F_dvalue); [apply I2F_denote_call_args | intros vs1 vs2 HVS];
+         rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _];
+         rbind (sum_rel I2F_dvalue I2F_dvalue);
+         [break_match_goal; [| bind_exp]; now (rstep; cbnn; try easy; eauto) | intros * HR'];
+         (* the call site's function attributes, !range, and return-value
+            attributes *)
+         rbind (sum_rel I2F_dvalue I2F_dvalue);
+         [apply I2F_check_call_return; auto | intros * HR''];
+         inv HR'').
+      all: try now (rbind (fun _ _ => False); [rstep; cbnn; easy | intros ?? []]).
+      all: rewrite 2 Eqit.bind_ret_l...
+
     - destruct x; cbn[denote_instr].
       2: rstep; constructor.
       break_match_goal.
@@ -521,20 +339,19 @@ Lemma I2F_denote_instr :
     - destruct x; cbn...
       destruct ptr.
       bind_exp.
-      rbind (fun _ _ => True); [apply I2F_assert_alignment; auto | intros _ _ _].
+      rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_alignment; auto | intros _ _ _].
       rbind I2F_dvalue; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       (* the load's value metadata: !range, then the ones applied like
          attributes, then !dereferenceable *)
-      erbind; [apply I2F_apply_value_attrs, I2F_value_metadata_range; eauto | intros v1' v2' HV'].
-      rbind (fun (_ _ : unit) => True).
-      { destruct (load_metadata_dereferenceable _) as [[]|];
-          [apply I2F_assert_dereferenceable; auto | apply ruttc_ret; auto]. }
-      intros _ _ _.
+      erbind; [apply I2F_refine_lift', I2F_apply_value_attrs, I2F_value_metadata_range; eauto
+              | intros v1' v2' HV'].
+      rbind (fun (_ _ : unit) => True);
+        [apply I2F_assert_load_dereferenceable; auto | intros _ _ _].
       auto... (* [apply I2F_freeze'; auto | intros]...*)
     - destruct val,ptr, x; cbn...
       bind_exp.
       bind_exp.
-      rbind (fun _ _ => True); [apply I2F_assert_alignment; auto | intros _ _ _].
+      rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_alignment; auto | intros _ _ _].
       induction H0...
       induction H0...
       6: rbind (fun _ _ => False); [|intros _ _ []]...
@@ -545,7 +362,7 @@ Lemma I2F_denote_instr :
       do 3 break_goal_fast.
       break_match_goal...
       do 3 bind_exp.
-      rbind (fun _ _ => True); [apply I2F_assert_aligned_to; auto | intros _ _ _].
+      rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_aligned_to; auto | intros _ _ _].
       erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto |]. 
       intros.
       erbind.
@@ -564,7 +381,7 @@ Lemma I2F_denote_instr :
       repeat break_goal_fast.
       bind_exp.
       bind_exp.
-      rbind (fun _ _ => True); [apply I2F_assert_aligned_to; auto | intros _ _ _].
+      rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_aligned_to; auto | intros _ _ _].
       erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       unfold denote_atomic_rmw_operation.
       break_goal_fast...
@@ -699,12 +516,12 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     bind_exp.
     rbind (sum_rel I2F_dvalue I2F_dvalue)...
     intros * HR.
-    rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
-    induction HR.
+    (* the invoke's function and return-value attributes *)
+    rbind (sum_rel I2F_dvalue I2F_dvalue);
+      [apply I2F_check_call_return; auto | intros * HR'].
+    induction HR'.
     rbind TT...
     intros...
-    (* the invoke's return-value attributes, on the normal path *)
-    rbind I2F_dvalue; [apply I2F_apply_value_attrs, I2F_value_metadata_range; auto | intros].
     break_goal_fast...
     rbind TT...
     intros...
@@ -915,20 +732,6 @@ Proof.
     gstep; constructor; auto.
 Qed.
 
-(** Per-argument attributes applied to related argument lists. *)
-Lemma I2F_apply_args_attrs attrss msg args1 args2 :
-  Forall2 I2F_dvalue args1 args2 ->
-  I2F_refine_CFG (Forall2 I2F_dvalue)
-    (@apply_args_attrs PInf attrss msg args1) (@apply_args_attrs PFin attrss msg args2).
-Proof.
-  intros H; revert attrss; induction H as [| v1 v2 vs1 vs2 Hv _ IH]; intros attrss; cbn.
-  - unfold I2F_refine_CFG; rstep; cbnn; auto.
-  - destruct attrss as [| attrs rest];
-      (erbind; [apply I2F_apply_value_attrs; eauto | intros v1' v2' Hv'];
-       erbind; [apply IH | intros vs1' vs2' Hvs'];
-       unfold I2F_refine_CFG; rstep; cbnn; auto).
-Qed.
-
 Lemma I2F_denote_function d :
     I2F_function_denotation (@denote_function PInf d) (@denote_function PFin d).
 Proof with try now (rstep; cbnn; try (easy); eauto).
@@ -937,25 +740,23 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   intros cc ???.
   (* the calling-convention check, the same on both sides *)
   rbind (fun (_ _ : unit) => True).
-  { destruct (cconv_eqb _ _); [apply ruttc_ret; auto | rstep; cbnn; try easy; eauto]. }
+  { apply I2F_refine_lift'.
+    eapply I2F_EOU_mono with (RR := @Logic.eq unit); [auto | apply I2F_EOU_refl]. }
   intros _ _ _.
   (* the callee's declared argument attributes, on entry *)
-  rbind (Forall2 I2F_dvalue); [apply I2F_apply_args_attrs; auto | intros args1' args2' Hargs'].
+  rbind (Forall2 I2F_dvalue);
+    [apply I2F_apply_args_attrs; auto | intros args1' args2' Hargs'].
   rbind I2F_Addr; [apply I2F_push_call_frame; auto | intros].
   erbind...
   eapply I2F_run_exc, I2F_denote_cfg; constructor; auto.
   intros.
-  unfold pop_call_frame; cbn; rewrite 2 Eqit.bind_bind.
+  unfold pop_call_frame; cbn -[check_call_return]; rewrite 2 Eqit.bind_bind.
   rbind TT...
   intros ???.
   rbind TT...
   intros ???.
-  (* the callee's noreturn / nounwind attributes *)
-  rbind (fun (_ _ : unit) => True); [apply I2F_check_call_result; auto | intros _ _ _].
-  (* the callee's declared return attributes, on a normal return *)
-  match goal with HR : sum_rel I2F_dvalue I2F_dvalue _ _ |- _ => destruct HR end.
-  - rstep; cbnn; auto.
-  - erbind; [apply I2F_apply_value_attrs; eauto | intros]...
+  (* the callee's function and declared return-value attributes *)
+  apply I2F_check_call_return; auto.
 Qed.
 
 (** Pointwise lifting of [I2F_function_denotation] to function contexts,
@@ -967,6 +768,16 @@ Definition I2F_ctx
   (ctx1 : IntMap (@function_denotation PInf))
   (ctx2 : IntMap (@function_denotation PFin)) : Prop :=
   forall k, option_rel I2F_function_denotation (lookup k ctx1) (lookup k ctx2).
+
+Lemma I2F_lookup_defn ctx1 ctx2 f1 f2 :
+  I2F_ctx ctx1 ctx2 ->
+  I2F_dvalue f1 f2 ->
+  option_rel I2F_function_denotation (lookup_defn f1 ctx1) (lookup_defn f2 ctx2).
+Proof.
+  intros Hctx H; inv H; [inv H0 | |]; cbn; try constructor.
+  destruct p as [z1 pr1], p' as [z2 pr2]; destruct H as [HI ->]; red in HI; subst.
+  apply Hctx.
+Qed.
 
 Lemma I2F_denote_mcfg :
   forall t ctx1 ctx2 f1 f2 args1 args2,
@@ -998,17 +809,10 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     { intros * HA; exact (I2FA_CFG_sum HA). }
     { intros ? ? HS; cbn; simp I2FA_Call; exact HS. }
     cbn.
-    (* Dispatch on the related function values: poison is UB on the
-       infinite side, a non-pointer is a failure on both sides, and a
-       pointer is checked against null and then looked up. *)
-    pose proof HFv as HFv'.
-    inv HFv; [inv H | |]; cbn.
-    all: try now (rstep; cbnn; try (easy); eauto).
-    (* the pointer case: related addresses share their [ptr_to_int] key *)
-    destruct p as [z1 pr1], p' as [z2 pr2]; destruct H0 as [HI ->]; red in HI; subst; cbn.
-    destruct (unsigned z2 =? 0)%Z; [now (rstep; cbnn; try (easy); eauto) |].
-    specialize (Hctx (unsigned z2)).
-    destruct (lookup (unsigned z2) ctx1), (lookup (unsigned z2) ctx2); inv Hctx.
+    (* calls through poison or null *)
+    rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_check_callee; auto | intros _ _ _].
+    pose proof (I2F_lookup_defn Hctx HFv) as HL.
+    destruct (lookup_defn fv1 ctx1), (lookup_defn fv2 ctx2); inv HL.
     - (* internal call: the related denotations found in the contexts *)
       match goal with
       | HFD : I2F_function_denotation _ _ |- _ => now apply HFD

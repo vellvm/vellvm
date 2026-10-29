@@ -35,6 +35,7 @@ concrete instances live in `Implementations/`.
 ## Denotation
 
 - `Operations/`              semantics of the individual operations: `Gep.v`, `Select.v`, `Compare.v`, `Conversion.v`, `Freeze.v` (re-exported by `Operations.v`)
+- `Attributes.v`             the pure checks LLVM annotations impose on values: explicit alignments, parameter/return-value attributes (and load metadata), `noreturn`/`nounwind`, and calls through poison or null
 - `IntrinsicsDefinitions.v`  declarations and semantics of the supported LLVM intrinsics
 - `Denotation.v`             representation function: VIR syntax to uninterpreted interaction trees
 - `Libraries.v`              denotation of natively supported library functions (`putchar`, `puts`, ...) linked against programs

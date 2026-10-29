@@ -19,6 +19,7 @@ From Vellvm Require Import
   VellvmFloats
   LLVMEvents
   Operations
+  Attributes
   IntrinsicsDefinitions
   DynamicValues.
 
@@ -56,39 +57,34 @@ Definition fast_mode_object : fast_mode :=
     This file implements step 1: to a [mcfg], and to every internal syntactic constructs of _VIR_, we associate
     an uninterpreted interaction tree.
 
-    The interface of events used for this denotation is defined in LLVMEvents.v. Roughly speaking, they include:
-     - Internal Calls                                 (CallE)
-     - External Calls                                 (ExtrernalCallE)
-     - Calls to Intrinsics                            (IntrinsicE and MemoryIntrinsicE)
-     - Manipulation of the global environment         (LLVMGEnvE)
-     - Manipulation of the local environment          (LLVMEnvE)
-     - Manipulation of the stack of local environment (LLVMStackE)
+    The events used for this denotation are defined in LLVMEvents.v:
+     - Internal calls                                 (CallE)
+     - External calls                                 (ExternalCallE)
+     - Calls to intrinsics                            (IntrinsicE)
+     - Manipulation of the global environment         (GlobalE)
+     - Manipulation of the local environment          (LocalE)
+     - Manipulation of the stack of local environments (StackE)
      - Manipulation of the memory                     (MemoryE)
-     - Determination of freeze                        (DrawE)
+     - Choice of a value for [freeze]                 (DrawE)
+     - Running out of memory                          (OOME)
+     - LLVM exceptions (unwinding)                    (LLVMExcE)
      - Undefined behavior                             (UBE)
-     - Failure                                        (FailureE)
      - Debugging                                      (DebugE)
+     - Failure                                        (FailureE)
 
+    Two signatures are used:
+    - [MCFGEtop] (trees of type [MCFGtop]) has every event except [CallE].  It is
+      the signature of whole programs, where internal calls are resolved by tying
+      the mutually recursive knot with [mrec] (see [denote_mcfg]), and of
+      expressions, which are also denoted at the [mcfg] level to initialize
+      globals.
+    - [CFGEtop] (trees of type [CFGtop]) adds [CallE].  It is the signature of
+      instructions, blocks and functions; [withCall] injects an expression's
+      [MCFGtop] tree into it (see [denote_exp']).
 
-    The exact interface used by each denotation function depends slightly on the object of consideration.
-    Most specifically, three interfaces are used.
-    - At the top level, in order to denote whole _VIR_ programs, we use the interface:
-      L0 ::=  ExternalCallE +' IntrinsicE +' LLVMGEnvE +' (LLVMEnvE +' LLVMStackE) +' MemoryE +' PickE +' UBE +' DebugE +' FailureE.
-      Noticeable:
-      * there are no more internal calls, they are resolved through the itree combinator
-        for mutual recursiion [mrec].
-    - For individual [cfg] (i.e. VIR functions) and most of their internal components:
-      [instr_E ::= CallE +' IntrinsicE +' LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE].
-      Noticeable:
-      * there are no external calls: the distinction between internal and external is only made once we
-        tie the mutually recursive knot.
-      * there are no manipulation of the stack: internally to a function, the denotation only sees the
-        current local stack. The stack discipline is handled when tying the knot.
-    - For expressions [exp], we specialize further the interface:
-      [exp_E ::= LLVMGEnvE +' LLVMEnvE +' MemoryE +' PickE +' UBE +' DebugE +' FailureE].
-      The rationale for this restriction is that we need to denote expressions both internally to cfgs
-      of course, but also at the [mcfg] level to perform the initialization of the memory.
-      We therefore need to be able to inject their signature into both [L0] and [instr_E].
+    Checks that annotations impose on values (alignments, parameter and
+    return-value attributes, [noreturn]/[nounwind]) are pure functions in
+    Attributes.v, lifted here where LangRef applies them.
 
     The effect of each event used through this first phase is defined by the corresponding [handler] in
     the Handlers repository. These handlers are chained together to form the interpretation of the
@@ -118,12 +114,6 @@ Section Denotation.
       global of the program, whose names do not contain "(". *)
   Definition blockaddress_id (f : function_id) (b : block_id) : raw_id :=
     Name ("blockaddress(@" ++ show_raw_id f ++ ", %" ++ show_raw_id b ++ ")").
-
-  Definition dvalue_ptr_address (v : dvalue) : option Z :=
-    match v with
-    | DVALUE_Base (DVALUE_Pointer p) => Some (ptr_to_int p)
-    | _ => None
-    end.
 
   (* The listed block whose address is [z], given each listed block's
      address. *)
@@ -155,10 +145,7 @@ Section Denotation.
      Expressions are denoted as itrees that return a [dvalue].
    *)
 
-  (* TODO: move these two guys? *)
-  Definition denote_int_syntax (x:int_syntax) : Z := 
-    BinIntDef.Z.of_num_int x.
-
+  (* TODO: move this guy?  ([denote_int_syntax] is in [Attributes.v].) *)
   Definition denote_float_syntax_as_float
     (t : dtyp) (f : float_syntax) : EOU dvalue :=
     match t with
@@ -258,7 +245,7 @@ Section Denotation.
       vs <- map_monad eval_texp es ;;
       ret (DVALUE_Array false vs)
 
-    (* [undef] is treated semantically as [poison] on this branch. *)
+    (* [undef] is denoted as [poison] (see [EXP_Undef] in LLVMAst.v). *)
     | EXP_Undef => ret (DVALUE_Base DVALUE_Poison)
 
     | EXP_Poison => ret (DVALUE_Base DVALUE_Poison)
@@ -382,190 +369,6 @@ Section Denotation.
   Definition denote_exp' t e := withCall (denote_exp t e).
   Arguments denote_exp' _ _ : simpl nomatch.
 
-  (** Alignment checks.  LangRef (load/store): "Overestimating the alignment
-      results in undefined behavior."  [assert_aligned_to a align msg] raises
-      UB (reported with [msg]) if [a] is a pointer that is not aligned to the
-      explicit alignment [align].  Without an explicit alignment, or when [a]
-      is not a pointer (e.g. poison, which the access itself rejects), it
-      does nothing.  [assert_alignment] reads the alignment from an
-      instruction's annotations ([align N] on load/store). *)
-  Definition assert_aligned_to (a : dvalue) (align : option int_syntax) (msg : string)
-    : CFGtop unit :=
-    match a, align with
-    | DVALUE_Base (DVALUE_Pointer p), Some al =>
-        if ptr_aligned_to p (Z.to_N (denote_int_syntax al)) then ret tt
-        else raiseUB msg
-    | _, _ => ret tt
-    end.
-
-  Definition assert_alignment (a : dvalue) (anns : list (annotation dtyp)) (msg : string)
-    : CFGtop unit :=
-    assert_aligned_to a (find_option ann_align anns) msg.
-
-  (** ** Value attributes on parameters and return values
-
-      LangRef: [nonnull], [align N], and [range(a, b)] turn a violating value
-      into poison ("poison value is returned or passed instead"); [noundef]
-      makes a value that is not well defined immediate UB.  So [nonnull]
-      without [noundef] passes poison on, while [nonnull noundef] on null is
-      UB.  [dereferenceable(n)] "implies nonnull in addrspace(0)" and "implies
-      noundef"; that its [n] bytes are accessible is checked by
-      [assert_attrs_dereferenceable] in [apply_value_attrs].
-
-      Only attributes that can be checked from the value itself are handled.
-      Vectors of pointers ([align]/[nonnull] per lane) are not yet covered. *)
-
-  (** Is the [sz]-bit integer [x] in the (possibly wrapping) range [[lo, hi)]?
-      LangRef (range): "The pair a,b represents the range [a,b) ... The range
-      is allowed to wrap.  The empty range is represented using 0,0." *)
-  Definition in_wrapping_range (sz : positive) (x lo hi : Z) : bool :=
-    let m := (2 ^ Z.pos sz)%Z in
-    let x := (x mod m)%Z in
-    let lo := (lo mod m)%Z in
-    let hi := (hi mod m)%Z in
-    if (lo =? hi)%Z then false                     (* the empty range *)
-    else if (lo <? hi)%Z then (lo <=? x)%Z && (x <? hi)%Z
-    else (lo <=? x)%Z || (x <? hi)%Z.              (* wraps around *)
-
-  (** The poison-producing attributes, one at a time. *)
-  Definition value_attr_nonnull (attrs : list param_attr) (v : dvalue) : dvalue :=
-    match v with
-    | DVALUE_Base (DVALUE_Pointer p) =>
-        if has_param_attr attr_is_nonnull attrs && (ptr_to_int p =? ptr_to_int null)%Z
-        then DVALUE_Base DVALUE_Poison else v
-    | _ => v
-    end.
-
-  Definition value_attr_align (attrs : list param_attr) (v : dvalue) : dvalue :=
-    match v, find_option attr_align attrs with
-    | DVALUE_Base (DVALUE_Pointer p), Some al =>
-        if ptr_aligned_to p (Z.to_N (denote_int_syntax al)) then v
-        else DVALUE_Base DVALUE_Poison
-    | _, _ => v
-    end.
-
-  Definition value_attr_range (attrs : list param_attr) (v : dvalue) : dvalue :=
-    match v, find_option attr_range attrs with
-    | DVALUE_Base (DVALUE_I sz x), Some (lo, hi) =>
-        if in_wrapping_range sz (unsigned x) (denote_int_syntax lo) (denote_int_syntax hi)
-        then v else DVALUE_Base DVALUE_Poison
-    | _, _ => v
-    end.
-
-  (** The floating-point class of a value, as its bit in a [nofpclass] mask
-      (LangRef llvm.is.fpclass: snan 1, qnan 2, ninf 4, nnorm 8, nsub 16,
-      nzero 32, pzero 64, psub 128, pnorm 256, pinf 512), read off the IEEE
-      representation with [e] exponent and [m] mantissa bits. *)
-  Definition fp_class_of_bits (e m : Z) (bits : Z) : Z :=
-    let neg := Z.testbit bits (e + m) in
-    let exp := Z.land (Z.shiftr bits m) (Z.ones e) in
-    let mant := Z.land bits (Z.ones m) in
-    if (exp =? Z.ones e)%Z then
-      if (mant =? 0)%Z then (if neg then 4 else 512)               (* infinities *)
-      else if Z.testbit mant (m - 1) then 2 else 1                 (* quiet / signaling NaN *)
-    else if (exp =? 0)%Z then
-      if (mant =? 0)%Z then (if neg then 32 else 64)               (* zeros *)
-      else (if neg then 16 else 128)                               (* subnormals *)
-    else (if neg then 8 else 256).                                 (* normals *)
-
-  Definition fp_class (v : dvalue_base) : option Z :=
-    match v with
-    | DVALUE_Double d => Some (fp_class_of_bits 11 52 (unsigned (Floats.Float.to_bits d)))
-    | DVALUE_Float f => Some (fp_class_of_bits 8 23 (unsigned (Floats.Float32.to_bits f)))
-    | _ => None
-    end.
-
-  (** LangRef (nofpclass): "If the value is a floating-point class indicated
-      by the nofpclass test mask, a poison value is passed or returned
-      instead."  It applies to floating-point values, vectors of them, and
-      aggregates of those, element by element. *)
-  Fixpoint value_nofpclass (mask : Z) (v : dvalue) : dvalue :=
-    match v with
-    | DVALUE_Base b =>
-        match fp_class b with
-        | Some c => if (Z.land mask c =? 0)%Z then v else DVALUE_Base DVALUE_Poison
-        | None => v
-        end
-    | DVALUE_Array vec elts => DVALUE_Array vec (List.map (value_nofpclass mask) elts)
-    | DVALUE_Struct p fields => DVALUE_Struct p (List.map (value_nofpclass mask) fields)
-    end.
-
-  Definition value_attr_nofpclass (attrs : list param_attr) (v : dvalue) : dvalue :=
-    match find_option attr_nofpclass attrs with
-    | Some mask => value_nofpclass mask v
-    | None => v
-    end.
-
-  (** The value passed on after the poison-producing attributes. *)
-  Definition value_attrs_poison (attrs : list param_attr) (v : dvalue) : dvalue :=
-    value_attr_nofpclass attrs
-      (value_attr_range attrs (value_attr_align attrs (value_attr_nonnull attrs v))).
-
-  (** [!dereferenceable n] / [!dereferenceable_or_null n]: LangRef "the value
-      loaded is known to be dereferenceable at the current program point
-      [or null], otherwise the behavior is undefined. The number of bytes
-      known to be dereferenceable is specified by the integer value in the
-      metadata node."  The [n] bytes are checked by reading them at the byte
-      type, which accepts any content: the read raises UB exactly when they
-      are not accessible through the pointer (unallocated, freed, out of
-      bounds, or another object's provenance). *)
-  Definition assert_dereferenceable (or_null : bool) (n : N) (v : dvalue) (msg : string)
-    : CFGtop unit :=
-    match v with
-    | DVALUE_Base (DVALUE_Pointer p) =>
-        if (or_null && (ptr_to_int p =? ptr_to_int null)%Z) || (n =? 0)%N
-        then ret tt
-        else _ <- load (DTYPE_Array false n (DTYPE_B 8)) v ;; ret tt
-    | DVALUE_Base DVALUE_Poison => raiseUB msg
-    | _ => raise (msg ++ " (not a pointer)")
-    end.
-
-  (** The memory part of the [dereferenceable(n)] and
-      [dereferenceable_or_null(n)] attributes, on a pointer.  (A poison value
-      under [dereferenceable] is already UB through the [noundef] it
-      implies.) *)
-  Definition assert_attrs_dereferenceable (attrs : list param_attr) (v : dvalue) (msg : string)
-    : CFGtop unit :=
-    match find_option attr_dereferenceable attrs, v with
-    | Some (or_null, n), DVALUE_Base (DVALUE_Pointer _) =>
-        assert_dereferenceable or_null (Z.to_N (denote_int_syntax n)) v msg
-    | _, _ => ret tt
-    end.
-
-  (** Apply a parameter's or return value's attributes to [v]: the value to
-      pass on, or UB (reported with [msg]) if [noundef] is violated or a
-      [dereferenceable] pointer's bytes are not accessible. *)
-  Definition apply_value_attrs (attrs : list param_attr) (msg : string) (v : dvalue)
-    : CFGtop dvalue :=
-    let v := value_attrs_poison attrs v in
-    if has_param_attr attr_is_noundef attrs && negb (dvalue_well_defined v)
-    then raiseUB msg
-    else assert_attrs_dereferenceable attrs v msg;; ret v.
-
-  (** ** Load metadata without an attribute counterpart *)
-
-  (** [!range]: LangRef "If the loaded or returned value is not in the
-      specified range, a poison value is returned instead. ... The loaded
-      value or the value returned is known to be in the union of the ranges
-      defined by each consecutive pair. ... For vector-typed instructions,
-      the range is applied element-wise." *)
-  Definition in_metadata_ranges (sz : positive) (x : Z) (ranges : list (int_syntax * int_syntax)) : bool :=
-    existsb (fun '(lo, hi) => in_wrapping_range sz x (denote_int_syntax lo) (denote_int_syntax hi)) ranges.
-
-  Definition value_metadata_range_base (ranges : list (int_syntax * int_syntax)) (v : dvalue) : dvalue :=
-    match v with
-    | DVALUE_Base (DVALUE_I sz x) =>
-        if in_metadata_ranges sz (unsigned x) ranges then v else DVALUE_Base DVALUE_Poison
-    | _ => v
-    end.
-
-  Definition value_metadata_range (ranges : option (list (int_syntax * int_syntax))) (v : dvalue) : dvalue :=
-    match ranges, v with
-    | None, _ => v
-    | Some rs, DVALUE_Array true elts => DVALUE_Array true (List.map (value_metadata_range_base rs) elts)
-    | Some rs, _ => value_metadata_range_base rs v
-    end.
-
   Definition denote_cmpxchg (id : raw_id) (cpx : cmpxchg dtyp) : CFGtop unit :=
     (* SAZ: This will have to be revisited when we have a truly concurrent semantics. *)
     let '(ptr_ty, ptr_val) := cpx.(c_ptr) in
@@ -584,7 +387,7 @@ Section Denotation.
       cmp_v <- denote_exp' (Some cmp_ty) cmp_val ;;
       new_v <- denote_exp' (Some cmp_ty) new_val ;;
 
-      assert_aligned_to ptr_v cpx.(c_align) "cmpxchg with overestimated alignment.";;
+      lift (assert_aligned_to ptr_v cpx.(c_align) "cmpxchg with overestimated alignment.");;
 
       (* Perform the load *)
       loaded_v <- load cmp_ty ptr_v;;
@@ -677,7 +480,7 @@ Section Denotation.
     ptr_v <- denote_exp' (Some ptr_ty) ptr_val ;;
     a_v <- denote_exp' (Some a_ty) a_val ;;
 
-    assert_aligned_to ptr_v armw.(a_align) "atomicrmw with overestimated alignment.";;
+    lift (assert_aligned_to ptr_v armw.(a_align) "atomicrmw with overestimated alignment.");;
 
     (* Perform the load - load addresses must be unique *)
     loaded_v <- load a_ty ptr_v;;
@@ -691,38 +494,13 @@ Section Denotation.
     lwrite id loaded_v;;
     ret tt.
 
-  (** Check how a call with arguments [args] ended against the function
-      attributes [fattrs] (of the callee's definition or of the call site).
-      LangRef (noreturn): "This produces undefined behavior at runtime if the
-      function ever does dynamically return."  (nounwind): "If the function
-      does raise an exception, its runtime behavior is undefined."
-      (nocreateundeforpoison): "the result of the function (prior to
-      application of return attributes/metadata) will not be undef or poison
-      if all arguments are not undef and not poison. Otherwise, it is
-      undefined behavior."  So this runs before the return attributes. *)
-  Definition check_call_result (fattrs : list fn_attr) (msg : string) (args : list dvalue)
-             (res : exc + dvalue) : CFGtop unit :=
-    match res with
-    | inl _ =>
-        if existsb fn_attr_is_nounwind fattrs
-        then raiseUB (msg ++ ": unwinding out of a nounwind function.")
-        else ret tt
-    | inr v =>
-        if existsb fn_attr_is_noreturn fattrs
-        then raiseUB (msg ++ ": returning from a noreturn function.")
-        else if existsb fn_attr_is_nocreateundeforpoison fattrs
-                && forallb dvalue_well_defined args && negb (dvalue_well_defined v)
-        then raiseUB (msg ++ ": a nocreateundeforpoison function returned undef or poison for well-defined arguments.")
-        else ret tt
-    end.
-
   (** Evaluate a call's arguments, passing each through its call-site
-      attributes ([apply_value_attrs]); [msg] reports a violated [noundef]. *)
+      attributes ([apply_attrs]); [msg] reports a violated [noundef]. *)
   Definition denote_call_args (args : list (texp dtyp * list param_attr)) (msg : string)
     : CFGtop (list dvalue) :=
     map_monad (fun '((t, op), attrs) =>
                  v <- denote_exp' (Some t) op ;;
-                 apply_value_attrs attrs msg v) args.
+                 apply_attrs attrs msg v) args.
 
   (** ** Operand bundles
 
@@ -730,122 +508,9 @@ Section Denotation.
       operand bundle at a call site cannot change the implementation of the
       called function").  Every call and invoke evaluates its bundles'
       operands at the call ([denote_operand_bundles]); what else a bundle
-      means depends on its tag and on what is called.  So far only the
-      bundles of [llvm.assume] mean more.  LangRef (Assume Operand Bundles):
-      "if any of the provided guarantees are violated at runtime the behavior
-      is undefined." *)
-
-  (* The check of the guarantee an [llvm.assume] bundle states about its
-     operands; the string locates its error messages. *)
-  Definition assume_bundle_check : Type := string -> list dvalue -> CFGtop unit.
-
-  Definition assume_violated {A} (loc tag : string) : CFGtop A :=
-    raiseUB (loc ++ ": llvm.assume operand bundle """ ++ tag ++ """ is violated.").
-
-  Definition assume_malformed {A} (loc tag : string) : CFGtop A :=
-    raise (loc ++ ": malformed llvm.assume operand bundle """ ++ tag ++ """.").
-
-  (* An integer operand of a bundle: an alignment or size (unsigned), or an
-     offset (signed); [None] for poison or a non-integer. *)
-  Definition bundle_uint (v : dvalue) : option Z :=
-    match v with
-    | DVALUE_Base (DVALUE_I _ x) => Some (unsigned x)
-    | _ => None
-    end.
-
-  Definition bundle_sint (v : dvalue) : option Z :=
-    match v with
-    | DVALUE_Base (DVALUE_I _ x) => Some (signed x)
-    | _ => None
-    end.
-
-  Definition is_power_of_two (n : Z) : bool :=
-    (0 <? n)%Z && (Z.land n (n - 1) =? 0)%Z.
-
-  (* ["nonnull"(ptr %p)]: "Equivalent to nonnull on %p". *)
-  Definition assume_nonnull : assume_bundle_check :=
-    fun loc vs =>
-      match vs with
-      | [p] =>
-          match dvalue_ptr_address p with
-          | Some a => if (a =? 0)%Z then assume_violated loc "nonnull" else ret tt
-          | None => assume_violated loc "nonnull"
-          end
-      | _ => assume_malformed loc "nonnull"
-      end.
-
-  (* ["noundef"(%v)]: "Equivalent to noundef on %v". *)
-  Definition assume_noundef : assume_bundle_check :=
-    fun loc vs =>
-      match vs with
-      | [v] => if dvalue_well_defined v then ret tt else assume_violated loc "noundef"
-      | _ => assume_malformed loc "noundef"
-      end.
-
-  (* ["align"(ptr %p, i64 %align[, i64 %offset])]: "Equivalent to align(%align)
-     on %p, or %p - %offset if the %offset argument exists, except that %align
-     may be a non-power-of-two alignment (including a zero alignment). If
-     %align is not a power of two, the pointer value must be all-zero." *)
-  Definition assume_align : assume_bundle_check :=
-    fun loc vs =>
-      match vs with
-      | p :: al :: off =>
-          let offset := match off with
-                        | [] => Some 0%Z
-                        | [o] => bundle_sint o
-                        | _ => None
-                        end in
-          match dvalue_ptr_address p, bundle_uint al, offset with
-          | Some a, Some n, Some o =>
-              if (if is_power_of_two n then ((a - o) mod n) =? 0 else a =? 0)%Z
-              then ret tt else assume_violated loc "align"
-          | _, _, _ => assume_violated loc "align"
-          end
-      | _ => assume_malformed loc "align"
-      end.
-
-  (* ["dereferenceable"(ptr %p, i64 %size)]: "Equivalent to
-     dereferenceable(%size) on %p, except that %size may also be zero, in
-     which case the bundle doesn't imply nonnull"; and likewise
-     ["dereferenceable_or_null"]. *)
-  Definition assume_dereferenceable (or_null : bool) : assume_bundle_check :=
-    fun loc vs =>
-      let tag := if or_null then "dereferenceable_or_null" else "dereferenceable" in
-      match vs with
-      | [p; sz] =>
-          match dvalue_ptr_address p, bundle_uint sz with
-          | Some _, Some n =>
-              if (n =? 0)%Z then ret tt
-              else assert_dereferenceable or_null (Z.to_N n) p
-                     (loc ++ ": llvm.assume operand bundle """ ++ tag ++ """ is violated.")
-          | _, _ => assume_violated loc tag
-          end
-      | _ => assume_malformed loc tag
-      end.
-
-  (** The guarantees an [llvm.assume] bundle can state, by tag.  To support
-      another kind of assumption, add its check here and its case to
-      [I2F_assume_bundle_checks] (Theory/I2F/I2F_denotation.v).  Tags not
-      listed, such as ["separate_storage"] (an aliasing guarantee, left to
-      the provenance model), ["cold"], and ["ignore"], are not checked. *)
-  Definition assume_bundle_checks : list (string * assume_bundle_check) :=
-    [ ("nonnull", assume_nonnull);
-      ("noundef", assume_noundef);
-      ("align", assume_align);
-      ("dereferenceable", assume_dereferenceable false);
-      ("dereferenceable_or_null", assume_dereferenceable true) ].
-
-  Definition is_llvm_assume (f : exp dtyp) : bool :=
-    match intrinsic_exp f with
-    | Some s => String.eqb s "llvm.assume"
-    | None => false
-    end.
-
-  (* The check a bundle of a call to [f] gets, if any. *)
-  Definition bundle_check (f : exp dtyp) (tag : string) : option assume_bundle_check :=
-    if is_llvm_assume f
-    then option_map snd (find (fun '(t, _) => String.eqb t tag) assume_bundle_checks)
-    else None.
+      means depends on its tag and on what is called ([bundle_check]).  So
+      far only the bundles of [llvm.assume] mean more; their checks are in
+      Attributes.v ([assume_bundle_checks]). *)
 
   (** Evaluate the operand bundles of a call to [f], and check the ones whose
       tag means something for [f]. *)
@@ -888,23 +553,8 @@ Section Denotation.
             
     (* Allocation *)
     | (IId id, INSTR_Alloca dt annotations) =>
-        let num_elements :=
-          match find
-                  (fun x => match x with | ANN_num_elements _ => true | _ => false end)
-                  annotations with
-          | Some (ANN_num_elements n) => Some n
-          | _ => None
-          end
-        in
-        let align :=
-          match find
-                  (fun x => match x with | ANN_align _ => true | _ => false end)
-                  annotations with
-          | Some (ANN_align a) => Some (Z.to_N (denote_int_syntax a))
-          | _ => None
-          end
-        in
-        match num_elements with
+        let align := explicit_alignment annotations in
+        match find_option ann_num_elements annotations with
         | None =>
             v <- alloca dt 1 align;;
             lwrite id v
@@ -924,28 +574,23 @@ Section Denotation.
     (* Load *)
     | (IId id, INSTR_Load dt (du,ptr) anns) =>
       a <- denote_exp' (Some du) ptr;;
-      assert_alignment a anns (err_loc tt ++ ": Load with overestimated alignment.");;
+      lift (assert_alignment a anns (err_loc tt ++ ": Load with overestimated alignment."));;
       v <- load dt a;;
       (* the load's !range, then its !nonnull / !align / !noundef metadata,
          which act like the corresponding attributes on the loaded value (so
-         a value out of range is UB with !noundef) *)
-      let v := value_metadata_range (metadata_range md) v in
-      v <- apply_value_attrs (load_metadata_attrs md)
-             (err_loc tt ++ ": Loaded value violates !noundef.") v;;
-      match load_metadata_dereferenceable md with
-      | Some (or_null, n) =>
-          assert_dereferenceable or_null (Z.to_N (denote_int_syntax n)) v
-            (err_loc tt ++ ": Loaded value violates !dereferenceable.")
-      | None => ret tt
-      end;;
-      (* v' <- freeze dt v;; *)
+         a value out of range is UB with !noundef), then !dereferenceable *)
+      v <- lift (apply_value_attrs (load_metadata_attrs md)
+                   (err_loc tt ++ ": Loaded value violates !noundef.")
+                   (value_metadata_range (metadata_range md) v));;
+      assert_load_dereferenceable md v
+        (err_loc tt ++ ": Loaded value violates !dereferenceable.");;
       lwrite id v
 
     (* Store *)
     | (IVoid _, INSTR_Store (dt, val) (du, ptr) anns) =>
       v <- denote_exp' (Some dt) val ;;
       a <- denote_exp' (Some du) ptr ;;
-      assert_alignment a anns (err_loc tt ++ ": Store with overestimated alignment.");;
+      lift (assert_alignment a anns (err_loc tt ++ ": Store with overestimated alignment."));;
       match a with
       | DVALUE_Poison => raiseUB (err_loc tt ++ ": Store to poisoned address.")
       | _ => store dt a v
@@ -959,31 +604,23 @@ Section Denotation.
     | (pt, INSTR_Call (dt, f) args anns obs) =>
         vs <- denote_call_args args (err_loc tt ++ ": Call argument violates noundef.") ;;
         denote_operand_bundles (err_loc tt) f obs ;;
-        returned_value <-
+        res <-
           match intrinsic_exp f with
-          | Some s =>
-              res <- intrinsic dt s vs varargs ;;
-              check_call_result (ann_fun_attributes anns) (err_loc tt) vs res ;;
-              match res with
-              | inl exc => raiseLLVM exc
-              | inr dv => ret dv
-              end
-                
+          | Some s => intrinsic dt s vs varargs
           | None =>
               fv <- denote_exp' None f;;
-              res <- call dt (anns_cconv anns) fv vs;;
-              check_call_result (ann_fun_attributes anns) (err_loc tt) vs res ;;
-              match res with
-              | inl exc => raiseLLVM exc
-              | inr uv => ret uv
-              end
+              call dt (anns_cconv anns) fv vs
           end
         ;;
-        (* the call's !range metadata, then the call site's return-value
-           attributes *)
-        returned_value <- apply_value_attrs (ann_ret_attributes anns)
-                            (err_loc tt ++ ": Call return value violates noundef.")
-                            (value_metadata_range (metadata_range md) returned_value) ;;
+        (* the call site's function attributes, then its !range metadata and
+           return-value attributes *)
+        res <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
+                 (metadata_range md) (err_loc tt ++ ": Call") vs res ;;
+        returned_value <-
+          match res with
+          | inl exc => raiseLLVM exc
+          | inr dv => ret dv
+          end ;;
         match pt with
         | IVoid _ =>
             ret tt
@@ -1014,7 +651,6 @@ Section Denotation.
 
     | (_, INSTR_Fence _ _) => ret tt
 
-    (* Currently unhandled itree instructions *)
     (* Landingpad: bind the in-flight exception payload (parked in this frame by
        the [invoke] that diverted here) to the result, consuming it — a
        landingpad reached without a fresh raise is an error, not a stale read.
@@ -1113,7 +749,10 @@ Section Denotation.
       denote_operand_bundles (err_loc tt) fnptrval obs ;;
       fv <- denote_exp' None fnptrval ;;
       rv <- call dt (anns_cconv anns) fv uvs ;;
-      check_call_result (ann_fun_attributes anns) (err_loc tt) uvs rv ;;
+      (* the invoke's function attributes, then its !range metadata and
+         return-value attributes *)
+      rv <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
+              (metadata_range md) (err_loc tt ++ ": Invoke") uvs rv ;;
       (* branch to to_label *)
       match rv with
       | inl exn =>
@@ -1122,10 +761,6 @@ Section Denotation.
           stack_raise exn ;;
           ret (inl unwind_label)
       | inr returned_value =>
-          (* the invoke's !range metadata, then its return-value attributes *)
-          returned_value <- apply_value_attrs (ann_ret_attributes anns)
-                              (err_loc tt ++ ": Invoke return value violates noundef.")
-                              (value_metadata_range (metadata_range md) returned_value) ;;
           match iid with
           | IVoid _ => ret tt
           | IId id  => lwrite id returned_value
@@ -1137,7 +772,6 @@ Section Denotation.
       exn <- denote_exp' (Some t) expr;;
       raiseLLVM exn
 
-    (* Currently unhandled VIR terminators *)
     | TERM_IndirectBr (t, addr) brs fn =>
       (* LangRef (indirectbr): "All possible destination blocks must be
          listed in the label list, otherwise this instruction has undefined
@@ -1325,23 +959,6 @@ Section Denotation.
     | _ => raise "Non-address returned from alloca of varargs"
     end.
 
-  (** Apply per-argument attribute lists to a list of arguments.  Arguments
-      past the end of [attrss] (e.g. variadic ones) have no attributes. *)
-  Fixpoint apply_args_attrs (attrss : list (list param_attr)) (msg : string)
-    (args : list dvalue) : CFGtop (list dvalue) :=
-    match args with
-    | [] => ret []
-    | v :: vs =>
-        let '(attrs, rest) :=
-          match attrss with
-          | [] => ([], [])
-          | a :: r => (a, r)
-          end in
-        v' <- apply_value_attrs attrs msg v;;
-        vs' <- apply_args_attrs rest msg vs;;
-        ret (v' :: vs')
-    end.
-
   Definition denote_function (df:definition dtyp (cfg dtyp)) : function_denotation :=
     (* Built outside the closure: one block map per definition (see
        [TopLevel] building [fundefs]), shared by every call to it. *)
@@ -1352,11 +969,9 @@ Section Denotation.
     let fname := show_raw_id (dc_name (df_prototype df)) in
     let fcc := anns_cconv (dc_annotations (df_prototype df)) in
     fun (cc : cconv) (args : list dvalue) =>
-      (* LangRef (Calling Conventions): "The calling convention of any pair
-         of dynamic caller/callee must match, or the behavior of the program
-         is undefined."  Checked on entry, so it is reported at the call. *)
-      (if cconv_eqb cc fcc then ret tt
-       else raiseUB ("Call to " ++ fname ++ " with a calling convention that does not match its definition.")) ;;
+      (* the calling convention, checked on entry so that a mismatch is
+         reported at the call (see [check_cconv]) *)
+      lift (check_cconv fcc cc fname);;
       args <- apply_args_attrs args_attrs
                ("Argument of " ++ fname ++ " violates noundef.") args;;
       varg <- push_call_frame df args;;
@@ -1365,14 +980,7 @@ Section Denotation.
          frame is always torn down before the (value-carried) unwind continues. *)
       rv <- run_exc (denote_cfg_map bmap (df_instrs df) (Some varg));;
       pop_call_frame;;
-      check_call_result (dc_attrs (df_prototype df)) fname args rv;;
-      match rv with
-      | inl exc => ret (inl exc)
-      | inr v =>
-          v' <- apply_value_attrs ret_attrs
-                  ("Return value of " ++ fname ++ " violates noundef.") v;;
-          ret (inr v')
-      end.
+      check_call_return (dc_attrs (df_prototype df)) ret_attrs None fname args rv.
 
   (* We now turn to the second knot to be tied: a top-level itree program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to
@@ -1387,6 +995,14 @@ Section Denotation.
          interpret, we therefore cast external calls into an isomorphic family of events
          that life in the "right" injection of the [_CFGtop_INTERNAL] effect
    *)
+
+  Definition lookup_defn (dv : dvalue) (m : IntMap function_denotation) : option function_denotation
+    := match dv with
+       | DVALUE_Base (DVALUE_Pointer addr) =>
+           lookup (ptr_to_int addr) m
+       | _ => None
+       end.
+
   Definition denote_mcfg
     (fundefs : IntMap function_denotation) (dt : dtyp)
     (f_value : dvalue) (args : list dvalue) : MCFGtop (dvalue + dvalue) :=
@@ -1394,22 +1010,14 @@ Section Denotation.
       (fun T call =>
          match call with
          | Call dt cc fv args =>
-             match fv with
-             | DVALUE_Base DVALUE_Poison => raiseUB "call via poison function pointer"
-             | DVALUE_Base (DVALUE_Pointer addr) =>
-                 (* Null is associated with no object, so it is not a function.
-                    Compare addresses only, as for free(null). *)
-                 if (ptr_to_int addr =? ptr_to_int null)%Z
-                 then raiseUB "call via null function pointer"
-                 else
-                 match lookup (ptr_to_int addr) fundefs with
-                 | Some f_den => (* If the call is internal *)
-                     (* [f_den] already produces [exc + dvalue] (see [denote_function]),
-                        so the callee's unwind crosses the [mrec] knot as this value. *)
-                     f_den cc args
-                 | None => inr <$> external_call dt fv args
-                 end
-             | _ => raise "function call to non-pointer value"
+             (* UB through poison or null (see [check_callee]) *)
+             lift (check_callee fv);;
+             match lookup_defn fv fundefs with
+             | Some f_den => (* If the call is internal *)
+                 (* [f_den] already produces [exc + dvalue] (see [denote_function]),
+                    so the callee's unwind crosses the [mrec] knot as this value. *)
+                 f_den cc args
+             | None => inr <$> external_call dt fv args
              end
          end) _ (Call dt CC_Ccc f_value args).
   

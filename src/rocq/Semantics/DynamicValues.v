@@ -517,6 +517,13 @@ Section DValue.
         dvalue_is_poison d = false -> d <> DVALUE_Base DVALUE_Poison.
     Proof. intros d H C; subst; discriminate. Qed.
 
+    (** The address of a pointer value. *)
+    Definition dvalue_ptr_address (v : dvalue) : option Z :=
+      match v with
+      | DVALUE_Base (DVALUE_Pointer p) => Some (ptr_to_int p)
+      | _ => None
+      end.
+
     (** LangRef (Well-Defined Values): "a value is *well defined* if the
         value does not have an undef bit and is not poison ...  An aggregate
         value or vector is well defined if its elements are well defined."

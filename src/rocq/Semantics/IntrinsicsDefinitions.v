@@ -57,325 +57,105 @@ Import EqvNotation.
 
         - _if_ it is impure, i.e. depends on the memory, as is the case for
           [memcpy], its implementation must be provided in [src/rocq/Semantics/Implementations/Memory.v]
-          and an equality test on its name added to [handle_intrinsic].
+          and a test on its name added to [handle_intrinsicM] (for the
+          memory intrinsics, [declares] against their declarations).
  *)
 
-Definition vellvm_internal_throw_decl: declaration typ :=
+(** The declaration of an intrinsic, without attributes.  Only its name
+    matters to the semantics (see [lookup_intrinsic_declaration]). *)
+Definition intrinsic_decl (name : string) (ret : typ) (args : list typ) : declaration typ :=
   {|
-    dc_name        := Name "llvm.vellvm.internal.throw";
-    dc_type        := TYPE_Function TYPE_Void [] false;
-    dc_param_attrs := ([], [[]]);
+    dc_name        := Name name;
+    dc_type        := TYPE_Function ret args false;
+    dc_param_attrs := ([], map (fun _ => []) args);
     dc_attrs       := [];
-    dc_annotations  := []
+    dc_annotations := []
   |}.
 
-Definition assume_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.assume";
-    dc_type        := TYPE_Function TYPE_Void [TYPE_I 1] false;
-    dc_param_attrs := ([], [[PARAMATTR_Noundef]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition vellvm_internal_throw_decl : declaration typ :=
+  intrinsic_decl "llvm.vellvm.internal.throw" TYPE_Void [].
 
-Definition va_start_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.va_start";
-    dc_type        := TYPE_Function TYPE_Void [TYPE_Pointer None] false;
-    dc_param_attrs := ([], [[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+(* A poison condition is UB in [llvm_assume] itself. *)
+Definition assume_decl : declaration typ :=
+  intrinsic_decl "llvm.assume" TYPE_Void [TYPE_I 1].
 
-Definition va_end_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.va_end";
-    dc_type        := TYPE_Function TYPE_Void [TYPE_Pointer None] false;
-    dc_param_attrs := ([], [[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition va_start_decl : declaration typ :=
+  intrinsic_decl "llvm.va_start" TYPE_Void [TYPE_Pointer None].
 
-Definition va_copy_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.va_copy";
-    dc_type        := TYPE_Function TYPE_Void [TYPE_Pointer None; TYPE_Pointer None] false;
-    dc_param_attrs := ([], [[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition va_end_decl : declaration typ :=
+  intrinsic_decl "llvm.va_end" TYPE_Void [TYPE_Pointer None].
 
-Definition fabs_32_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.fabs.f32";
-    dc_type        := TYPE_Function (TYPE_FP FP_float) [(TYPE_FP FP_float)] false;
-    dc_param_attrs := ([], [[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition va_copy_decl : declaration typ :=
+  intrinsic_decl "llvm.va_copy" TYPE_Void [TYPE_Pointer None; TYPE_Pointer None].
 
+Definition fabs_32_decl : declaration typ :=
+  intrinsic_decl "llvm.fabs.f32" (TYPE_FP FP_float) [TYPE_FP FP_float].
 
-Definition fabs_64_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.fabs.f64";
-    dc_type        := TYPE_Function (TYPE_FP FP_double) [(TYPE_FP FP_double)] false;
-    dc_param_attrs := ([], [[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition fabs_64_decl : declaration typ :=
+  intrinsic_decl "llvm.fabs.f64" (TYPE_FP FP_double) [TYPE_FP FP_double].
 
-Definition memcpy_8_32_decl: declaration typ :=
-  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
-  let i32 := TYPE_I 32%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memcpy.p0i8.p0i8.i32";
-    dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition maxnum_32_decl : declaration typ :=
+  intrinsic_decl "llvm.maxnum.f32" (TYPE_FP FP_float) [TYPE_FP FP_float; TYPE_FP FP_float].
 
-Definition memcpy_8_64_decl: declaration typ :=
-  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
-  let i64 := TYPE_I 64%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memcpy.p0i8.p0i8.i64";
-    dc_type        := TYPE_Function TYPE_Void [pt; pt; i64; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition maxnum_64_decl : declaration typ :=
+  intrinsic_decl "llvm.maxnum.f64" (TYPE_FP FP_double) [TYPE_FP FP_double; TYPE_FP FP_double].
 
-Definition memmove_8_32_decl: declaration typ :=
-  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
-  let i32 := TYPE_I 32%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memmove.p0i8.p0i8.i32";
-    dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition minimum_32_decl : declaration typ :=
+  intrinsic_decl "llvm.minimum.f32" (TYPE_FP FP_float) [TYPE_FP FP_float; TYPE_FP FP_float].
 
-Definition memmove_8_64_decl: declaration typ :=
-  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
-  let i64 := TYPE_I 64%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memmove.p0i8.p0i8.i64";
-    dc_type        := TYPE_Function TYPE_Void [pt; pt; i64; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition memmove_p0_32_decl: declaration typ :=
-  let pt := TYPE_Pointer None in
-  let i32 := TYPE_I 32%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memmove.p0.p0.i32";
-    dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition memmove_p0_64_decl: declaration typ :=
-  let pt := TYPE_Pointer None in
-  let i64 := TYPE_I 64%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memmove.p0.p0.i64";
-    dc_type        := TYPE_Function TYPE_Void [pt; pt; i64; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition memset_8_32_decl: declaration typ :=
-  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
-  let i32 := TYPE_I 32%positive in
-  let i8 := TYPE_I 8%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memset.p0i8.i32";
-    dc_type        := TYPE_Function TYPE_Void [pt; i8; i32; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition memset_8_64_decl: declaration typ :=
-  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
-  let i64 := TYPE_I 64%positive in
-  let i8 := TYPE_I 8%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memset.p0i8.i64";
-    dc_type        := TYPE_Function TYPE_Void [pt; i8; i64; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-(* The same intrinsics under their opaque-pointer names (`ptr` rather than
-   `i8*`), which is what current LLVM emits. *)
-Definition memcpy_p0_32_decl: declaration typ :=
-  let pt := TYPE_Pointer None in
-  let i32 := TYPE_I 32%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memcpy.p0.p0.i32";
-    dc_type        := TYPE_Function TYPE_Void [pt; pt; i32; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition memcpy_p0_64_decl: declaration typ :=
-  let pt := TYPE_Pointer None in
-  let i64 := TYPE_I 64%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memcpy.p0.p0.i64";
-    dc_type        := TYPE_Function TYPE_Void [pt; pt; i64; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition memset_p0_32_decl: declaration typ :=
-  let pt := TYPE_Pointer None in
-  let i32 := TYPE_I 32%positive in
-  let i8 := TYPE_I 8%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memset.p0.i32";
-    dc_type        := TYPE_Function TYPE_Void [pt; i8; i32; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition memset_p0_64_decl: declaration typ :=
-  let pt := TYPE_Pointer None in
-  let i64 := TYPE_I 64%positive in
-  let i8 := TYPE_I 8%positive in
-  let i1 := TYPE_I 1%positive in
-  {|
-    dc_name        := Name "llvm.memset.p0.i64";
-    dc_type        := TYPE_Function TYPE_Void [pt; i8; i64; i1] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition malloc_decl: declaration typ :=
-  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
-  let i64 := TYPE_I 64%positive in
-  {|
-    dc_name        := Name "malloc";
-    dc_type        := TYPE_Function pt [i64] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition free_decl: declaration typ :=
-  let pt := TYPE_Pointer (Some (TYPE_I 8%positive)) in
-  {|
-    dc_name        := Name "free";
-    dc_type        := TYPE_Function TYPE_Void [pt] false;
-    dc_param_attrs := ([], [[];[];[];[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition maxnum_64_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.maxnum.f64";
-    dc_type        := TYPE_Function (TYPE_FP FP_double) [(TYPE_FP FP_double);(TYPE_FP FP_double)] false;
-    dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition minimum_64_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.minimum.f64";
-    dc_type        := TYPE_Function (TYPE_FP FP_double) [(TYPE_FP FP_double);(TYPE_FP FP_double)] false;
-    dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition maxnum_32_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.maxnum.f32";
-    dc_type        := TYPE_Function (TYPE_FP FP_float) [(TYPE_FP FP_float);(TYPE_FP FP_float)] false;
-    dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
-
-Definition minimum_32_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.minimum.f32";
-    dc_type        := TYPE_Function (TYPE_FP FP_float) [(TYPE_FP FP_float);(TYPE_FP FP_float)] false;
-    dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition minimum_64_decl : declaration typ :=
+  intrinsic_decl "llvm.minimum.f64" (TYPE_FP FP_double) [TYPE_FP FP_double; TYPE_FP FP_double].
 
 (* Saturated arithmetic: https://llvm.org/docs/LangRef.html#saturation-arithmetic-intrinsics *)
-Definition ushl_sat_1_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.ushl.sat.i1";
-    dc_type        := TYPE_Function (TYPE_I 1) [TYPE_I 1 ;TYPE_I 1] false;
-    dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition ushl_sat_decl (name : string) (sz : positive) : declaration typ :=
+  intrinsic_decl name (TYPE_I sz) [TYPE_I sz; TYPE_I sz].
 
-Definition ushl_sat_8_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.ushl.sat.i8";
-    dc_type        := TYPE_Function (TYPE_I 8) [TYPE_I 8 ;TYPE_I 8] false;
-    dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition ushl_sat_1_decl  := ushl_sat_decl "llvm.ushl.sat.i1" 1.
+Definition ushl_sat_8_decl  := ushl_sat_decl "llvm.ushl.sat.i8" 8.
+Definition ushl_sat_16_decl := ushl_sat_decl "llvm.ushl.sat.i16" 16.
+Definition ushl_sat_32_decl := ushl_sat_decl "llvm.ushl.sat.i32" 32.
+Definition ushl_sat_64_decl := ushl_sat_decl "llvm.ushl.sat.i64" 64.
 
-Definition ushl_sat_16_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.ushl.sat.i16";
-    dc_type        := TYPE_Function (TYPE_I 16) [TYPE_I 16 ;TYPE_I 16] false;
-    dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+(** The memory intrinsics, under both pointer manglings ([p0i8], i.e. [i8*],
+    and [p0], i.e. [ptr], which is what current LLVM emits) and both length
+    types.  memcpy and memmove take [(dst, src, len, isvolatile)]; memset
+    takes [(dst, val, len, isvolatile)].  Their semantics is in
+    [Implementations/Memory.v]. *)
+Definition mem_pointer_manglings : list (string * typ) :=
+  [("p0i8", TYPE_Pointer (Some (TYPE_I 8))); ("p0", TYPE_Pointer None)].
 
-Definition ushl_sat_32_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.ushl.sat.i32";
-    dc_type        := TYPE_Function (TYPE_I 32) [TYPE_I 32 ;TYPE_I 32] false;
-    dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+Definition mem_length_manglings : list (string * typ) :=
+  [("i32", TYPE_I 32); ("i64", TYPE_I 64)].
 
-Definition ushl_sat_64_decl: declaration typ :=
-  {|
-    dc_name        := Name "llvm.ushl.sat.i64";
-    dc_type        := TYPE_Function (TYPE_I 64) [TYPE_I 64 ;TYPE_I 64] false;
-    dc_param_attrs := ([], [[];[]]);
-    dc_attrs       := [];
-    dc_annotations  := []
-  |}.
+(** One declaration per pointer and length mangling; [mk p pt l lt] builds
+    it from the pointer mangling [p] (type [pt]) and the length mangling [l]
+    (type [lt]). *)
+Definition mem_intrinsic_decls (mk : string -> typ -> string -> typ -> declaration typ)
+  : list (declaration typ) :=
+  flat_map (fun '(p, pt) => map (fun '(l, lt) => mk p pt l lt) mem_length_manglings)
+    mem_pointer_manglings.
+
+(** memcpy and memmove: [llvm.<op>.<p>.<p>.<l>]. *)
+Definition memtransfer_decls (op : string) : list (declaration typ) :=
+  mem_intrinsic_decls (fun p pt l lt =>
+    intrinsic_decl ("llvm." ++ op ++ "." ++ p ++ "." ++ p ++ "." ++ l)%string
+      TYPE_Void [pt; pt; lt; TYPE_I 1]).
+
+Definition memcpy_decls : list (declaration typ) := memtransfer_decls "memcpy".
+
+Definition memmove_decls : list (declaration typ) := memtransfer_decls "memmove".
+
+(** memset: [llvm.memset.<p>.<l>]. *)
+Definition memset_decls : list (declaration typ) :=
+  mem_intrinsic_decls (fun p pt l lt =>
+    intrinsic_decl ("llvm.memset." ++ p ++ "." ++ l)%string
+      TYPE_Void [pt; TYPE_I 8; lt; TYPE_I 1]).
+
+Definition malloc_decl : declaration typ :=
+  intrinsic_decl "malloc" (TYPE_Pointer (Some (TYPE_I 8))) [TYPE_I 64].
+
+Definition free_decl : declaration typ :=
+  intrinsic_decl "free" TYPE_Void [TYPE_Pointer (Some (TYPE_I 8))].
 
 (* This may seem to overlap with `defined_intrinsics`, but there are few differences:
    1. This one is defined outside of the module and could be used at the LLVM AST generation stage without yet specifying memory model.
@@ -393,22 +173,11 @@ Definition defined_intrinsics_decls :=
     ushl_sat_8_decl;
     ushl_sat_16_decl;
     ushl_sat_32_decl;
-    ushl_sat_64_decl;
-
-    (* memory intrinsics *)
-    memcpy_8_32_decl;
-    memcpy_8_64_decl;
-    memmove_8_32_decl;
-    memmove_8_64_decl;
-    memmove_p0_32_decl;
-    memmove_p0_64_decl;
-    memset_8_32_decl;
-    memset_8_64_decl;
-    memcpy_p0_32_decl;
-    memcpy_p0_64_decl;
-    memset_p0_32_decl;
-    memset_p0_64_decl;
-    malloc_decl;
+    ushl_sat_64_decl]
+  ++
+  (* memory intrinsics *)
+  memcpy_decls ++ memmove_decls ++ memset_decls ++
+  [ malloc_decl;
     free_decl;
 
     (* exception intrinsics *)
@@ -443,6 +212,10 @@ Definition function_name_eq (a b:function_id) : bool :=
   | Name aname, Name bname => String.eqb aname bname
   | _, _ => false
   end.
+
+(** Is [name] the name of one of [decls]? *)
+Definition declares (decls : list (declaration typ)) (name : string) : bool :=
+  existsb (fun d => function_name_eq (Name name) (dc_name d)) decls.
 
 Definition lookup_intrinsic_declaration name : option (declaration typ) :=
   List.find (fun x => function_name_eq name (dc_name x)) defined_intrinsics_decls.
@@ -488,7 +261,7 @@ Section Intrinsics.
 
    - each intrinsic should "morally" be a total function: assuming the LLVM program
      is well formed, the intrisnic should always produce an LLVM value (which itself
-     might be poison or undef)
+     might be poison)
 
    - error should be returned only in the case that the LLVM program is ill-formed
      (e.g. if the wrong number and/or type of arguments is given to the intrinsic)

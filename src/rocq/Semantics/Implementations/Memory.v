@@ -35,7 +35,8 @@ From Vellvm.Semantics Require Import
   LLVMEvents
   Interfaces.Memory
   MemoryBytes
-  Operations.Conversion.
+  Operations.Conversion
+  IntrinsicsDefinitions.
 From Stdlib Require Import FunctionalExtensionality.
 Import Logic.
 
@@ -236,12 +237,8 @@ Section MemoryModel.
 
   (** memset spec *)
   Definition memset
-    (dst : ptr) (byte : memory_byte) (len : Z) (volatile : bool) : memM unit :=
-    if Z.ltb len 0
-    then
-      mub "memset given negative length."
-    else
-      write_bytes dst (repeatN (Z.to_N len) byte).
+    (dst : ptr) (byte : memory_byte) (len : N) (volatile : bool) : memM unit :=
+    write_bytes dst (repeatN len byte).
   
   (** The shared argument handling of memcpy and memmove: [overlap_ok] is
       true for memmove (overlapping ranges allowed) and false for memcpy. *)
@@ -292,7 +289,7 @@ Section MemoryModel.
                | _ => merr "Unsupported arguments to memset."
                end;;
         size <- match len with
-               | DVALUE_I _ len => ret (unsigned len)
+               | DVALUE_I _ len => ret (Z.to_N (unsigned len))
                (* LangRef: "If <len> is not a well-defined value, the
                   behavior is undefined." *)
                | DVALUE_Poison => mub "memset with poison length."
@@ -304,7 +301,7 @@ Section MemoryModel.
            <dest> should be well-defined, otherwise the behavior is
            undefined." *)
         | DVALUE_Poison =>
-            if (size =? 0)%Z then ret tt
+            if (size =? 0)%N then ret tt
             else mub "memset with a poison destination and nonzero length."
         | _ => merr "Unsupported arguments to memset."
         end
@@ -336,22 +333,13 @@ Section MemoryModel.
 
   Definition NONE := DVALUE_Base DVALUE_None.
   
-  (** The names of the memcpy, memmove, and memset intrinsics, under both
-      the typed-pointer (`p0i8`) and opaque-pointer (`p0`) manglings. *)
-  Definition is_memcpy_name (name : string) : bool :=
-    existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
-      ["llvm.memcpy.p0i8.p0i8.i32"; "llvm.memcpy.p0i8.p0i8.i64";
-       "llvm.memcpy.p0.p0.i32"; "llvm.memcpy.p0.p0.i64"].
+  (** The names of the memcpy, memmove, and memset intrinsics, as declared
+      in [IntrinsicsDefinitions.v]. *)
+  Definition is_memcpy_name : string -> bool := declares memcpy_decls.
 
-  Definition is_memmove_name (name : string) : bool :=
-    existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
-      ["llvm.memmove.p0i8.p0i8.i32"; "llvm.memmove.p0i8.p0i8.i64";
-       "llvm.memmove.p0.p0.i32"; "llvm.memmove.p0.p0.i64"].
+  Definition is_memmove_name : string -> bool := declares memmove_decls.
 
-  Definition is_memset_name (name : string) : bool :=
-    existsb (fun s => Rocqlib.proj_sumbool (string_dec name s))
-      ["llvm.memset.p0i8.i32"; "llvm.memset.p0i8.i64";
-       "llvm.memset.p0.i32"; "llvm.memset.p0.i64"].
+  Definition is_memset_name : string -> bool := declares memset_decls.
 
   Definition handle_intrinsicM : IntrinsicE ~> memM :=
     fun T e =>
@@ -359,8 +347,6 @@ Section MemoryModel.
       | Intrinsic t name args _ =>
           args' <- lift (map_monad dvalue_to_dvalue_base args) ;;
           (* Pick all arguments, they should all be unique. *)
-          (* TODO: add more variants to memcpy *)
-          (* FIXME: use reldec typeclass? *)
           if is_memcpy_name name
           then
             handle_memcpy args' ;;
