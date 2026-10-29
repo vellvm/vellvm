@@ -192,9 +192,19 @@ Section CFG.
   Definition init_of_definition (d : definition T (block T * list (block T))) : block_id :=
     blk_id (fst (df_instrs d)).
 
+  (* An [indirectbr] records the function it is in (see [TERM_IndirectBr]). *)
+  Definition annotate_indirectbr (f : function_id) (b : block T) : block T :=
+    match blk_term b with
+    | (id, TERM_IndirectBr v brs _, md) =>
+        mk_block (blk_id b) (blk_phis b) (blk_code b)
+                 (id, TERM_IndirectBr v brs (Some f), md) (blk_comments b)
+    | _ => b
+    end.
+
   Definition cfg_of_definition (d : definition T (block T * list (block T))) : cfg :=
     {| init := init_of_definition d;
-       blks := fst (df_instrs d) :: snd (df_instrs d);
+       blks := List.map (annotate_indirectbr (dc_name (df_prototype d)))
+                        (fst (df_instrs d) :: snd (df_instrs d));
        args := df_args d;
     |}.
 
@@ -259,12 +269,82 @@ Section CFG.
                      |}
     end.
 
+  (** * Block addresses
+      The [(function, block)] pairs whose address a module needs: every
+      [blockaddress(@f, %b)], and every label of an [indirectbr] in [f]
+      (which compares its target against those addresses). *)
+  Fixpoint exp_block_addresses (e : exp T) : list (function_id * block_id) :=
+    match e with
+    | EXP_BlockAddress f b => [(f, b)]
+
+    | EXP_Ident _ | EXP_Integer _ | EXP_Float _ | EXP_Bool _ | EXP_Null
+    | EXP_Zero_initializer | EXP_Undef | EXP_Poison
+    | EXP_Asm _ _ _ _ _ _ | EXP_Metadata _
+      => []
+
+    | EXP_Cstring l | EXP_Struct l | EXP_Packed_struct l | EXP_Array l | EXP_Vector l
+      => flat_map (fun x => exp_block_addresses (snd x)) l
+
+    | OP_Conversion _ _ e _ | OP_ExtractValue (_,e) _ | OP_Freeze (_,e)
+    | OP_Fneg _ (_,e) | EXP_Splat (_,e)
+      => exp_block_addresses e
+
+    | OP_IBinop _ _ e1 e2 | OP_ICmp _ _ _ e1 e2 | OP_FBinop _ _ _ e1 e2
+    | OP_FCmp _ _ _ e1 e2 | OP_ExtractElement (_,e1) (_,e2) | OP_InsertValue (_,e1) (_,e2) _
+      => exp_block_addresses e1 ++ exp_block_addresses e2
+
+    | OP_InsertElement (_,e1) (_,e2) (_,e3) | OP_ShuffleVector (_,e1) (_,e2) (_,e3)
+    | OP_Select _ (_,e1) (_,e2) (_,e3)
+      => exp_block_addresses e1 ++ exp_block_addresses e2 ++ exp_block_addresses e3
+
+    | OP_GetElementPtr _ _ (_,e) l
+      => exp_block_addresses e ++ flat_map (fun x => exp_block_addresses (snd x)) l
+    end.
+
+  Definition texps_block_addresses (l : list (texp T)) : list (function_id * block_id) :=
+    flat_map (fun x => exp_block_addresses (snd x)) l.
+
+  Definition instr_block_addresses (i : instr T) : list (function_id * block_id) :=
+    match i with
+    | INSTR_Op e => exp_block_addresses e
+    | INSTR_Call fn args _ _ => texps_block_addresses (fn :: List.map fst args)
+    | INSTR_Load _ ptr _ => texps_block_addresses [ptr]
+    | INSTR_Store v ptr _ => texps_block_addresses [v; ptr]
+    | INSTR_AtomicCmpXchg c => texps_block_addresses [c_ptr c; c_cmp c; c_new c]
+    | INSTR_AtomicRMW a => texps_block_addresses [a_ptr a; a_val a]
+    | INSTR_VAArg v _ => texps_block_addresses [v]
+    | INSTR_Comment _ | INSTR_Alloca _ _ | INSTR_Fence _ _ | INSTR_LandingPad _ _ _ => []
+    end.
+
+  Definition term_block_addresses (t : terminator T) : list (function_id * block_id) :=
+    match t with
+    | TERM_IndirectBr v brs fn =>
+        texps_block_addresses [v] ++
+        match fn with
+        | Some f => List.map (fun b => (f, b)) brs
+        | None => []
+        end
+    | TERM_Ret v | TERM_Br v _ _ | TERM_Switch v _ _ | TERM_Resume v => texps_block_addresses [v]
+    | TERM_Invoke fn args _ _ _ _ => texps_block_addresses (fn :: List.map fst args)
+    | TERM_Ret_void | TERM_Br_1 _ | TERM_Unreachable => []
+    end.
+
+  Definition block_block_addresses (b : block T) : list (function_id * block_id) :=
+    flat_map (fun '(_, Phi _ _ args, _) => flat_map (fun x => exp_block_addresses (snd x)) args) (blk_phis b)
+    ++ flat_map (fun '(_, i, _) => instr_block_addresses i) (blk_code b)
+    ++ (let '(_, t, _) := blk_term b in term_block_addresses t).
+
+  Definition mcfg_block_addresses (m : mcfg) : list (function_id * block_id) :=
+    flat_map (fun g => match g_exp g with Some e => exp_block_addresses e | None => [] end) (m_globals m)
+    ++ flat_map (fun d => flat_map block_block_addresses (blks (df_instrs d))) (m_definitions m).
+
 End CFG.
 
 Arguments modul_of_toplevel_entities {T X}.
 Arguments mcfg_of_modul {T}.
 Arguments modul_of_mcfg {T}.
 Arguments modul_defns_of_mcfg_defns {T}.
+Arguments mcfg_block_addresses {T}.
 
 (* Conversion of the output of the parser to the [mcfg] structure manipulated internally *)
 Definition mcfg_of_tle (p : toplevel_entities typ (block typ * list (block typ))) :=
@@ -288,23 +368,40 @@ Arguments args {_}.
 
 Section TLE_To_Modul.
 
+  (* [cfg_of_definition] annotates each [indirectbr] with its function, and
+     the conversion back to a [modul] keeps the annotations, so the round
+     trip gives back the module with its [indirectbr]s annotated. *)
+  Definition annotate_definition {T} (d : definition T (block T * list (block T)))
+    : definition T (block T * list (block T)) :=
+    let f := dc_name (df_prototype d) in
+    {| df_prototype := df_prototype d;
+       df_args := df_args d;
+       df_instrs := (annotate_indirectbr f (fst (df_instrs d)),
+                     map (annotate_indirectbr f) (snd (df_instrs d)))
+    |}.
+
   Lemma modul_defns_of_mcfg_defns_map_cfg_of_definition:
     forall {T} (l: list (definition T (block T * list (block T)))),
       modul_defns_of_mcfg_defns (map (fun d => {|
                                           df_prototype := df_prototype d;
                                           df_args := df_args d;
                                           df_instrs := cfg_of_definition d
-                                        |}) l) = Some l.
+                                        |}) l) = Some (map annotate_definition l).
   Proof using.
     induction l; simpl; auto.
     rewrite IHl. repeat f_equal.
-    destruct a; simpl; f_equal.
-    destruct df_instrs; simpl; auto.
   Qed.
 
   Lemma modul_of_mcfg_of_modul:
     forall {T} (m: @modul T _),
-      modul_of_mcfg (mcfg_of_modul m) = Some m.
+      modul_of_mcfg (mcfg_of_modul m) =
+        Some {| m_name := m_name m;
+                m_target := m_target m;
+                m_datalayout := m_datalayout m;
+                m_type_defs := m_type_defs m;
+                m_globals := m_globals m;
+                m_declarations := m_declarations m;
+                m_definitions := map annotate_definition (m_definitions m) |}.
   Proof using.
     destruct m.
     unfold mcfg_of_modul; simpl.

@@ -45,7 +45,7 @@ Section LABELS_OPERATIONS.
        | TERM_Br v br1 br2 => [br1; br2]
        | TERM_Br_1 br => [br]
        | TERM_Switch v default_dest brs => default_dest :: map snd brs
-       | TERM_IndirectBr v brs => brs
+       | TERM_IndirectBr v brs _ => brs
        | TERM_Resume v => []
        | TERM_Invoke fnptrval args to_label unwind_label _ _ => [to_label; unwind_label]
        | TERM_Unreachable => []
@@ -123,7 +123,7 @@ Section LABELS_OPERATIONS.
     not (In id (inputs cfg)).
 
   Definition phi_sources (φ : phi T) : list block_id :=
-    let '(Phi _ l) := φ in map fst l.
+    let '(Phi _ _ l) := φ in map fst l.
 
   (* Over a closed graph, phi nodes should expect exactly jumps from their predecessors:
      - For any block [bk] in the graph
@@ -238,7 +238,7 @@ Section REGISTER_OPERATIONS.
                       | OP_IBinop _ _ e1 e2
                       | OP_ICmp _ _ _ e1 e2
                       | OP_FBinop _ _ _ e1 e2
-                      | OP_FCmp _ _ e1 e2
+                      | OP_FCmp _ _ _ e1 e2
                       | OP_ExtractElement (_,e1) (_,e2)
                       | OP_InsertValue (_,e1) (_,e2) _
                         => f e1 +++ f e2
@@ -246,7 +246,7 @@ Section REGISTER_OPERATIONS.
                             
                       | OP_InsertElement (_,e1) (_,e2) (_,e3)
                       | OP_ShuffleVector (_,e1) (_,e2) (_,e3)
-                      | OP_Select (_,e1) (_,e2) (_,e3)
+                      | OP_Select _ (_,e1) (_,e2) (_,e3)
                         => f e1 +++ f e2 +++ f e3
 
                       | EXP_Struct l
@@ -255,9 +255,11 @@ Section REGISTER_OPERATIONS.
                       | EXP_Vector l
                         => set_flat_map (fun x => f (snd x)) l
 
-                      | OP_GetElementPtr _ (_,e) l
+                      | OP_GetElementPtr _ _ (_,e) l
                         => f e +++ set_flat_map (fun x => f (snd x)) l
                       | EXP_Splat (_,e) => f e
+                      (* a block address names a block, not a local *)
+                      | EXP_BlockAddress _ _ => []
                       end
       |}.
 
@@ -299,7 +301,7 @@ Section REGISTER_OPERATIONS.
       {| use_sites := fun t => match t with
                                | TERM_Ret e
                                | TERM_Br e _ _
-                               | TERM_IndirectBr e _
+                               | TERM_IndirectBr e _ _
                                | TERM_Resume e
                                  => use_sites e
 
@@ -317,7 +319,7 @@ Section REGISTER_OPERATIONS.
       |}.
 
     #[global] Instance phi_use_sites {T} : Use_sites (phi T) :=
-      {| use_sites := fun '(Phi _ l) => set_flat_map (fun x => use_sites (snd x)) l |}.
+      {| use_sites := fun '(Phi _ _ l) => set_flat_map (fun x => use_sites (snd x)) l |}.
 
     #[global] Instance block_use_sites {T} : Use_sites (block T) :=
       {| use_sites := fun bk => set_flat_map (fun x => use_sites (snd (fst x))) bk.(blk_phis) +++ use_sites bk.(blk_code) +++ use_sites (snd (fst bk.(blk_term))) |}.

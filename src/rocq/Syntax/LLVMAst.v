@@ -165,6 +165,28 @@ Variant cconv : Set :=
 | CC_cfguard_checkcc
 .
 
+(* LLVM's number for a calling convention (llvm/IR/CallingConv.h), so that
+   [cc 8] and [fastcc] are the same convention. *)
+Definition cconv_number (c : cconv) : Z :=
+  match c with
+  | CC_Ccc => 0
+  | CC_Fastcc => 8
+  | CC_Coldcc => 9
+  | CC_Cc n => BinIntDef.Z.of_num_int n
+  | CC_Webkit_jscc => 12
+  | CC_Anyregcc => 13
+  | CC_Preserve_mostcc => 14
+  | CC_Preserve_allcc => 15
+  | CC_Swiftcc => 16
+  | CC_Cxx_fast_tlscc => 17
+  | CC_Tailcc => 18
+  | CC_cfguard_checkcc => 19
+  | CC_Swifttailcc => 20
+  end.
+
+Definition cconv_eqb (c1 c2 : cconv) : bool :=
+  Z.eqb (cconv_number c1) (cconv_number c2).
+
 Variant param_attr : Set :=
 | PARAMATTR_Zeroext
 | PARAMATTR_Signext
@@ -189,7 +211,8 @@ Variant param_attr : Set :=
 | PARAMATTR_Swifterror
 | PARAMATTR_Immarg
 | PARAMATTR_Noundef
-(* | PARAMATTR_Nofpclass (* MISSING: floating point class *) *) 
+| PARAMATTR_Nofpclass (mask : int_ast) (* see [nofpclass_names] *)
+| PARAMATTR_Nofreeobj
 | PARAMATTR_Alignstack (a : int_syntax)
 | PARAMATTR_Allocalign
 | PARAMATTR_Allocptr
@@ -198,10 +221,42 @@ Variant param_attr : Set :=
 | PARAMATTR_Writeonly
 | PARAMATTR_Writable
 | PARAMATTR_Dead_on_unwind      
+| PARAMATTR_Dead_on_return (size : option int_syntax)
 | PARAMATTR_Range (t : typ) (a b : int_syntax)
 | PARAMATTR_Initializes (l : list (int_syntax * int_syntax))
 | PARAMATTR_Captures (p : (list string) * (list string))
 .
+
+(* The floating-point classes of [nofpclass(...)], as LLVM's [FPClassTest]
+   bits: snan 1, qnan 2, ninf 4, nnorm 8, nsub 16, nzero 32, pzero 64,
+   psub 128, pnorm 256, pinf 512.  The order is LLVM's printing order: the
+   printer names the bits of a mask greedily, so compound names come first. *)
+Definition nofpclass_names : list (string * int_ast) :=
+  [("all", 1023); ("nan", 3); ("snan", 1); ("qnan", 2);
+   ("inf", 516); ("ninf", 4); ("pinf", 512);
+   ("zero", 96); ("nzero", 32); ("pzero", 64);
+   ("sub", 144); ("nsub", 16); ("psub", 128);
+   ("norm", 264); ("nnorm", 8); ("pnorm", 256)]%Z.
+
+(* The mask of [nofpclass(w1 w2 ...)], or [None] if a word is not a class
+   name. *)
+Definition nofpclass_mask (words : list string) : option int_ast :=
+  fold_left (fun acc w =>
+               match acc, find (fun '(n, _) => String.eqb n w) nofpclass_names with
+               | Some m, Some (_, bits) => Some (Z.lor m bits)
+               | _, _ => None
+               end) words (Some 0%Z).
+
+(* LLVM rejects an empty mask and bits outside the ten classes. *)
+Definition nofpclass_mask_valid (mask : int_ast) : bool :=
+  (0 <? mask)%Z && (mask <=? 1023)%Z.
+
+(* The class names that [nofpclass] prints for a mask. *)
+Definition nofpclass_words (mask : int_ast) : list string :=
+  snd (fold_left (fun '(m, ws) '(n, bits) =>
+                    if Z.eqb (Z.land m bits) bits
+                    then (Z.ldiff m bits, ws ++ [n])
+                    else (m, ws)) nofpclass_names (mask, [])).
 
 Variant frame_pointer_val : Set :=
 | FRAMEPTR_None
@@ -261,6 +316,7 @@ Variant fn_attr : Set :=
 | FNATTR_Willreturn
 | FNATTR_Nosync
 | FNATTR_Nounwind
+| FNATTR_Nocreateundeforpoison
 | FNATTR_Nosanitize_bounds
 | FNATTR_Nosanitize_coverage
 | FNATTR_Null_pointer_is_valid
@@ -382,6 +438,17 @@ Variant conversion_type : Set :=
   | CONV_Pure (c : pure_conversion)
   | CONV_Impure (c : impure_conversion)
 .
+
+(* The no-wrap flags of [getelementptr], as written.  LLVM's [inbounds]
+   implies [nusw]; the semantics, not the syntax, accounts for that. *)
+Record gep_flags : Set :=
+  mk_gep_flags {
+      gep_inbounds : bool;
+      gep_nusw     : bool;
+      gep_nuw      : bool;
+    }.
+
+Definition gep_no_flags : gep_flags := mk_gep_flags false false false.
                 
 Section TypedSyntax.
 
@@ -458,19 +525,20 @@ Inductive exp : Set :=
 | OP_ICmp             (samesign:bool) (cmp:icmp)   (t:T) (v1:exp) (v2:exp)
 | OP_FBinop           (fop:fbinop) (fm:list fast_math) (t:T) (v1:exp) (v2:exp)
 | OP_Fneg             (flags:list fast_math) (v:(T * exp))
-| OP_FCmp             (cmp:fcmp)   (t:T) (v1:exp) (v2:exp)
+| OP_FCmp             (cmp:fcmp) (fm:list fast_math) (t:T) (v1:exp) (v2:exp)
 | OP_Conversion       (conv:conversion_type) (t_from:T) (v:exp) (t_to:T)
-| OP_GetElementPtr    (t:T) (ptrval:(T * exp)) (idxs:list (T * exp))
+| OP_GetElementPtr    (flags:gep_flags) (t:T) (ptrval:(T * exp)) (idxs:list (T * exp))
 | OP_ExtractElement   (vec:(T * exp)) (idx:(T * exp))
 | OP_InsertElement    (vec:(T * exp)) (elt:(T * exp)) (idx:(T * exp))
 | OP_ShuffleVector    (vec1:(T * exp)) (vec2:(T * exp)) (idxmask:(T * exp))
 | OP_ExtractValue     (vec:(T * exp)) (idxs:list int_syntax)
 | OP_InsertValue      (vec:(T * exp)) (elt:(T * exp)) (idxs:list int_syntax)
-| OP_Select           (cnd:(T * exp)) (v1:(T * exp)) (v2:(T * exp)) (* if * then * else *)
+| OP_Select           (fm:list fast_math) (cnd:(T * exp)) (v1:(T * exp)) (v2:(T * exp)) (* if * then * else *)
 | OP_Freeze           (v:(T * exp))
 | EXP_Asm             (sideffect:bool) (alignstack:bool) (inteldialect:bool) (unwind:bool) (template:string) (operand_constraints:string)
 | EXP_Metadata        (m:metadata)
 | EXP_Splat           (elt:(T * exp))
+| EXP_BlockAddress    (fn:function_id) (blk:block_id) (* blockaddress(@fn, %blk) *)
                       
 with metadata : Set :=
 (* METADATA_Id covers all metadata values of the form:
@@ -528,7 +596,7 @@ Variant instr_id : Set :=
 .
 
 Variant phi : Set :=
-  | Phi  (t:T) (args:list (block_id * exp))
+  | Phi  (fm:list fast_math) (t:T) (args:list (block_id * exp))
 .
 
 Variant ordering : Set :=
@@ -824,6 +892,9 @@ Definition fn_attr_is_noreturn (f : fn_attr) : bool :=
 Definition fn_attr_is_nounwind (f : fn_attr) : bool :=
   match f with FNATTR_Nounwind => true | _ => false end.
 
+Definition fn_attr_is_nocreateundeforpoison (f : fn_attr) : bool :=
+  match f with FNATTR_Nocreateundeforpoison => true | _ => false end.
+
 Definition ann_atomic (a:annotation) : option unit :=
   match a with
   | ANN_atomic => Some tt
@@ -849,6 +920,21 @@ Definition attr_align (a : param_attr) : option int_syntax :=
   | _ => None
   end.
 
+(* [dereferenceable(n)] or [dereferenceable_or_null(n)]: whether null is
+   allowed, and [n]. *)
+Definition attr_dereferenceable (a : param_attr) : option (bool * int_syntax) :=
+  match a with
+  | PARAMATTR_Dereferenceable n => Some (false, n)
+  | PARAMATTR_Dereferenceable_or_null n => Some (true, n)
+  | _ => None
+  end.
+
+Definition attr_nofpclass (a : param_attr) : option int_ast :=
+  match a with
+  | PARAMATTR_Nofpclass mask => Some mask
+  | _ => None
+  end.
+
 Definition attr_range (a : param_attr) : option (int_syntax * int_syntax) :=
   match a with
   | PARAMATTR_Range _ lo hi => Some (lo, hi)
@@ -857,21 +943,57 @@ Definition attr_range (a : param_attr) : option (int_syntax * int_syntax) :=
 
 (* The value-constraining metadata of a load, as the parameter attributes
    LangRef defines them by analogy with: [!nonnull] ("analogous to the nonnull
-   attribute"), [!align] ("analogous to the 'align' attribute"), and
-   [!noundef].  Only an inline [!align] node ([!align !{i64 N}]) is read:
-   named metadata nodes ([!align !1]) are not kept in the mcfg.  [!range] and
-   [!dereferenceable] are not handled yet. *)
+   attribute"), [!align] ("analogous to the 'align' attribute"), [!nofpclass]
+   ("the same meaning and format as the nofpclass attribute"), and
+   [!noundef].  The [!align] node must be inline ([!align !{i64 N}]); a
+   reference to a numbered node ([!align !1]) is replaced by the node before
+   linking (see [resolve_module_refs] in ModuleRefs.v).  [!range] and
+   [!dereferenceable] have no attribute counterpart that fits (a union of
+   ranges; a check on memory), so they are read separately below. *)
 Definition load_metadata_attr (md : metadata) : list param_attr :=
   match md with
   | METADATA_Pair (METADATA_Id (Name "nonnull")) _ => [PARAMATTR_Nonnull]
   | METADATA_Pair (METADATA_Id (Name "noundef")) _ => [PARAMATTR_Noundef]
   | METADATA_Pair (METADATA_Id (Name "align"))
                   (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) => [PARAMATTR_Align n]
+  | METADATA_Pair (METADATA_Id (Name "nofpclass"))
+                  (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) =>
+      [PARAMATTR_Nofpclass (BinIntDef.Z.of_num_int n)]
   | _ => []
   end.
 
 Definition load_metadata_attrs (mds : list metadata) : list param_attr :=
   flat_map load_metadata_attr mds.
+
+(* The [lo, hi) pairs of a [!range] node: [!range !{i8 0, i8 2, i8 3, i8 6}]
+   lists the ranges [0, 2) and [3, 6). *)
+Fixpoint metadata_range_pairs (mds : list metadata) : list (int_syntax * int_syntax) :=
+  match mds with
+  | METADATA_Const (_, EXP_Integer lo) :: METADATA_Const (_, EXP_Integer hi) :: mds' =>
+      (lo, hi) :: metadata_range_pairs mds'
+  | _ => []
+  end.
+
+(* The ranges of a load's, call's, or invoke's [!range] node, if it has one. *)
+Definition metadata_range (mds : list metadata) : option (list (int_syntax * int_syntax)) :=
+  find_option (fun md =>
+                 match md with
+                 | METADATA_Pair (METADATA_Id (Name "range")) (METADATA_Node ns) =>
+                     Some (metadata_range_pairs ns)
+                 | _ => None
+                 end) mds.
+
+(* A load's [!dereferenceable !{i64 n}] or [!dereferenceable_or_null !{i64 n}]
+   node: whether null is allowed, and [n]. *)
+Definition load_metadata_dereferenceable (mds : list metadata) : option (bool * int_syntax) :=
+  find_option (fun md =>
+                 match md with
+                 | METADATA_Pair (METADATA_Id (Name "dereferenceable"))
+                                 (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) => Some (false, n)
+                 | METADATA_Pair (METADATA_Id (Name "dereferenceable_or_null"))
+                                 (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) => Some (true, n)
+                 | _ => None
+                 end) mds.
 
 (* Operand Bundles
    - Note: does not support `preallocated(%foo)` style bundles.
@@ -913,7 +1035,11 @@ Variant terminator : Set :=
 | TERM_Br         (v:texp) (br1:block_id) (br2:block_id)
 | TERM_Br_1       (br:block_id)
 | TERM_Switch     (v:texp) (default_dest:block_id) (brs: list (tint_literal * block_id))
-| TERM_IndirectBr (v:texp) (brs:list block_id) (* address * possible addresses (labels) *)
+(* address * possible addresses (labels) * the enclosing function.  The
+   function is not written in the source: the parser leaves it [None] and
+   [cfg_of_definition] fills it in, so that [indirectbr] can tell the
+   addresses of its own blocks from those of other functions. *)
+| TERM_IndirectBr (v:texp) (brs:list block_id) (fn:option function_id)
 | TERM_Resume     (v:texp)
 
 | TERM_Invoke  (fnptrval:texp) (args:list (texp * (list param_attr))) (to_label:block_id) (unwind_label:block_id) (anns:list annotation) (obs : list operand_bundle)
@@ -1019,6 +1145,15 @@ Definition dc_align (d:declaration) : option int_syntax :=
 
 Definition dc_cconv (d:declaration) : option cconv :=
   find_option ann_cconv (dc_annotations d).
+
+(* The calling convention of a call site's or declaration's annotations;
+   LangRef: "If no calling convention is specified, the "ccc" (C) calling
+   convention is used." *)
+Definition anns_cconv (anns : list annotation) : cconv :=
+  match find_option ann_cconv anns with
+  | Some c => c
+  | None => CC_Ccc
+  end.
 
 Definition dc_gc (d:declaration) : option string :=
   find_option ann_gc (dc_annotations d).

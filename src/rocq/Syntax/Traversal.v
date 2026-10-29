@@ -116,12 +116,12 @@ Section Endo.
           OP_FBinop (endo fop) fm (endo t) (f_exp v1) (f_exp v2)
       | OP_Fneg flags v =>
           OP_Fneg flags (endo (fst v), f_exp (snd v))
-      | OP_FCmp cmp t v1 v2 =>
-          OP_FCmp (endo cmp) (endo t) (f_exp v1) (f_exp v2)
+      | OP_FCmp cmp fm t v1 v2 =>
+          OP_FCmp (endo cmp) fm (endo t) (f_exp v1) (f_exp v2)
       | OP_Conversion conv t_from v t_to =>
           OP_Conversion conv (endo t_from) (f_exp v) (endo t_to)
-      | OP_GetElementPtr t ptrval idxs =>
-          OP_GetElementPtr (endo t) (endo (fst ptrval), f_exp (snd ptrval))
+      | OP_GetElementPtr flags t ptrval idxs =>
+          OP_GetElementPtr flags (endo t) (endo (fst ptrval), f_exp (snd ptrval))
             (List.map (fun '(a,b) => (endo a, f_exp b)) idxs)
       | OP_ExtractElement vec idx =>
           OP_ExtractElement (endo (fst vec), f_exp (snd vec))
@@ -141,8 +141,8 @@ Section Endo.
           OP_InsertValue (endo (fst vec), f_exp (snd vec))
             (endo (fst elt), f_exp (snd elt))
             idxs
-      | OP_Select cnd v1 v2 =>
-          OP_Select (endo (fst cnd), f_exp (snd cnd))
+      | OP_Select fm cnd v1 v2 =>
+          OP_Select fm (endo (fst cnd), f_exp (snd cnd))
             (endo (fst v1), f_exp (snd v1))
             (endo (fst v2), f_exp (snd v2))
       | OP_Freeze v =>
@@ -151,6 +151,7 @@ Section Endo.
           EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
       | EXP_Metadata m => EXP_Metadata (@endo_metadata _ _ _ _ _ _ _ m)
       | EXP_Splat elt => EXP_Splat (endo (fst elt), f_exp (snd elt))
+      | EXP_BlockAddress fn blk => EXP_BlockAddress (endo fn) (endo blk)
       end
     with endo_metadata
       `{Endo T}
@@ -279,8 +280,8 @@ Section Endo.
         | TERM_Br_1 br => TERM_Br_1 (endo br)
         | TERM_Switch  v default_dest brs =>
           TERM_Switch (endo v) (endo default_dest) (endo brs)
-        | TERM_IndirectBr v brs =>
-          TERM_IndirectBr (endo v) (endo brs)
+        | TERM_IndirectBr v brs fn =>
+          TERM_IndirectBr (endo v) (endo brs) (endo fn)
         | TERM_Resume v => TERM_Resume (endo v)
         | TERM_Invoke fnptrval args to_label unwind_label atts obs =>
           TERM_Invoke (endo fnptrval) (endo args) (endo to_label) (endo unwind_label) (endo atts) (endo obs)
@@ -293,7 +294,7 @@ Section Endo.
            `{Endo (exp T)}
       : Endo (phi T) | 50 :=
       fun p => match p with
-            | Phi t args => Phi (endo t) (endo args)
+            | Phi fm t args => Phi fm (endo t) (endo args)
             end.
 
     #[global] Instance Endo_block
@@ -539,20 +540,21 @@ Section TFunctor.
         | OP_ICmp s cmp t v1 v2              => OP_ICmp s (endo cmp) (f t) (ft_exp f v1) (ft_exp f v2)
         | OP_FBinop fop fm t v1 v2           => OP_FBinop (endo fop) fm (f t) (ft_exp f v1) (ft_exp f v2)
         | OP_Fneg flags v                    => OP_Fneg flags (ftexp v)
-        | OP_FCmp cmp t v1 v2                => OP_FCmp (endo cmp) (f t) (ft_exp f v1) (ft_exp f v2)
+        | OP_FCmp cmp fm t v1 v2             => OP_FCmp (endo cmp) fm (f t) (ft_exp f v1) (ft_exp f v2)
         | OP_Conversion conv t_from v t_to   => OP_Conversion conv (f t_from) (ft_exp f  v) (f t_to)
-        | OP_GetElementPtr t ptr idxs        => OP_GetElementPtr (f t) (ftexp ptr) (tfmap ftexp idxs)
+        | OP_GetElementPtr fl t ptr idxs     => OP_GetElementPtr fl (f t) (ftexp ptr) (tfmap ftexp idxs)
         | OP_ExtractElement vec idx          => OP_ExtractElement (ftexp vec) (ftexp idx)
         | OP_InsertElement vec elt idx       => OP_InsertElement (ftexp vec) (ftexp elt) (ftexp idx)
         | OP_ShuffleVector vec1 vec2 idxmask => OP_ShuffleVector (ftexp vec1) (ftexp vec2) (ftexp  idxmask)
         | OP_ExtractValue vec idxs           => OP_ExtractValue (ftexp vec) idxs
         | OP_InsertValue vec elt idxs        => OP_InsertValue (ftexp vec) (ftexp elt) idxs
-        | OP_Select cnd v1 v2                => OP_Select (ftexp cnd) (ftexp v1) (ftexp v2)
+        | OP_Select fm cnd v1 v2             => OP_Select fm (ftexp cnd) (ftexp v1) (ftexp v2)
         | OP_Freeze v                        => OP_Freeze (ftexp v)
         | EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints =>
             EXP_Asm sideffect alignstack inteldialect unwind template operand_constraints
         | EXP_Metadata m => EXP_Metadata (ft_metadata f m)
         | EXP_Splat elt                      => EXP_Splat (ftexp elt)
+        | EXP_BlockAddress fn blk            => EXP_BlockAddress (endo fn) (endo blk)
         end
     with ft_metadata
       `{Endo raw_id}
@@ -697,7 +699,7 @@ Section TFunctor.
         | TERM_Br v br1 br2 => TERM_Br (tfmap f v) (endo br1) (endo br2)
         | TERM_Br_1 br => TERM_Br_1 (endo br)
         | TERM_Switch v default_dest brs => TERM_Switch (tfmap f v) (endo default_dest) (endo brs)
-        | TERM_IndirectBr v brs => TERM_IndirectBr (tfmap f v) (endo brs)
+        | TERM_IndirectBr v brs fn => TERM_IndirectBr (tfmap f v) (endo brs) (endo fn)
         | TERM_Resume v => TERM_Resume (tfmap f v)
         | TERM_Invoke fnptrval args to_label unwind_label atts obs =>
             TERM_Invoke 
@@ -711,8 +713,8 @@ Section TFunctor.
            `{Endo raw_id}
            `{TFunctor exp}
       : TFunctor phi | 50 :=
-      fun U V f '(Phi t args) =>
-        Phi (f t) (tfmap (fun '(id,e) => (endo id, tfmap f e)) args).
+      fun U V f '(Phi fm t args) =>
+        Phi fm (f t) (tfmap (fun '(id,e) => (endo id, tfmap f e)) args).
 
     #[global] Instance TFunctor_code
            `{Endo raw_id}
