@@ -600,7 +600,6 @@ Section Denotation.
     | (_, INSTR_Store _ _ _) => raise (err_loc tt ++ ": ILL-FORMED itree ERROR: Store to non-void ID")
 
     (* Call *)
-    (* TODO: technically operand bundles can affect semantics *)
     | (pt, INSTR_Call (dt, f) args anns obs) =>
         vs <- denote_call_args args (err_loc tt ++ ": Call argument violates noundef.") ;;
         denote_operand_bundles (err_loc tt) f obs ;;
@@ -743,7 +742,6 @@ Section Denotation.
 
     | TERM_Unreachable => raiseUB (err_loc tt ++ ": IMPOSSIBLE: unreachable in reachable position")
 
-    (* TODO: technically operand bundles can affect the semantics of invoke *)
     | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns obs =>
       uvs <- denote_call_args args (err_loc tt ++ ": Invoke argument violates noundef.") ;;
       denote_operand_bundles (err_loc tt) fnptrval obs ;;
