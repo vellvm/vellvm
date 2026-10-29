@@ -62,7 +62,7 @@ let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV
       DVALUE_Base (DVALUE_Pointer Interpreter.pointer_v.null)
   | TYPE_I bits, EXP_Integer x ->                 
      DVALUE_Base (ocaml_of_EOU
-       (DV.coerce_integer_to_int Interpreter.params (Some bits) (Denotation.denote_int_syntax x)))
+       (DV.coerce_integer_to_int Interpreter.params (Some bits) (Attributes.denote_int_syntax x)))
 
   | TYPE_FP FP_float, EXP_Float f ->
      begin match float32_of_float_syntax f with

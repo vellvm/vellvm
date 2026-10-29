@@ -106,7 +106,7 @@ Fixpoint Dtyp_alignment (dt : dtyp) : alignment :=
   | DTYPE_Array true sz (DTYPE_Base t) => vector_alignment sz t
   (* Vector elements are scalars in well-formed IR; anything else keeps its
      element's alignment, like an array. *)
-  | DTYPE_Array v sz t => Dtyp_alignment t
+  | DTYPE_Array _v _sz t => Dtyp_alignment t
   end.
 
 (* Same shape as [Dtyp_alignment]'s struct fold, and as the [Sizeof]-generic

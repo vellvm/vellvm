@@ -25,6 +25,7 @@ The crux of the refinement then relies on:
 
 - [refinement.v] : defining the refinement relation and its elementary meta-theory
 - [exp.v] : proving the refinement for expressions---this contains most of the heavy-lifting in the sense that a lot of arithmetic and address manipulation happens there
+- [attributes.v] : the refinement for the annotation checks of [Semantics/Attributes.v], as pure [EOU] computations
 - [denotation.v] : lifting things all the way to [denote_mcfg]---this goes more smoothly once the structural results are in place
 - [memS.v] : defines the same notion of refinement _at the memS level_
 - [memory.v] : defines and prove a refinement for the memory model _at the memM level_

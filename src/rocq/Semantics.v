@@ -11,6 +11,7 @@ From Vellvm Require Export
      Handlers
      Semantics.EOU
      Semantics.Operations
+     Semantics.Attributes
      Semantics.Denotation
      Semantics.TopLevel
      Semantics.DynamicValues
