@@ -26,7 +26,8 @@ From Vellvm Require Import
 From Vellvm Require Import
   Utils.rutt_cutoff
   Theory.I2F.Refinement
-  Theory.I2F.I2F_exp.
+  Theory.I2F.I2F_exp
+  Theory.I2F.I2F_attributes.
 
 From Paco Require Import paco.
 
@@ -66,6 +67,18 @@ Lemma I2F_refine_lift' {R1 R2} (RR : R1 -> R2 -> Prop) (m1 : EOU R1) (m2 : EOU R
   I2F_refine_CFG RR (EOU_to_itree m1) (EOU_to_itree m2).
 Proof. intros H; unfold I2F_refine_CFG; apply (I2F_refine_lift_gen I2FE_CFG_Throw); exact H. Qed.
 
+(** Call arguments: each is evaluated and passed through its attributes on
+    both sides. *)
+Lemma I2F_denote_call_args args msg :
+  I2F_refine_CFG (Forall2 I2F_dvalue)
+    (@denote_call_args PInf args msg) (@denote_call_args PFin args msg).
+Proof.
+  unfold I2F_refine_CFG, denote_call_args.
+  apply ruttc_map_monad.
+  intros [[t op] attrs] _.
+  erbind; [apply I2F_denote_exp' | intros; apply I2F_refine_lift', I2F_apply_value_attrs; auto].
+Qed.
+
 Lemma I2F_denote_instr :
   forall i va1 va2,
     option_rel I2F_Addr va1 va2 ->
@@ -80,65 +93,31 @@ Lemma I2F_denote_instr :
       bind_exp.
       rbind TT...
       intros ???...
-    - destruct x, fn.
-      + cbn.
-        rbind (Forall2 I2F_dvalue).
-        { apply ruttc_map_monad.
-          intros [] HIN.
-          apply I2F_denote_exp'.
-        }
-        break_match...
-        * intros.
-          rewrite 2 Eqit.bind_bind.
-          rbind (sum_rel I2F_dvalue I2F_dvalue)...
-          intros * HR'.
-          inv HR'.
-          rbind (fun _ _ => False)...
-          intros ?? [].
-          rewrite 2 Eqit.bind_ret_l...
-        * intros.
-          rewrite 2 Eqit.bind_bind.
-          bind_exp.
-          rewrite 2 Eqit.bind_bind.
-          rbind (sum_rel I2F_dvalue I2F_dvalue)...
-          intros * HR'.
-          inv HR'.
-          rbind (fun _ _ => False)...
-          intros ?? [].
-          rewrite 2 Eqit.bind_ret_l...
-      + cbn.
-        rbind (Forall2 I2F_dvalue).
-        { apply ruttc_map_monad.
-          intros [] HIN.
-          apply I2F_denote_exp'.
-        }
-        intros.
-        break_match...
-        * intros.
-          rewrite 2 Eqit.bind_bind.
-          rbind (sum_rel I2F_dvalue I2F_dvalue)...
-          intros * HR'.
-          inv HR'.
-          rbind (fun _ _ => False)...
-          intros ?? [].
-          rewrite 2 Eqit.bind_ret_l...
-        * intros.
-          rewrite 2 Eqit.bind_bind.
-          bind_exp.
-          rewrite 2 Eqit.bind_bind.
-          rbind (sum_rel I2F_dvalue I2F_dvalue)...
-          intros * HR'.
-          inv HR'.
-          rbind (fun _ _ => False)...
-          intros ?? [].
-          rewrite 2 Eqit.bind_ret_l...
-        
+    - destruct x, fn; cbn;
+        (rbind (Forall2 I2F_dvalue); [apply I2F_denote_call_args | intros];
+         rbind (sum_rel I2F_dvalue I2F_dvalue);
+         [break_match_goal; [| bind_exp]; now (rstep; cbnn; try easy; eauto) | intros * HR'];
+         (* the call site's function and return-value attributes *)
+         rbind (sum_rel I2F_dvalue I2F_dvalue);
+         [apply I2F_refine_lift', I2F_check_call_return; auto | intros * HR''];
+         inv HR'').
+      all: try now (rbind (fun _ _ => False); [rstep; cbnn; easy | intros ?? []]).
+      all: rewrite 2 Eqit.bind_ret_l...
+
     - destruct x; cbn[denote_instr].
       2: rstep; constructor.
       break_match_goal.
       + break_goal_fast.
         cbn; rewrite 2 Eqit.bind_bind.
         bind_exp.
+        (* a poison element count is UB, and related counts agree on it *)
+        match goal with
+        | |- ruttc _ _ _ _ _ (ITree.bind (if ?b1 then _ else _) _)
+                             (ITree.bind (if ?b2 then _ else _) _) =>
+            assert (EQP : b1 = b2) by (apply I2F_dvalue_is_poison; exact H);
+            rewrite EQP; clear EQP; destruct b2;
+            [rbind (fun _ _ => False); [rstep; cbnn; easy | intros ?? []] |]
+        end.
         rewrite ?Eqit.bind_bind.
         rbind I2F_dvalue_base; [apply I2F_refine_lift', I2F_dvalue_to_dvalue_base; auto |].
         intros.
@@ -153,11 +132,15 @@ Lemma I2F_denote_instr :
     - destruct x; cbn...
       destruct ptr.
       bind_exp.
-      erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+      rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_alignment; auto | intros _ _ _].
+      rbind I2F_dvalue; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+      (* the load's value metadata, applied like attributes *)
+      erbind; [apply I2F_refine_lift', I2F_apply_value_attrs; eauto | intros].
       auto... (* [apply I2F_freeze'; auto | intros]...*)
     - destruct val,ptr, x; cbn...
       bind_exp.
       bind_exp.
+      rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_alignment; auto | intros _ _ _].
       induction H0...
       induction H0...
       6: rbind (fun _ _ => False); [|intros _ _ []]...
@@ -168,6 +151,7 @@ Lemma I2F_denote_instr :
       do 3 break_goal_fast.
       break_match_goal...
       do 3 bind_exp.
+      rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_aligned_to; auto | intros _ _ _].
       erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto |]. 
       intros.
       erbind.
@@ -186,6 +170,7 @@ Lemma I2F_denote_instr :
       repeat break_goal_fast.
       bind_exp.
       bind_exp.
+      rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_aligned_to; auto | intros _ _ _].
       erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       unfold denote_atomic_rmw_operation.
       break_goal_fast...
@@ -294,17 +279,23 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
         erewrite I2F_select_switch; eauto.
         apply I2F_EOU_refl. }
     intros ?? <-...
+  - (* indirectbr: UB on a poison address, otherwise unsupported *)
+    destruct v; bind_exp.
+    rewrite (I2F_dvalue_is_poison H).
+    break_match_goal...
   - destruct v.
     bind_exp...
   - destruct fnptrval.
     erbind.
-    apply ruttc_map_monad.
-    intros [] ?; apply I2F_denote_exp'.
+    apply I2F_denote_call_args.
     intros.
     bind_exp.
     rbind (sum_rel I2F_dvalue I2F_dvalue)...
     intros * HR.
-    induction HR.
+    (* the invoke's function and return-value attributes *)
+    rbind (sum_rel I2F_dvalue I2F_dvalue);
+      [apply I2F_refine_lift', I2F_check_call_return; auto | intros * HR'].
+    induction HR'.
     rbind TT...
     intros...
     break_goal_fast...
@@ -521,7 +512,11 @@ Lemma I2F_denote_function d :
     I2F_function_denotation (@denote_function PInf d) (@denote_function PFin d).
 Proof with try now (rstep; cbnn; try (easy); eauto).
   unfold denote_function.
+  destruct (dc_param_attrs (df_prototype d)) as [ret_attrs args_attrs].
   intros ???.
+  (* the callee's declared argument attributes, on entry *)
+  rbind (Forall2 I2F_dvalue);
+    [apply I2F_refine_lift', I2F_apply_args_attrs; auto | intros args1' args2' Hargs'].
   rbind I2F_Addr; [apply I2F_push_call_frame; auto | intros].
   erbind...
   eapply I2F_run_exc, I2F_denote_cfg; constructor; auto.
@@ -530,32 +525,31 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   rbind TT...
   intros ???.
   rbind TT...
-  intros ???...
+  intros ???.
+  (* the callee's function and declared return-value attributes *)
+  apply I2F_refine_lift', I2F_check_call_return; auto.
 Qed.
 
 (** Pointwise lifting of [I2F_function_denotation] to function contexts,
     extensionally over [lookup] (in the style of [IntMaps.Equiv]): the two
     maps have the same domain, and denotations found at a common key are
-    related. [lookup_defn] keys the map by [ptr_to_int], which coincides
+    related. [denote_mcfg] keys the map by [ptr_to_int], which coincides
     on [I2F_Addr]-related addresses, so related lookups share their key. *)
 Definition I2F_ctx
   (ctx1 : IntMap (@function_denotation PInf))
   (ctx2 : IntMap (@function_denotation PFin)) : Prop :=
   forall k, option_rel I2F_function_denotation (lookup k ctx1) (lookup k ctx2).
 
-(** Related function values look up related denotations: [ptr_to_int]
-    coincides on related addresses, and no other shape is a key. *)
-Lemma I2F_lookup_defn f1 f2 ctx1 ctx2 :
-  I2F_dvalue f1 f2 ->
+Lemma I2F_lookup_defn ctx1 ctx2 f1 f2 :
   I2F_ctx ctx1 ctx2 ->
-  option_rel I2F_function_denotation
-    (lookup_defn f1 ctx1) (lookup_defn f2 ctx2).
+  I2F_dvalue f1 f2 ->
+  option_rel I2F_function_denotation (lookup_defn f1 ctx1) (lookup_defn f2 ctx2).
 Proof.
-  intros HF HC; inv HF; [inv H | |]; cbn; try constructor.
-  destruct p, p'; destruct H0 as [HI ->]; red in HI; subst.
-  apply HC.
+  intros Hctx H; inv H; [inv H0 | |]; cbn; try constructor.
+  destruct p as [z1 pr1], p' as [z2 pr2]; destruct H as [HI ->]; red in HI; subst.
+  apply Hctx.
 Qed.
-    
+
 Lemma I2F_denote_mcfg :
   forall t ctx1 ctx2 f1 f2 args1 args2,
     I2F_dvalue f1 f2 ->
@@ -586,9 +580,10 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     { intros * HA; exact (I2FA_CFG_sum HA). }
     { intros ? ? HS; cbn; simp I2FA_Call; exact HS. }
     cbn.
-    pose proof (I2F_lookup_defn HFv Hctx) as HL.
-    destruct (lookup_defn fv1 ctx1) eqn:L1, (lookup_defn fv2 ctx2) eqn:L2;
-      inv HL.
+    (* calls through poison or null *)
+    rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_check_callee; auto | intros _ _ _].
+    pose proof (I2F_lookup_defn Hctx HFv) as HL.
+    destruct (lookup_defn fv1 ctx1), (lookup_defn fv2 ctx2); inv HL.
     - (* internal call: the related denotations found in the contexts *)
       match goal with
       | HFD : I2F_function_denotation _ _ |- _ => now apply HFD

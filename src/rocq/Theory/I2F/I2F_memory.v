@@ -924,17 +924,29 @@ Proof.
   - apply I2F_Mub_l.
 Qed.
 
+Lemma I2F_memmove : forall (src1 dst1 : @ptr (@PROV PInf) (@PTR PInf))
+                          (src2 dst2 : @ptr (@PROV PFin) (@PTR PFin)),
+    I2F_Addr src1 src2 -> I2F_Addr dst1 dst2 ->
+    forall size volatile,
+    I2F_memS I2F_State (fun (_ _ : unit) => True)
+      (memmove src1 dst1 size volatile) (memmove src2 dst2 size volatile).
+Proof.
+  intros src1 dst1 src2 dst2 Hsrc Hdst size volatile; unfold memmove.
+  eapply I2F_memS_bind; [apply I2F_read_bytes; auto |].
+  intros bytes1 bytes2 Hbytes.
+  apply I2F_write_bytes; auto.
+Qed.
+
 Lemma I2F_memset : forall (dst1 : @ptr (@PROV PInf) (@PTR PInf)) (dst2 : @ptr (@PROV PFin) (@PTR PFin)),
     I2F_Addr dst1 dst2 ->
-    forall val len volatile,
+    forall byte1 byte2, I2F_memory_byte byte1 byte2 ->
+    forall len volatile,
     I2F_memS I2F_State (fun (_ _ : unit) => True)
-      (memset dst1 val len volatile) (memset dst2 val len volatile).
+      (memset dst1 byte1 len volatile) (memset dst2 byte2 len volatile).
 Proof.
-  intros dst1 dst2 Hdst val len volatile; unfold memset.
-  destruct (Z.ltb len 0); [constructor |].
+  intros dst1 dst2 Hdst byte1 byte2 Hbyte len volatile; unfold memset.
   apply I2F_write_bytes; auto.
-  apply Forall2_repeatN.
-  repeat constructor.
+  apply Forall2_repeatN; auto.
 Qed.
 
 Lemma I2F_malloc_bytes : forall
@@ -949,27 +961,49 @@ Proof.
   apply I2F_Malloc_bytes_with_pr; auto.
 Qed.
 
+(** The shared argument handling of memcpy and memmove.  (The lemma
+    quantifies over the [overlap_ok] flag rather than over the copy
+    primitive: spelling out a [memM]-valued function type here sends
+    instance resolution into a loop.) *)
+Lemma I2F_handle_memtransfer : forall overlap_ok
+    (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
+    Forall2 I2F_dvalue_base args1 args2 ->
+    I2F_memS I2F_State (fun (_ _ : unit) => True)
+      (handle_memtransfer overlap_ok args1) (handle_memtransfer overlap_ok args2).
+Proof.
+  intros overlap_ok args1 args2 Hargs; unfold handle_memtransfer.
+  destruct Hargs as [ | dst1 dst2 l1 l2 Hdst Hargs]; [apply I2F_Merr |].
+  destruct Hargs as [ | src1 src2 l1' l2' Hsrc Hargs]; [apply I2F_Merr |].
+  destruct Hargs as [ | sz1 sz2 l1'' l2'' Hsz Hargs]; [apply I2F_Merr |].
+  destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
+  destruct Hvol as [ | szv2 vv1 | | | | | | ]; try apply I2F_Merr.
+  destruct Hargs; [ | apply I2F_Merr].
+  (* The length: the same [N] on both sides, UB for poison, or an error. *)
+  eapply I2F_memS_bind with (RX := fun (n1 n2 : BinNums.N) => n1 = n2).
+  { destruct Hsz as [ | szv i1 | ip1 ip2 Hip | | | | | ]; try apply I2F_Merr.
+    - constructor; reflexivity.
+    - red in Hip; subst; cbn; constructor; reflexivity.
+    - apply I2F_Mub_l. }
+  intros size ? <-.
+  (* The pointers: poison with a nonzero length is UB on the infinite
+     side, and with length 0 a no-op on both. *)
+  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | ];
+    destruct Hsrc as [psrc1 psrc2 Hpsrc | | | | | | | ];
+    try apply I2F_Merr;
+    try (destruct (size =? 0)%N; [constructor; auto | apply I2F_Mub_l]).
+  destruct overlap_ok; [apply I2F_memmove | apply I2F_memcpy]; auto.
+Qed.
+
+
 Lemma I2F_handle_memcpy : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
     Forall2 I2F_dvalue_base args1 args2 ->
     I2F_memS I2F_State (fun (_ _ : unit) => True) (handle_memcpy args1) (handle_memcpy args2).
-Proof.
-  intros args1 args2 Hargs; unfold handle_memcpy.
-  destruct Hargs as [ | dst1 dst2 l1 l2 Hdst Hargs]; [apply I2F_Merr |].
-  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
-  destruct Hargs as [ | src1 src2 l1' l2' Hsrc Hargs]; [apply I2F_Merr |].
-  destruct Hsrc as [psrc1 psrc2 Hpsrc | | | | | | | ]; try apply I2F_Merr.
-  destruct Hargs as [ | sz1 sz2 l1'' l2'' Hsz Hargs]; [apply I2F_Merr |].
-  destruct Hsz as [ | szv i1 | ip1 ip2 Hip | | | | | ]; try apply I2F_Merr.
-  - destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
-    destruct Hvol as [ | szv2 vv1 | | | | | | ]; try apply I2F_Merr.
-    destruct Hargs; [ | apply I2F_Merr].
-    apply I2F_memcpy; auto.
-  - destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
-    destruct Hvol as [ | szv2 vv1 | | | | | | ]; try apply I2F_Merr.
-    destruct Hargs; [ | apply I2F_Merr].
-    red in Hip; subst; cbn.
-    apply I2F_memcpy; auto.
-Qed.
+Proof. apply I2F_handle_memtransfer. Qed.
+
+Lemma I2F_handle_memmove : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
+    Forall2 I2F_dvalue_base args1 args2 ->
+    I2F_memS I2F_State (fun (_ _ : unit) => True) (handle_memmove args1) (handle_memmove args2).
+Proof. apply I2F_handle_memtransfer. Qed.
 
 Lemma I2F_handle_memset : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
     Forall2 I2F_dvalue_base args1 args2 ->
@@ -977,17 +1011,28 @@ Lemma I2F_handle_memset : forall (args1 : list (@dvalue_base PInf)) (args2 : lis
 Proof.
   intros args1 args2 Hargs; unfold handle_memset.
   destruct Hargs as [ | dst1 dst2 l1 l2 Hdst Hargs]; [apply I2F_Merr |].
-  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | val1 val2 l1' l2' Hval Hargs]; [apply I2F_Merr |].
-  destruct Hval as [ | szval v1 | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | len1 len2 l1'' l2'' Hlen Hargs]; [apply I2F_Merr |].
-  destruct Hlen as [ | szlen ln1 | | | | | | ]; try apply I2F_Merr.
   destruct Hargs as [ | vol1 vol2 l1''' l2''' Hvol Hargs]; [apply I2F_Merr |].
   destruct Hvol as [ | szvol vv1 | | | | | | ]; try apply I2F_Merr.
   destruct Hargs; [ | apply I2F_Merr].
-  destruct (Pos.eq_dec szval 8) as [e | ]; [ | apply I2F_Merr].
-  subst; cbn.
-  apply I2F_memset; auto.
+  (* The fill byte: the same i8 byte, or poison bytes, on both sides. *)
+  eapply I2F_memS_bind with (RX := I2F_memory_byte).
+  { destruct Hval as [ | szval v1 | | | | | | ]; try apply I2F_Merr.
+    - destruct (Pos.eqb szval 8); [repeat constructor | apply I2F_Merr].
+    - constructor; apply I2F_poison_memory_byte. }
+  intros byte1 byte2 Hbyte.
+  (* The length: the same [N] on both sides, UB for poison, or an error. *)
+  eapply I2F_memS_bind with (RX := fun (n1 n2 : N) => n1 = n2).
+  { destruct Hlen as [ | szlen ln1 | | | | | | ]; try apply I2F_Merr.
+    - constructor; reflexivity.
+    - apply I2F_Mub_l. }
+  intros size ? <-.
+  (* The destination: poison with a nonzero length is UB on the infinite
+     side, and with length 0 a no-op on both. *)
+  destruct Hdst as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
+  - apply I2F_memset; auto.
+  - destruct (size =? 0)%N; [constructor; auto | apply I2F_Mub_l].
 Qed.
 
 Lemma I2F_handle_malloc : forall (args1 : list (@dvalue_base PInf)) (args2 : list (@dvalue_base PFin)),
@@ -1011,9 +1056,15 @@ Lemma I2F_handle_free : forall (args1 : list (@dvalue_base PInf)) (args2 : list 
 Proof.
   intros args1 args2 Hargs; unfold handle_free.
   destruct Hargs as [ | p1 p2 l1 l2 Hp Hargs]; [apply I2F_Merr |].
-  destruct Hp as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr.
-  destruct Hargs; [ | apply I2F_Merr].
-  apply I2F_Free; auto.
+  destruct Hp as [pdst1 pdst2 Hpdst | | | | | | | ]; try apply I2F_Merr;
+    (destruct Hargs; [ | apply I2F_Merr]).
+  - (* The free(NULL) test sees the same addresses on both sides. *)
+    assert (HNULL : @ptr_to_int _ _ (@P2I PInf) null = @ptr_to_int _ _ (@P2I PFin) null)
+      by reflexivity.
+    rewrite (I2F_Addr_ptr_to_int _ _ Hpdst), HNULL.
+    destruct (_ =? _)%Z; [constructor; auto | apply I2F_Free; auto].
+  - (* free(poison) is UB on the infinite side. *)
+    apply I2F_Mub_l.
 Qed.
 
 Theorem I2F_handle_intrinsicM :
@@ -1032,12 +1083,13 @@ Proof.
     eapply I2F_EOU_map_monad2; [exact Hargs |].
     intros a1 a2 Ha; apply I2F_dvalue_to_dvalue_base; auto. }
   intros args1' args2' Hargs'.
-  destruct (orb (Rocqlib.proj_sumbool (string_dec f2 "llvm.memcpy.p0i8.p0i8.i32"))
-              (Rocqlib.proj_sumbool (string_dec f2 "llvm.memcpy.p0i8.p0i8.i64"))).
-  - eapply I2F_memS_bind; [apply I2F_handle_memcpy; auto |].
-    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
-  - destruct (orb (Rocqlib.proj_sumbool (string_dec f2 "llvm.memset.p0i8.i32"))
-                (Rocqlib.proj_sumbool (string_dec f2 "llvm.memset.p0i8.i64"))).
+  destruct (is_memcpy_name f2).
+  { eapply I2F_memS_bind; [apply I2F_handle_memcpy; auto |].
+    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor. }
+  destruct (is_memmove_name f2).
+  { eapply I2F_memS_bind; [apply I2F_handle_memmove; auto |].
+    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor. }
+  - destruct (is_memset_name f2).
     + eapply I2F_memS_bind; [apply I2F_handle_memset; auto |].
       intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
     + destruct (Rocqlib.proj_sumbool (string_dec f2 "malloc")).

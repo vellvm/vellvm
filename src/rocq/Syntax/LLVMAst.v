@@ -804,11 +804,25 @@ Definition ann_ret_attribute (a:annotation) : option param_attr :=
   | _ => None
   end.
 
+(* All the return-value attributes among a call's annotations. *)
+Definition ann_ret_attributes (anns : list annotation) : list param_attr :=
+  flat_map (fun a => match ann_ret_attribute a with Some p => [p] | None => [] end) anns.
+
 Definition ann_fun_attribute (a:annotation) : option fn_attr :=
   match a with
   | ANN_fun_attribute f => Some f
   | _ => None
   end.
+
+(* All the function attributes among a call's annotations. *)
+Definition ann_fun_attributes (anns : list annotation) : list fn_attr :=
+  flat_map (fun a => match ann_fun_attribute a with Some f => [f] | None => [] end) anns.
+
+Definition fn_attr_is_noreturn (f : fn_attr) : bool :=
+  match f with FNATTR_Noreturn => true | _ => false end.
+
+Definition fn_attr_is_nounwind (f : fn_attr) : bool :=
+  match f with FNATTR_Nounwind => true | _ => false end.
 
 Definition ann_atomic (a:annotation) : option unit :=
   match a with
@@ -827,6 +841,37 @@ Definition ann_ordering (a:annotation) : option ordering :=
   | ANN_ordering o => Some o
   | _ => None
   end.
+
+(* Projections of parameter and return-value attributes ([param_attr]). *)
+Definition attr_align (a : param_attr) : option int_syntax :=
+  match a with
+  | PARAMATTR_Align n => Some n
+  | _ => None
+  end.
+
+Definition attr_range (a : param_attr) : option (int_syntax * int_syntax) :=
+  match a with
+  | PARAMATTR_Range _ lo hi => Some (lo, hi)
+  | _ => None
+  end.
+
+(* The value-constraining metadata of a load, as the parameter attributes
+   LangRef defines them by analogy with: [!nonnull] ("analogous to the nonnull
+   attribute"), [!align] ("analogous to the 'align' attribute"), and
+   [!noundef].  Only an inline [!align] node ([!align !{i64 N}]) is read:
+   named metadata nodes ([!align !1]) are not kept in the mcfg.  [!range] and
+   [!dereferenceable] are not handled yet. *)
+Definition load_metadata_attr (md : metadata) : list param_attr :=
+  match md with
+  | METADATA_Pair (METADATA_Id (Name "nonnull")) _ => [PARAMATTR_Nonnull]
+  | METADATA_Pair (METADATA_Id (Name "noundef")) _ => [PARAMATTR_Noundef]
+  | METADATA_Pair (METADATA_Id (Name "align"))
+                  (METADATA_Node [METADATA_Const (_, EXP_Integer n)]) => [PARAMATTR_Align n]
+  | _ => []
+  end.
+
+Definition load_metadata_attrs (mds : list metadata) : list param_attr :=
+  flat_map load_metadata_attr mds.
 
 (* Operand Bundles
    - Note: does not support `preallocated(%foo)` style bundles.

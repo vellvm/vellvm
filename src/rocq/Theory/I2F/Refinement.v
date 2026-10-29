@@ -73,6 +73,16 @@ Section Refinement.
   Definition I2F_Addr : @ptr ProvenanceV (@PointerV IPZ) -> @ptr ProvenanceV (@PointerV IP64Bit) -> Prop :=
     fun '(z,p) '(i,p') => I2F_Iptr z i /\ p = p'.
 
+  (** Related pointers have the same address, so every alignment check
+      ([ptr_aligned_to]) gives the same answer on both sides. *)
+  Lemma I2F_Addr_ptr_aligned_to :
+    forall (p : @ptr (@PROV PInf) (@PTR PInf)) (p' : @ptr (@PROV PFin) (@PTR PFin)) align,
+      I2F_Addr p p' ->
+      @ptr_aligned_to _ _ (@P2I PInf) p align = @ptr_aligned_to _ _ (@P2I PFin) p' align.
+  Proof.
+    intros [z pr] [i pr'] align [HI ->]; red in HI; subst; reflexivity.
+  Qed.
+
   (** Bits of the byte carrier [DVALUE_B]: pointer bits carry related
       pointers, the other bits are parameter-free. *)
   Variant I2F_memory_bit : @memory_bit PInf -> @memory_bit PFin -> Prop :=

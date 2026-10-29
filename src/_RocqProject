@@ -66,6 +66,7 @@
 ./rocq/Semantics/Operations/Conversion.v
 ./rocq/Semantics/Operations/Freeze.v
 ./rocq/Semantics/Operations.v
+./rocq/Semantics/Attributes.v
 ./rocq/Semantics/IntrinsicsDefinitions.v
 ./rocq/Semantics/Denotation.v
 
@@ -89,6 +90,7 @@
 ./rocq/Theory/MemoryBytesFacts.v
 ./rocq/Theory/I2F/Refinement.v
 ./rocq/Theory/I2F/I2F_exp.v
+./rocq/Theory/I2F/I2F_attributes.v
 ./rocq/Theory/I2F/I2F_denotation.v
 ./rocq/Theory/I2F/I2F_memS.v
 ./rocq/Theory/I2F/I2F_memory.v
