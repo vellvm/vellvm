@@ -98,7 +98,7 @@ define i1 @llvm.vellvm.internal.smuloverflow.i32(i32 noundef %0, i32 noundef %1)
 
 34:                                               ; preds = %17, %27, %9, %29, %21, %11, %6
   %35 = phi i1 [ %8, %6 ], [ %16, %11 ], [ %26, %21 ], [ %33, %29 ], [ false, %9 ], [ false, %27 ], [ false, %17 ]
-  ret i32 %35
+  ret i1 %35
 }
 
 define i1 @llvm.vellvm.internal.smuloverflow.i64(i64 noundef %0, i64 noundef %1) local_unnamed_addr #0 {
