@@ -1198,3 +1198,17 @@ define { i8, i1 } @llvm.uadd.with.overflow.i8(i8 noundef %0, i8 noundef %1) loca
   %fullres = insertvalue {i8, i1} %base, i1 %overflow, 1
   ret {i8, i1} %fullres
 }
+
+define i32 @llvm.umin.i32(i32 %a, i32 %b) {
+entry:
+  %cmp = icmp ult i32 %a, %b
+  %min = select i1 %cmp, i32 %a, i32 %b
+  ret i32 %min
+}
+
+define i64 @llvm.umin.i64(i64 %a, i64 %b) {
+entry:
+  %cmp = icmp ult i64 %a, %b
+  %min = select i1 %cmp, i64 %a, i64 %b
+  ret i64 %min
+}
