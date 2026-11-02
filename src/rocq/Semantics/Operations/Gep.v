@@ -19,9 +19,25 @@ Section GEP.
       The offset is therefore incremented by this index times the size of the type of elements stored. Finally, a recursive call
       at this new offset allows for deeper unbundling of a nested structure.
    *)
+  (* Indexing into [t] is allowed unless [t] is a vector whose elements are
+     not byte-addressable, i.e. whose bit size is not their store size in
+     bits (<N x i1>, <N x i12>, ...).  Such an element has no address of its
+     own -- the vector is bit-packed -- and LLVM's verifier rejects the GEP
+     ("GEP into vector with non-byte-addressable element type", mirroring
+     [DataLayout::typeSizeEqualsStoreSize]).  No well-formed program
+     performs one, so the semantics may treat it as undefined behavior. *)
+  Definition gep_indexable (t : dtyp) : bool :=
+    match t with
+    | DTYPE_Array true _ ta => N.eqb (bit_sizeof_dtyp ta) (8 * store_size_dtyp ta)
+    | _ => true
+    end.
+
   Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): EOUP Z :=
     match vs with
     | v :: vs' =>
+        if negb (gep_indexable t)
+        then raise_ub "getelementptr into a vector with non-byte-addressable element type"
+        else
         match v with
         | DVALUE_Base (DVALUE_I 8 i) =>
             let k := signed i in

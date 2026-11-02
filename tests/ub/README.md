@@ -59,6 +59,7 @@ python3 ../tests/ub/compare.py                     # Vellvm vs llubi vs clang; s
 | `alloca.ll` | poison or undef element count; access through a zero-sized alloca |
 | `load.ll`, `store.ll` | null, poison, or undef address; out of bounds; dangling stack; use after free; overestimated `align`; `!noundef`, `!nonnull`+`!noundef`, `!align`+`!noundef` metadata; store to a `constant` global; store outside `llvm.lifetime.start`/`end` |
 | `getelementptr.ll` | dereferencing the poison result of `inbounds`/`nuw`/`nusw` violations or a poison index |
+| `getelementptr-vector.ll` | indexing into a vector of non-byte-addressable elements (`<N x i1>`, `<N x i12>`, …) *(invalid IR to LLVM's verifier, so it runs only under Vellvm)* |
 | `atomicrmw.ll`, `cmpxchg.ll` | null or poison address, out of bounds, misaligned |
 | `provenance.ll` | access through a pointer *based on* the wrong object (gep across objects, integer constants, stale heap or stack pointers) |
 | `call.ll` | poison, undef, null, or data-pointer callee; calling-convention mismatch |
