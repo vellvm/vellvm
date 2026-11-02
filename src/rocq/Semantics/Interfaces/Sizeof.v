@@ -147,10 +147,22 @@ Class SizeofTheory {S : Sizeof} : Prop :=
     forall sz t,
       store_size_dtyp (DTYPE_Array false sz t) = (sz * alloc_size_dtyp t)%N;
 
-    (** Vectors are bit-packed: elements are contiguous, with no per-element
-        padding.  (The vector's own alloc size may still exceed this.) *)
+    (** Vectors are bit-packed (LangRef, vector type, "Memory Layout"): a
+        vector of [sz] scalars of [M] bits is laid out as an integer of
+        [sz * M] bits, so it occupies [ceil (sz * M / 8)] bytes.  For a
+        byte-sized element that is [sz * store_size_dtyp t]; for a
+        non-byte-sized [iM] / [bM] it is less (<8 x i1> is one byte).  (The
+        vector's own alloc size may still exceed this.) *)
     store_size_dtyp_vector :
     forall sz t,
+      store_size_dtyp (DTYPE_Array true sz (DTYPE_Base t))
+      = ((sz * bit_sizeof_dtyp (DTYPE_Base t) + 7) / 8)%N;
+
+    (** A vector of non-scalars is not well-formed IR; its elements are kept
+        contiguous at their store size. *)
+    store_size_dtyp_vector_nonbase :
+    forall sz t,
+      (forall b, t <> DTYPE_Base b) ->
       store_size_dtyp (DTYPE_Array true sz t) = (sz * store_size_dtyp t)%N;
 
     store_size_dtyp_i8 :
