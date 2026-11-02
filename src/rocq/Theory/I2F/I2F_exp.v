@@ -1823,6 +1823,61 @@ Proof.
   destruct (forallb (@dvalue_is_poison PFin) l2); auto.
 Qed.
 
+(** The packed-vector branch of the reader: related bits decode to related
+    elements.  [memory_bits_to_Z] only answers with a value or poison
+    ([memory_bits_to_Z_total]), which rules out the one-sided [ub] / [oom]
+    cases of [I2F_EOUP]. *)
+Lemma I2F_packed_bits_to_dvalue tb m : forall bits bits',
+    Forall2 I2F_memory_bit bits bits' ->
+    I2F_dvalue (@packed_bits_to_dvalue PInf tb m bits) (@packed_bits_to_dvalue PFin tb m bits').
+Proof.
+  intros bits bits' F; unfold packed_bits_to_dvalue.
+  destruct tb;
+    try (pose proof (I2F_memory_bits_to_Z F) as HZ;
+         destruct (@memory_bits_to_Z_total PInf bits) as [E1 | [z1 E1]];
+         destruct (@memory_bits_to_Z_total PFin bits') as [E2 | [z2 E2]];
+         rewrite E1, E2 in *; inversion HZ; subst; repeat constructor; fail).
+  (* [DTYPE_B].  The two sides' tests differ only in their hidden [Params],
+     so take them from the goal and [replace] (see the notes on
+     [I2F_store_size_dtyp] and friends). *)
+  pose proof (I2F_all_poison_bits F) as HP; unfold all_poison_bits in HP.
+  match goal with
+  | |- I2F_dvalue (if ?c1 then _ else if ?d1 then _ else _)
+                  (if ?c2 then _ else if ?d2 then _ else _) =>
+      replace c1 with c2 by (symmetry; exact HP);
+      replace d1 with d2 by (symmetry; exact (I2F_forallb_int_bits F));
+      destruct c2; [repeat constructor |]; destruct d2
+  end.
+  - match goal with
+    | |- context [@int_bits_to_Z PInf ?a] =>
+        replace (@int_bits_to_Z PInf a) with (@int_bits_to_Z PFin bits')
+          by (symmetry; exact (I2F_int_bits_to_Z F))
+    end.
+    repeat constructor.
+  - do 3 constructor; exact F.
+Qed.
+
+Lemma I2F_packed_bits_to_elts tb m : forall n bits bits',
+    Forall2 I2F_memory_bit bits bits' ->
+    Forall2 I2F_dvalue (@packed_bits_to_elts PInf tb m n bits)
+      (@packed_bits_to_elts PFin tb m n bits').
+Proof.
+  induction n as [| n IH]; intros bits bits' F; cbn [packed_bits_to_elts]; constructor.
+  - apply I2F_packed_bits_to_dvalue, Forall2_take, F.
+  - apply IH, Forall2_drop, F.
+Qed.
+
+Lemma I2F_packed_vector_elts tb m sz dbs dbs' :
+    Forall2 I2F_memory_byte dbs dbs' ->
+    Forall2 I2F_dvalue (@packed_vector_elts PInf tb m sz dbs)
+      (@packed_vector_elts PFin tb m sz dbs').
+Proof.
+  intros F; unfold packed_vector_elts.
+  apply I2F_packed_bits_to_elts.
+  apply Forall2_rev_append; [| constructor].
+  apply I2F_get_bits_of_memory_byte_list; [exact F | constructor].
+Qed.
+
 Lemma I2F_memory_bytes_to_dvalue : forall t dbs dbs',
     Forall2 I2F_memory_byte dbs dbs' ->
     I2F_EOU I2F_dvalue
@@ -1943,15 +1998,23 @@ Proof.
                 | repeat constructor ].
   - (* DTYPE_Array / vector.  Same shape as the struct case; [destruct v]
        first so that the [stride] selector reduces. *)
-    destruct v; cbn.
-    + (* vector: contiguous elements *)
+    destruct v.
+    + (* vector: bit-packed when the elements are sub-byte, otherwise
+         contiguous elements.  [read_array_unfold] keeps [packed_vector_type]
+         folded (it mentions no [Params]), so one case split serves both
+         sides. *)
+      rewrite (@read_array_unfold PInf true sz t dbs), (@read_array_unfold PFin true sz t dbs').
       destruct (I2F_poison_split F) as [EN FS].
       destruct (poison_split dbs) as [np1 r1].
       destruct (poison_split dbs') as [np2 r2].
       cbn in EN, FS; subst np2.
-      destruct FS as [| x y xs ys Hxy FS]; cbn.
+      destruct FS as [| x y xs ys Hxy FS]; cbv beta iota zeta.
       * repeat constructor.
-      * match goal with
+      * destruct (packed_vector_type (DTYPE_Array true sz t)) as [[tb m] |] eqn:EP.
+        { constructor; apply I2F_canonicalize_agg;
+            [apply I2F_packed_vector_elts, F | constructor; apply I2F_packed_vector_elts, F]. }
+        cbn.
+        match goal with
         | |- context [?L (N.to_nat sz) 0%N dbs] => set (goL := L)
         end.
         match goal with
@@ -1980,6 +2043,7 @@ Proof.
           first [ constructor; apply I2F_canonicalize_agg; auto
                 | repeat constructor ].
     + (* array: elements at their alloc size *)
+      cbn.
       destruct (I2F_poison_split F) as [EN FS].
       destruct (poison_split dbs) as [np1 r1].
       destruct (poison_split dbs') as [np2 r2].
@@ -2120,7 +2184,10 @@ Section SerUnfold.
 
   Lemma ser_Array_eq : forall p sz elt_t b elts offset tail_align acc,
       acc_dvalue_to_memory_bytes_h (DTYPE_Array p sz elt_t) (DVALUE_Array b elts) offset tail_align acc =
-        accumulate_array_bytes tail_align p elt_t elts offset acc.
+        match packed_vector_type (DTYPE_Array p sz elt_t) with
+        | Some (_, m) => packed_vector_bytes m (DTYPE_Array p sz elt_t) elts offset tail_align acc
+        | None => accumulate_array_bytes tail_align p elt_t elts offset acc
+        end.
   Proof. reflexivity. Qed.
 
   (* Poison at an aggregate type: the whole type's worth of poison bytes. *)
@@ -2326,6 +2393,84 @@ Proof.
     now apply IH.
 Qed.
 
+(** The packed-vector branch of the serializer: related elements give
+    related bits, and related bits pack into related bytes. *)
+Lemma I2F_packed_elt_bits m e e' :
+  I2F_dvalue e e' ->
+  I2F_EOU (Forall2 I2F_memory_bit) (@packed_elt_bits PInf m e) (@packed_elt_bits PFin m e').
+Proof.
+  intros H; destruct H as [b b' HB | p s1 s2 HF | v s1 s2 HF];
+    [| cbn; constructor | cbn; constructor].
+  destruct HB as [p p' Ha | sz i | p p' Ha | d | f | | | sz bv bv' Hbv];
+    cbn [packed_elt_bits]; try (constructor; fail).
+  - (* an integer: its bits *)
+    constructor; unfold memory_bits_from.
+    apply Forall2_rev_append; [| constructor].
+    apply Forall2_rev_loop_acc; [intros; constructor | constructor].
+  - (* poison *)
+    constructor; apply Forall2_repeat; constructor.
+  - (* a byte value *)
+    destruct Hbv as [i | p p' n Ha | bits bits' Hb]; cbn [dvalue_bv_to_memory_bits];
+      apply I2F_EOU_ret; [| | exact Hb]; unfold memory_bits_from;
+      (apply Forall2_rev_append; [| constructor]);
+      (apply Forall2_rev_loop_acc; [| constructor]); intros; constructor; exact Ha.
+Qed.
+
+Lemma I2F_memory_byte_of_bits c c' :
+  Forall2 I2F_memory_bit c c' ->
+  I2F_memory_byte (@memory_byte_of_bits PInf c) (@memory_byte_of_bits PFin c').
+Proof.
+  intros F; unfold memory_byte_of_bits, I2F_memory_byte.
+  match goal with
+  | |- I2F_dvalue_bv (if ?c1 then _ else _) (if ?c2 then _ else _) =>
+      replace c1 with c2 by (symmetry; exact (I2F_forallb_int_bits F)); destruct c2
+  end.
+  - match goal with
+    | |- context [@int_bits_to_Z PInf ?a] =>
+        replace (@int_bits_to_Z PInf a) with (@int_bits_to_Z PFin c')
+          by (symmetry; exact (I2F_int_bits_to_Z F))
+    end; constructor.
+  - constructor; exact F.
+Qed.
+
+Lemma I2F_acc_bits_to_memory_bytes : forall n bits bits' acc acc',
+  Forall2 I2F_memory_bit bits bits' -> Forall2 I2F_memory_byte acc acc' ->
+  Forall2 I2F_memory_byte (@acc_bits_to_memory_bytes PInf n bits acc)
+    (@acc_bits_to_memory_bytes PFin n bits' acc').
+Proof.
+  induction n as [| n IH]; intros bits bits' acc acc' F A;
+    cbn [acc_bits_to_memory_bytes]; [exact A |].
+  apply IH; [apply Forall2_drop, F |].
+  constructor; [apply I2F_memory_byte_of_bits, Forall2_take, F | exact A].
+Qed.
+
+Lemma I2F_acc_packed_bits_to_memory_bytes nb bits bits' acc acc' :
+  Forall2 I2F_memory_bit bits bits' -> Forall2 I2F_memory_byte acc acc' ->
+  Forall2 I2F_memory_byte (@acc_packed_bits_to_memory_bytes PInf nb bits acc)
+    (@acc_packed_bits_to_memory_bytes PFin nb bits' acc').
+Proof.
+  intros F A; unfold acc_packed_bits_to_memory_bytes.
+  rewrite (Forall2_length F).
+  apply I2F_acc_bits_to_memory_bytes; [| exact A].
+  apply Forall2_app; [exact F | apply Forall2_repeat; constructor].
+Qed.
+
+Lemma I2F_packed_vector_bytes m dt elts elts' offset ta acc acc' :
+  Forall2 I2F_dvalue elts elts' -> Forall2 I2F_memory_byte acc acc' ->
+  I2F_EOU I2F_ser_state
+    (@packed_vector_bytes PInf m dt elts offset ta acc)
+    (@packed_vector_bytes PFin m dt elts' offset ta acc').
+Proof.
+  intros HE A; unfold packed_vector_bytes.
+  eapply I2F_EOU_bind.
+  { apply I2F_EOU_map_monad2 with (RA := I2F_dvalue); [exact HE |].
+    intros a1 a2 Ha; apply I2F_packed_elt_bits, Ha. }
+  intros b1 b2 Hb.
+  rewrite ?I2F_store_size_dtyp.
+  constructor; apply I2F_accumulate_padding.
+  apply I2F_acc_packed_bits_to_memory_bytes; [apply Forall2_concat, Hb | exact A].
+Qed.
+
 Lemma I2F_acc_dvalue_to_memory_bytes_h : forall v v', I2F_dvalue v v' -> SER v v'.
 Proof.
   intros v v' HDV; induction HDV as [b b' HB | p s1 s2 HF IH | vf s1 s2 HF IH];
@@ -2359,7 +2504,9 @@ Proof.
   - cbn; constructor.
   - cbn; constructor.
   - cbn; constructor.
-  - rewrite 2 ser_Array_eq; now apply I2F_accumulate_array_bytes.
+  - rewrite 2 ser_Array_eq.
+    destruct (packed_vector_type (DTYPE_Array p' sz elt_t)) as [[tb m] |];
+      [now apply I2F_packed_vector_bytes | now apply I2F_accumulate_array_bytes].
 Qed.
 
 Lemma I2F_memory_dvalue_to_memory_bytes : forall dt v v',
@@ -2494,12 +2641,27 @@ Qed.
 (** GEP. The offset computation [handle_gep_h] lives in [EOU Z], a
       parameter-free type: on related indices the two sides are literally
       equal ([to_Z] agrees on related intptrs). *)
+(* Bridges for the two [Sizeof]-dependent helpers [handle_gep_h] uses; as
+   with [I2F_store_size_dtyp], the two sides differ only in their hidden
+   [Params]. *)
+Lemma I2F_gep_indexable : forall t,
+    @gep_indexable PInf t = @gep_indexable PFin t.
+Proof. reflexivity. Qed.
+
+Lemma I2F_sequential_stride : forall v t,
+    @sequential_stride PInf v t = @sequential_stride PFin v t.
+Proof. reflexivity. Qed.
+
 Lemma I2F_handle_gep_h : forall vs vs',
     Forall2 I2F_dvalue vs vs' ->
     forall t off,
       @handle_gep_h PInf t off vs = @handle_gep_h PFin t off vs'.
 Proof.
-  intros vs vs' F; induction F; intros t off; cbn; auto.
+  intros vs vs' F; induction F; intros t off;
+    cbn -[gep_indexable sequential_stride]; auto.
+  (* a GEP into a non-byte-addressable vector is UB on both sides *)
+  rewrite I2F_gep_indexable; destruct (@gep_indexable PFin t); cbn [negb]; [| reflexivity].
+  rewrite ?I2F_sequential_stride.
   match goal with
   | HC : I2F_dvalue ?c ?c' |- _ =>
       induction HC; cbn; auto

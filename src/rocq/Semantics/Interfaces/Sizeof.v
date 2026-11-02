@@ -148,21 +148,26 @@ Class SizeofTheory {S : Sizeof} : Prop :=
       store_size_dtyp (DTYPE_Array false sz t) = (sz * alloc_size_dtyp t)%N;
 
     (** Vectors are bit-packed (LangRef, vector type, "Memory Layout"): a
-        vector of [sz] scalars of [M] bits is laid out as an integer of
-        [sz * M] bits, so it occupies [ceil (sz * M / 8)] bytes.  For a
-        byte-sized element that is [sz * store_size_dtyp t]; for a
-        non-byte-sized [iM] / [bM] it is less (<8 x i1> is one byte).  (The
-        vector's own alloc size may still exceed this.) *)
+        vector of [sz] elements of [M] bits is laid out as an integer of
+        [sz * M] bits, so it occupies [ceil (sz * M / 8)] bytes.  That only
+        differs from [sz * store_size_dtyp t] for a non-byte-sized [iM] /
+        [bM] (<8 x i1> is one byte), so the law is stated for those element
+        types and, separately, for every other.  (The vector's own alloc size
+        may still exceed this.) *)
+    store_size_dtyp_vector_int :
+    forall sz m,
+      store_size_dtyp (DTYPE_Array true sz (DTYPE_Base (DTYPE_I m)))
+      = ((sz * Npos m + 7) / 8)%N;
+
+    store_size_dtyp_vector_bytes :
+    forall sz m,
+      store_size_dtyp (DTYPE_Array true sz (DTYPE_Base (DTYPE_B m)))
+      = ((sz * Npos m + 7) / 8)%N;
+
     store_size_dtyp_vector :
     forall sz t,
-      store_size_dtyp (DTYPE_Array true sz (DTYPE_Base t))
-      = ((sz * bit_sizeof_dtyp (DTYPE_Base t) + 7) / 8)%N;
-
-    (** A vector of non-scalars is not well-formed IR; its elements are kept
-        contiguous at their store size. *)
-    store_size_dtyp_vector_nonbase :
-    forall sz t,
-      (forall b, t <> DTYPE_Base b) ->
+      (forall m, t <> DTYPE_Base (DTYPE_I m)) ->
+      (forall m, t <> DTYPE_Base (DTYPE_B m)) ->
       store_size_dtyp (DTYPE_Array true sz t) = (sz * store_size_dtyp t)%N;
 
     store_size_dtyp_i8 :

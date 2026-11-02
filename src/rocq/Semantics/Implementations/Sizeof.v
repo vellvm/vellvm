@@ -238,8 +238,17 @@ Proof.
      [Store_size_dtyp] *)
   constructor; try reflexivity.
   - lia.
-  - (* a vector of non-scalars keeps the contiguous layout *)
-    intros sz t H; destruct t; [exfalso; eapply H; reflexivity | reflexivity | reflexivity].
+  - (* a vector of anything but [iM] / [bM]: every such base type is a whole
+       number of bytes, so the packed size is [sz] times the element's *)
+    intros sz t HI HB.
+    destruct t as [b | |]; [| reflexivity | reflexivity].
+    assert (E : forall k b', b' = (8 * k)%N -> ((sz * b' + 7) / 8 = sz * k)%N).
+    { intros k b' ->.
+      replace (sz * (8 * k) + 7)%N with (7 + (sz * k) * 8)%N by lia.
+      rewrite N.div_add by lia; reflexivity. }
+    destruct b; try (exfalso; eapply HI; reflexivity); try (exfalso; eapply HB; reflexivity);
+      cbn [store_size_dtyp SizeofV Store_size_dtyp Sizeof_dtyp_base];
+      apply E; reflexivity.
   - (* [DTYPE_I sz] occupies ceil(sz/8) bytes *)
     intros sz; cbn [store_size_dtyp SizeofV Store_size_dtyp Sizeof_dtyp_base].
     apply round_up_to_eight_div; lia.
