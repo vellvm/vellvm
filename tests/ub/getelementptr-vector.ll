@@ -125,7 +125,8 @@ define i64 @gep_array_of_v4i6() {
 
 ; ASSERT EQ: i64 5 = call i64 @gep_array_of_v4i6()
 
-; i24 is byte-addressable (24 bits = 3 bytes), so <3 x i24> can be indexed
+; i24 is byte-addressable (24 bits = 3 bytes), so <3 x i24> can be indexed;
+; element 2 is at byte 6 (vector elements are at their store size)
 define i64 @gep_into_v3i24() {
   %p = alloca <3 x i24>
   %q = getelementptr <3 x i24>, ptr %p, i64 0, i64 2
@@ -135,7 +136,7 @@ define i64 @gep_into_v3i24() {
   ret i64 %d
 }
 
-; ASSERT SUCCEEDS: call i64 @gep_into_v3i24()
+; ASSERT EQ: i64 6 = call i64 @gep_into_v3i24()
 
 define i64 @gep_into_v4i8() {
   %p = alloca <4 x i8>
@@ -230,19 +231,19 @@ define i64 @ub_case_10() {
   ret i64 %r
 }
 
-; case 11 (line 138): ASSERT SUCCEEDS: call i64 @gep_into_v3i24()
+; case 11 (line 139): ASSERT EQ: i64 6 = call i64 @gep_into_v3i24()
 define i64 @ub_case_11() {
   %r = call i64 @gep_into_v3i24()
   ret i64 %r
 }
 
-; case 12 (line 149): ASSERT EQ: i64 3 = call i64 @gep_into_v4i8()
+; case 12 (line 150): ASSERT EQ: i64 3 = call i64 @gep_into_v4i8()
 define i64 @ub_case_12() {
   %r = call i64 @gep_into_v4i8()
   ret i64 %r
 }
 
-; case 13 (line 161): ASSERT EQ: i64 1 = call i64 @gep_into_array_i1()
+; case 13 (line 162): ASSERT EQ: i64 1 = call i64 @gep_into_array_i1()
 define i64 @ub_case_13() {
   %r = call i64 @gep_into_array_i1()
   ret i64 %r

@@ -32,6 +32,19 @@ Section GEP.
     | _ => true
     end.
 
+  (* The distance between consecutive elements when indexing into an array
+     ([vector = false]) or a vector ([vector = true]).  Array elements sit at
+     their alloc size, but a vector is bit-packed, so its elements are
+     contiguous at their *store* size -- e.g. element 2 of <3 x i24> is at
+     byte 6, of [3 x i24] at byte 8.  The two differ for over-aligned element
+     types such as [i24].  LangRef does not say this; it is LLVM's
+     [generic_gep_type_iterator::getSequentialElementStride]
+     (GetElementPtrTypeIterator.h, llvm-project PR #75448).  [gep_indexable]
+     guarantees the vector's elements are byte-addressable, so the store
+     size is exactly where the next element's bits begin. *)
+  Definition sequential_stride (vector : bool) (ta : dtyp) : N :=
+    if vector then store_size_dtyp ta else alloc_size_dtyp ta.
+
   Fixpoint handle_gep_h (t:dtyp) (off:Z) (vs:list dvalue): EOUP Z :=
     match vs with
     | v :: vs' =>
@@ -42,8 +55,8 @@ Section GEP.
         | DVALUE_Base (DVALUE_I 8 i) =>
             let k := signed i in
             match t with
-            | DTYPE_Array v _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (alloc_size_dtyp ta))) vs'                
+            | DTYPE_Array vec _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sequential_stride vec ta))) vs'
             | _ => raise_error ("non-i8-indexable type")
             end
         | DVALUE_Base (DVALUE_I 32 i) =>
@@ -51,8 +64,8 @@ Section GEP.
             let ks := signed i in
             let n := BinIntDef.Z.to_nat k in
             match t with
-            | DTYPE_Array v _ ta =>
-                handle_gep_h ta (off + ks * (Z.of_N (alloc_size_dtyp ta))) vs'                          
+            | DTYPE_Array vec _ ta =>
+                handle_gep_h ta (off + ks * (Z.of_N (sequential_stride vec ta))) vs'
             | DTYPE_Struct false ts =>
                 match nth_error ts n with
                 | None => raise_error "overflow"
@@ -76,17 +89,15 @@ Section GEP.
         | DVALUE_Base (DVALUE_I 64 i) =>
             let k := signed i in
             match t with
-            | DTYPE_Array false _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (alloc_size_dtyp ta))) vs'
-            | DTYPE_Array true _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (alloc_size_dtyp ta))) vs'
+            | DTYPE_Array vec _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sequential_stride vec ta))) vs'
             | _ => raise_error ("non-i64-indexable type")
             end
         | DVALUE_Base (DVALUE_Iptr i) =>
             let k := to_Z i in
             match t with
-            | DTYPE_Array v  _ ta =>
-                handle_gep_h ta (off + k * (Z.of_N (alloc_size_dtyp ta))) vs'                
+            | DTYPE_Array vec _ ta =>
+                handle_gep_h ta (off + k * (Z.of_N (sequential_stride vec ta))) vs'
             | _ => raise_error ("non-iptr-indexable type")
             end
         | DVALUE_Base (DVALUE_Poison) =>
