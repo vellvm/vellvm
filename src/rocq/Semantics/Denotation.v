@@ -239,25 +239,27 @@ Section Denotation.
       vs <- map_monad eval_texp es ;;
       ret (DVALUE_Array false vs)
 
+    (* A vector of poison lanes is the canonical [DVALUE_Poison]; see
+       [canonicalize_agg]. *)
     | EXP_Vector es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array true vs)
+      ret (canonicalize_agg (DVALUE_Array true) vs)
 
     | OP_IBinop iop dt op1 op2 =>
       v1 <- denote_exp (Some dt) op1 ;;
       v2 <- denote_exp (Some dt) op2 ;;
-      lift (eval_iop iop v1 v2)
+      lift (eval_iop iop dt v1 v2)
 
     | OP_ICmp samesign cmp dt op1 op2 =>
         v1 <- denote_exp (Some dt) op1 ;;
         v2 <- denote_exp (Some dt) op2 ;;
-        lift (eval_icmp samesign cmp v1 v2)
+        lift (eval_icmp samesign cmp dt v1 v2)
 
     (* TODO: fast_math? *)                
     | OP_FBinop fop _ dt op1 op2 =>
         v1 <- denote_exp (Some dt) op1 ;;
         v2 <- denote_exp (Some dt) op2 ;;
-        lift (eval_fop fop v1 v2)
+        lift (eval_fop fop dt v1 v2)
              
     (* TODO: fast_math? **)
     | OP_Fneg _ (dt, op) =>
@@ -267,7 +269,7 @@ Section Denotation.
     | OP_FCmp fcmp dt op1 op2 =>
         v1 <- denote_exp (Some dt) op1 ;;
         v2 <- denote_exp (Some dt) op2 ;;
-        lift (eval_fcmp fcmp v1 v2)
+        lift (eval_fcmp fcmp dt v1 v2)
 
     | OP_Conversion ct dt_from op dt_to =>
         v <- denote_exp (Some dt_from) op ;;
@@ -331,7 +333,7 @@ Section Denotation.
         (* use the type from the splat elt *)
         v <- eval_texp elt ;;
         (* this could be very expensive if the vector is big *)
-        ret (DVALUE_Array true (List.repeat v (N.to_nat sz)))
+        ret (canonicalize_agg (DVALUE_Array true) (List.repeat v (N.to_nat sz)))
           
     | OP_Freeze (dt, e) =>
         dv <- denote_exp (Some dt) e ;;
@@ -366,7 +368,7 @@ Section Denotation.
       loaded_v <- load cmp_ty ptr_v;;
       (* Perform the comparison *)
       (* SAZ: not clear whether this comparison implies "samesign" or not *)
-      dv <- lift (eval_icmp false Eq loaded_v cmp_v);;
+      dv <- lift (eval_icmp false Eq cmp_ty loaded_v cmp_v);;
       match dv with
       | DVALUE_Base (DVALUE_I 1 comparison_bit) =>
           if equ comparison_bit one then
@@ -393,26 +395,26 @@ Section Denotation.
            Similarly, it does not state whether the `disjoint` flag for `or` can be applied,
            so we set it to false.
   *)
-  Definition denote_atomic_rmw_operation a_op (pv : dvalue) (val : dvalue) : CFGtop dvalue :=
+  Definition denote_atomic_rmw_operation a_op (dt : dtyp) (pv : dvalue) (val : dvalue) : CFGtop dvalue :=
     match a_op with
     | Axchg =>
         (* xchg: *ptr = val *)
         ret val
     | Aadd =>
         (* add: *ptr = *ptr + val *)
-        lift (eval_iop (Add false false) pv val)
+        lift (eval_iop (Add false false) dt pv val)
     | Asub =>
         (* sub: *ptr = *ptr - val *)
-        lift (eval_iop (Sub false false) pv val)
+        lift (eval_iop (Sub false false) dt pv val)
     | Aand =>
         (* and: *ptr = *ptr - val *)
-        lift (eval_iop And pv val)
+        lift (eval_iop And dt pv val)
     | Aor =>
         (* or: *ptr = *ptr | val *)
-        lift (eval_iop (Or false) pv val)
+        lift (eval_iop (Or false) dt pv val)
     | Axor =>
         (* xor: *ptr = *ptr ^ val *)
-        lift (eval_iop Xor pv val)
+        lift (eval_iop Xor dt pv val)
     | Anand =>
         (* nand: *ptr = ~( *ptr & val ) *)
         match val with
@@ -420,16 +422,16 @@ Section Denotation.
             (* SAZ: Is this the best way to get a UValue with 0xFFFF..FFFF bit pattern? *)
             (* YZ: Same question, but over dvalues *)
             lift
-              (and_v <- eval_iop And pv val;;
-               eval_iop (Sub false false) (DVALUE_I sz (@repr (@bit_int sz) _ (@max_unsigned (@bit_int sz) _))) and_v)
+              (and_v <- eval_iop And dt pv val;;
+               eval_iop (Sub false false) dt (DVALUE_I sz (@repr (@bit_int sz) _ (@max_unsigned (@bit_int sz) _))) and_v)
         | _ => raise ("atomicrmw nand of non-integer value")
         end
     | Afadd =>
         (* fadd: *ptr = *ptr + val (using floating point arithmetic) *)
-        lift (eval_fop FAdd pv val)
+        lift (eval_fop FAdd dt pv val)
     | Afsub =>
         (* fsub: *ptr = *ptr - val (using floating point arithmetic) *)
-        lift (eval_fop FSub pv val)
+        lift (eval_fop FSub dt pv val)
     | Amax
     | Amin
     | Aumax
@@ -458,7 +460,7 @@ Section Denotation.
     (* Perform the load - load addresses must be unique *)
     loaded_v <- load a_ty ptr_v;;
 
-    stored_v <- denote_atomic_rmw_operation a_op loaded_v a_v ;;
+    stored_v <- denote_atomic_rmw_operation a_op a_ty loaded_v a_v ;;
 
     (* Perform the store *)
     store a_ty ptr_v stored_v ;;

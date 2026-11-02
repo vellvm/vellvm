@@ -39,15 +39,15 @@ Section Select.
             conds' <- map_monad dvalue_to_dvalue_base conds ;;
             match v1, v2 with
             | DVALUE_Array true elts1, DVALUE_Array true elts2 =>
-                (DVALUE_Array true) <$>
+                (canonicalize_agg (DVALUE_Array true)) <$>
                   (vec_loop (fun c => fun '(v1, v2) => eval_select_base_dvalue c v1 v2)
                      (List.combine conds' (List.combine elts1 elts2)))
             | DVALUE_Base DVALUE_Poison, DVALUE_Array true ys =>
-                (DVALUE_Array true) <$>
+                (canonicalize_agg (DVALUE_Array true)) <$>
                   (vec_loop (fun c => fun '(v1, v2) => eval_select_base_dvalue c v1 v2)
                      (List.combine conds' (List.combine (repeat (DVALUE_Base DVALUE_Poison) (N.to_nat sz)) ys)))
             | DVALUE_Array true xs, DVALUE_Base DVALUE_Poison =>
-                (DVALUE_Array true) <$>
+                (canonicalize_agg (DVALUE_Array true)) <$>
                   (vec_loop (fun c => fun '(v1, v2) => eval_select_base_dvalue c v1 v2)
                      (List.combine conds' (List.combine xs (repeat (DVALUE_Base DVALUE_Poison) (N.to_nat sz)))))
             | DVALUE_Base DVALUE_Poison, DVALUE_Base DVALUE_Poison =>

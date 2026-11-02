@@ -727,23 +727,14 @@ Section MemoryByte.
       come back under a different [dvalue_bv] constructor than it went in.
       Pinning down "<dv' agrees with dv>" is the open part of this model.
    *)
-  (* Canonicalising constructor for aggregates: an aggregate all of whose
-     immediate children are poison *is* poison, per [dvalue_has_dtyp].
-
-     The [poison_split] fast path in [memory_bytes_to_dvalue] catches the
-     common case -- every byte poison -- without rebuilding the value, but it
-     is not sufficient on its own.  A single non-poison byte lying in padding,
-     or in the tail of an array slot, leaves [rest] non-empty while every
-     field still reads back as poison; e.g. reading [{i8, i32}] from
-     [[psn; X; psn; psn; psn; psn; psn; psn]] would otherwise yield
-     [DVALUE_Struct false [Poison; Poison]].  Children are canonical by
-     induction, so the shallow [dvalue_is_poison] test is enough here.
-
-     Note this also sends an empty aggregate to poison, which is what the
-     [forallb ... = false] premises of [DVALUE_Struct_typ] / [DVALUE_Array_typ]
-     require. *)
-  Definition canonicalize_agg (mk : list dvalue -> dvalue) (vs : list dvalue) : dvalue :=
-    if forallb dvalue_is_poison vs then DVALUE_Base DVALUE_Poison else mk vs.
+  (* [canonicalize_agg] (DynamicValues.v) is the canonicalising constructor
+     for aggregates.  The [poison_split] fast path in [memory_bytes_to_dvalue]
+     catches the common case -- every byte poison -- without rebuilding the
+     value, but it is not sufficient on its own.  A single non-poison byte
+     lying in padding, or in the tail of an array slot, leaves [rest]
+     non-empty while every field still reads back as poison; e.g. reading
+     [{i8, i32}] from [[psn; X; psn; psn; psn; psn; psn; psn]] would
+     otherwise yield [DVALUE_Struct false [Poison; Poison]]. *)
 
   Fixpoint memory_bytes_to_dvalue (dbs : list memory_byte) (dt : dtyp) : EOU dvalue :=
     (* [np] is the index of the first non-poison byte of the *whole* aggregate.

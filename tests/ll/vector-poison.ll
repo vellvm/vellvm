@@ -751,6 +751,73 @@ define i64 @fneg_poison_constant_then_insert() {
   ret i64 %r
 }
 
+; ----------------------------------------------------------- canonical form
+;
+; A vector whose lanes are all poison is the value poison: an operation
+; whose every result lane is poison returns it in that form.  (The harness
+; compares a vector-typed `poison` answer syntactically, so these check the
+; representation, not just the lanes.)
+
+; ASSERT EQ: <2 x i32> poison = call <2 x i32> @canon_add_nsw_all_lanes_overflow()
+define <2 x i32> @canon_add_nsw_all_lanes_overflow() {
+  %s = add nsw <2 x i32> <i32 2147483647, i32 2147483647>, <i32 1, i32 1>
+  ret <2 x i32> %s
+}
+
+; ASSERT EQ: <2 x i32> poison = call <2 x i32> @canon_poison_lanes_literal()
+define <2 x i32> @canon_poison_lanes_literal() {
+  ret <2 x i32> <i32 poison, i32 poison>
+}
+
+; ASSERT EQ: <2 x i1> poison = call <2 x i1> @canon_icmp_poison_constant()
+define <2 x i1> @canon_icmp_poison_constant() {
+  %c = icmp eq <2 x i32> <i32 1, i32 2>, poison
+  ret <2 x i1> %c
+}
+
+; ASSERT EQ: <2 x i32> poison = call <2 x i32> @canon_select_poison_lanes()
+define <2 x i32> @canon_select_poison_lanes() {
+  %s = select <2 x i1> <i1 true, i1 poison>, <2 x i32> <i32 poison, i32 1>, <2 x i32> <i32 2, i32 3>
+  ret <2 x i32> %s
+}
+
+; ASSERT EQ: <2 x i32> poison = call <2 x i32> @canon_shuffle_poison_lanes()
+define <2 x i32> @canon_shuffle_poison_lanes() {
+  %s = shufflevector <2 x i32> <i32 1, i32 poison>, <2 x i32> poison, <2 x i32> <i32 1, i32 poison>
+  ret <2 x i32> %s
+}
+
+; ASSERT EQ: <2 x i32> poison = call <2 x i32> @canon_insert_poison_into_poison()
+define <2 x i32> @canon_insert_poison_into_poison() {
+  %v = insertelement <2 x i32> poison, i32 poison, i32 0
+  ret <2 x i32> %v
+}
+
+; ASSERT EQ: <2 x i64> poison = call <2 x i64> @canon_zext_poison_lanes()
+define <2 x i64> @canon_zext_poison_lanes() {
+  %z = zext <2 x i32> <i32 poison, i32 poison> to <2 x i64>
+  ret <2 x i64> %z
+}
+
+; ASSERT EQ: <2 x double> poison = call <2 x double> @canon_fneg_poison_lanes()
+define <2 x double> @canon_fneg_poison_lanes() {
+  %n = fneg <2 x double> <double poison, double poison>
+  ret <2 x double> %n
+}
+
+; ASSERT EQ: <2 x double> poison = call <2 x double> @canon_fdiv_by_poison()
+define <2 x double> @canon_fdiv_by_poison() {
+  %d = fdiv <2 x double> <double 1.0, double 2.0>, poison
+  ret <2 x double> %d
+}
+
+; a defined lane keeps the vector a vector
+; ASSERT EQ: <2 x i32> <i32 3, i32 poison> = call <2 x i32> @canon_one_defined_lane()
+define <2 x i32> @canon_one_defined_lane() {
+  %s = add nsw <2 x i32> <i32 2, i32 2147483647>, <i32 1, i32 1>
+  ret <2 x i32> %s
+}
+
 ; --- executable form: print each result so the file can be run and
 ; --- its output diffed against clang/llc.
 
