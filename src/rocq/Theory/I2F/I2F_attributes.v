@@ -1,8 +1,10 @@
-(** * I2F invariant for the annotation checks of [Semantics/Attributes.v]
+(** * I2F invariant for the pure annotation checks of [Semantics/Attributes.v]
 
-    Each check is a pure [EOU] computation; related inputs give related
+    Each pure check is an [EOU] computation; related inputs give related
     results ([I2F_EOU]), which [I2F_denotation.v] lifts into the itree
-    semantics with [I2F_refine_lift']. *)
+    semantics with [I2F_refine_lift'].  The checks that read memory
+    (section [MemoryChecks]) are itrees, and their lemmas are in
+    [I2F_denotation.v]. *)
 
 From Stdlib Require Import Lia Program.
 
@@ -97,12 +99,39 @@ Proof.
   repeat break_match_goal; auto.
 Qed.
 
+(** [nofpclass]: related floats are equal, so both sides test the same
+    class, element by element. *)
+Lemma I2F_fp_class b1 b2 :
+  I2F_dvalue_base b1 b2 -> @fp_class PInf b1 = @fp_class PFin b2.
+Proof. intros H; inversion H; subst; cbn; auto. Qed.
+
+Lemma I2F_value_nofpclass mask v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_nofpclass PInf mask v1) (@value_nofpclass PFin mask v2).
+Proof.
+  induction 1 as [b1 b2 HB | p s1 s2 F IH | vec s1 s2 F IH] using I2F_dvalue_ind; cbn.
+  - rewrite (I2F_fp_class HB).
+    destruct (@fp_class PFin b2); [| constructor; auto].
+    destruct (Z.land mask z =? 0)%Z; repeat constructor; auto.
+  - constructor; induction IH; cbn; constructor; auto; inv F; auto.
+  - constructor; induction IH; cbn; constructor; auto; inv F; auto.
+Qed.
+
+Lemma I2F_value_attr_nofpclass attrs v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_attr_nofpclass PInf attrs v1) (@value_attr_nofpclass PFin attrs v2).
+Proof.
+  intros H; unfold value_attr_nofpclass.
+  destruct (find_option attr_nofpclass attrs); auto using I2F_value_nofpclass.
+Qed.
+
 Lemma I2F_value_attrs_poison attrs v1 v2 :
   I2F_dvalue v1 v2 ->
   I2F_dvalue (@value_attrs_poison PInf attrs v1) (@value_attrs_poison PFin attrs v2).
 Proof.
   intros H; unfold value_attrs_poison.
-  apply I2F_value_attr_range, I2F_value_attr_align, I2F_value_attr_nonnull, H.
+  apply I2F_value_attr_nofpclass, I2F_value_attr_range, I2F_value_attr_align,
+    I2F_value_attr_nonnull, H.
 Qed.
 
 (** Applying value attributes: related values give the same [noundef]
@@ -123,44 +152,54 @@ Proof.
   end; now constructor.
 Qed.
 
-(** Per-argument attributes applied to related argument lists. *)
-Lemma I2F_apply_args_attrs attrss msg args1 args2 :
-  Forall2 I2F_dvalue args1 args2 ->
-  I2F_EOU (Forall2 I2F_dvalue)
-    (@apply_args_attrs PInf attrss msg args1) (@apply_args_attrs PFin attrss msg args2).
+(** Load and call metadata [!range]: both sides test the same integer,
+    lane by lane for vectors. *)
+Lemma I2F_value_metadata_range_base rs v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_metadata_range_base PInf rs v1) (@value_metadata_range_base PFin rs v2).
 Proof.
-  intros H; revert attrss; induction H as [| v1 v2 vs1 vs2 Hv _ IH]; intros attrss;
-    cbn [apply_args_attrs].
-  - apply I2F_EOU_ret; constructor.
-  - destruct attrss as [| attrs rest]; cbv beta iota;
-      (eapply I2F_EOU_bind; [apply I2F_apply_value_attrs; eauto | intros v1' v2' Hv'];
-       eapply I2F_EOU_bind; [apply IH | intros vs1' vs2' Hvs'];
-       apply I2F_EOU_ret; constructor; auto).
+  intros H; pose proof H as H'; unfold value_metadata_range_base.
+  inv H; [inv H0 | |]; cbn; auto.
+  repeat break_match_goal; auto.
 Qed.
 
-(** The noreturn/nounwind check sees related call results, which are both
-    returns or both unwinds. *)
-Lemma I2F_check_call_result fattrs msg r1 r2 :
+Lemma I2F_value_metadata_range r v1 v2 :
+  I2F_dvalue v1 v2 ->
+  I2F_dvalue (@value_metadata_range PInf r v1) (@value_metadata_range PFin r v2).
+Proof.
+  intros H.
+  destruct r as [rs|]; cbn; auto.
+  inversion H; subst; try (apply I2F_value_metadata_range_base; auto).
+  destruct v; [| apply I2F_value_metadata_range_base; auto].
+  constructor.
+  match goal with
+  | HF : Forall2 I2F_dvalue _ _ |- _ =>
+      induction HF; cbn; constructor; auto using I2F_value_metadata_range_base
+  end.
+Qed.
+
+Lemma I2F_forallb_well_defined vs1 vs2 :
+  Forall2 I2F_dvalue vs1 vs2 ->
+  forallb (@dvalue_well_defined PInf) vs1 = forallb (@dvalue_well_defined PFin) vs2.
+Proof.
+  induction 1 as [|v1 v2 vs1 vs2 H F IH]; cbn; auto.
+  rewrite (I2F_dvalue_well_defined H), IH; reflexivity.
+Qed.
+
+(** The noreturn/nounwind/nocreateundeforpoison check sees related call
+    results, which are both returns or both unwinds, and related arguments:
+    both sides agree on which are well defined. *)
+Lemma I2F_check_call_result fattrs msg args1 args2 r1 r2 :
+  Forall2 I2F_dvalue args1 args2 ->
   sum_rel I2F_dvalue I2F_dvalue r1 r2 ->
   I2F_EOU (fun _ _ => True)
-    (@check_call_result PInf fattrs msg r1) (@check_call_result PFin fattrs msg r2).
+    (@check_call_result PInf fattrs msg args1 r1) (@check_call_result PFin fattrs msg args2 r2).
 Proof.
-  intros H; unfold check_call_result.
-  destruct H; break_match_goal; now constructor.
-Qed.
-
-Lemma I2F_check_call_return fattrs ret_attrs loc r1 r2 :
-  sum_rel I2F_dvalue I2F_dvalue r1 r2 ->
-  I2F_EOU (sum_rel I2F_dvalue I2F_dvalue)
-    (@check_call_return PInf fattrs ret_attrs loc r1)
-    (@check_call_return PFin fattrs ret_attrs loc r2).
-Proof.
-  intros H; unfold check_call_return.
-  eapply I2F_EOU_bind; [apply I2F_check_call_result; eauto | intros _ _ _].
-  destruct H; cbv beta iota.
-  - apply I2F_EOU_ret; constructor; auto.
-  - eapply I2F_EOU_bind; [apply I2F_apply_value_attrs; eauto | intros].
-    apply I2F_EOU_ret; constructor; auto.
+  intros HA H; unfold check_call_result.
+  rewrite (I2F_forallb_well_defined HA).
+  destruct H as [e1 e2 He | v1 v2 Hv];
+    [| rewrite (I2F_dvalue_well_defined Hv)];
+    repeat break_match_goal; now constructor.
 Qed.
 
 (** Related function values are rejected alike: poison is UB on the
@@ -174,4 +213,35 @@ Proof.
   inv H; [inv H0 | |]; cbn; try now constructor.
   destruct p as [z1 pr1], p' as [z2 pr2]; destruct H as [HI ->]; red in HI; subst; cbn.
   destruct (unsigned z2 =? 0)%Z; now constructor.
+Qed.
+
+(** Related pointers have the same address. *)
+Lemma I2F_dvalue_ptr_address : forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    @dvalue_ptr_address PInf v1 = @dvalue_ptr_address PFin v2.
+Proof.
+  intros v1 v2 R.
+  inversion R; subst; cbn; auto.
+  match goal with
+  | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto
+  end.
+  match goal with
+  | HA : I2F_Addr ?a ?a' |- _ => destruct a, a'; destruct HA as [HI ->]; red in HI; subst
+  end.
+  reflexivity.
+Qed.
+
+(** The integer operands of [llvm.assume] bundles. *)
+Lemma I2F_bundle_uint v1 v2 :
+  I2F_dvalue v1 v2 -> @bundle_uint PInf v1 = @bundle_uint PFin v2.
+Proof.
+  intros R; inversion R; subst; cbn; auto.
+  match goal with HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto end.
+Qed.
+
+Lemma I2F_bundle_sint v1 v2 :
+  I2F_dvalue v1 v2 -> @bundle_sint PInf v1 = @bundle_sint PFin v2.
+Proof.
+  intros R; inversion R; subst; cbn; auto.
+  match goal with HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto end.
 Qed.

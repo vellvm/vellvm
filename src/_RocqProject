@@ -30,6 +30,7 @@
 ./rocq/Syntax/AstLib.v
 ./rocq/Syntax/RawIdMaps.v
 ./rocq/Syntax/CFG.v
+./rocq/Syntax/ModuleRefs.v
 ./rocq/Syntax/DynamicTypes.v
 ./rocq/Syntax/Traversal.v
 ./rocq/Syntax/TypToDtyp.v
@@ -66,8 +67,8 @@
 ./rocq/Semantics/Operations/Conversion.v
 ./rocq/Semantics/Operations/Freeze.v
 ./rocq/Semantics/Operations.v
-./rocq/Semantics/Attributes.v
 ./rocq/Semantics/IntrinsicsDefinitions.v
+./rocq/Semantics/Attributes.v
 ./rocq/Semantics/Denotation.v
 
 ./rocq/Semantics/Interfaces/Memory.v

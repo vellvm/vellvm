@@ -297,13 +297,155 @@ define i64 @load_align_md() {
 
 ; ASSERT EQ: i64 poison = call i64 @load_align_md()
 
-; NOTE: `!dereferenceable` / `!dereferenceable_or_null` load metadata ("the
-; value loaded is known to be dereferenceable at the current program point,
-; otherwise the behavior is undefined") does not currently parse in Vellvm
-; (`dereferenceable` is lexed as a keyword).  The test would be:
-;
-;   store ptr null, ptr %p
-;   %v = load ptr, ptr %p, !dereferenceable !2     ; UB, with !2 = !{i64 4}
+; LangRef (range metadata): "If the loaded or returned value is not in the
+; specified range, a poison value is returned instead. ... The loaded value
+; ... is known to be in the union of the ranges defined by each consecutive
+; pair. ... The range is allowed to wrap. ... For vector-typed instructions,
+; the range is applied element-wise."
+define i8 @load_range_out() {
+  %p = alloca i8
+  store i8 3, ptr %p
+  %v = load i8, ptr %p, !range !3
+  ret i8 %v
+}
+
+; ASSERT EQ: i8 poison = call i8 @load_range_out()
+
+define i8 @load_range_union() {
+  %p = alloca i8
+  store i8 6, ptr %p
+  %v = load i8, ptr %p, !range !4
+  ret i8 %v
+}
+
+; ASSERT EQ: i8 6 = call i8 @load_range_union()
+
+define i8 @load_range_wrap() {
+  %p = alloca i8
+  store i8 -1, ptr %p
+  %v = load i8, ptr %p, !range !5
+  ret i8 %v
+}
+
+; ASSERT EQ: i8 -1 = call i8 @load_range_wrap()
+
+; !range + !noundef with a value out of range is UB.
+define i8 @load_range_noundef() {
+  %p = alloca i8
+  store i8 3, ptr %p
+  %v = load i8, ptr %p, !range !3, !noundef !0    ; <- UB @load_range_noundef
+  ret i8 %v
+}
+
+; ASSERT UB 336: call i8 @load_range_noundef()
+
+define i8 @load_range_vector(i32 %k) {
+  %p = alloca <2 x i8>
+  store <2 x i8> <i8 1, i8 3>, ptr %p
+  %v = load <2 x i8>, ptr %p, !range !3
+  %e = extractelement <2 x i8> %v, i32 %k
+  ret i8 %e
+}
+
+; ASSERT EQ: i8 1 = call i8 @load_range_vector(i32 0)
+; ASSERT EQ: i8 poison = call i8 @load_range_vector(i32 1)
+
+; LangRef (nofpclass metadata): "If the loaded value is one of the specified
+; floating-point classes, a poison value is returned."
+define double @load_nofpclass_nan() {
+  %p = alloca double
+  %nan = fdiv double 0.0, 0.0
+  store double %nan, ptr %p
+  %v = load double, ptr %p, !nofpclass !6
+  ret double %v
+}
+
+; ASSERT EQ: double poison = call double @load_nofpclass_nan()
+
+define double @load_nofpclass_ok() {
+  %p = alloca double
+  store double 1.5, ptr %p
+  %v = load double, ptr %p, !nofpclass !6
+  ret double %v
+}
+
+; ASSERT EQ: double 1.5 = call double @load_nofpclass_ok()
+
+define i32 @load_nofpclass_noundef() {
+  %p = alloca double
+  %nan = fdiv double 0.0, 0.0
+  store double %nan, ptr %p
+  %v = load double, ptr %p, !nofpclass !6, !noundef !0 ; <- UB @load_nofpclass_noundef
+  ret i32 0
+}
+
+; ASSERT UB 378: call i32 @load_nofpclass_noundef()
+
+; LangRef (dereferenceable metadata): "the value loaded is known to be
+; dereferenceable at the current program point, otherwise the behavior is
+; undefined. The number of bytes known to be dereferenceable is specified by
+; the integer value in the metadata node."  (dereferenceable_or_null: "either
+; dereferenceable at the current program point or null".)
+define i32 @load_deref_null() {
+  %p = alloca ptr
+  store ptr null, ptr %p
+  %v = load ptr, ptr %p, !dereferenceable !2       ; <- UB @load_deref_null
+  ret i32 0
+}
+
+; ASSERT UB 392: call i32 @load_deref_null()
+
+define i32 @load_deref_too_small() {
+  %a = alloca i16
+  %p = alloca ptr
+  store ptr %a, ptr %p
+  %v = load ptr, ptr %p, !dereferenceable !2       ; <- UB @load_deref_too_small
+  ret i32 0
+}
+
+; ASSERT UB 402: call i32 @load_deref_too_small()
+
+define i32 @load_deref_freed() {
+  %a = call ptr @malloc(i64 4)
+  call void @free(ptr %a)
+  %p = alloca ptr
+  store ptr %a, ptr %p
+  %v = load ptr, ptr %p, !dereferenceable !2       ; <- UB @load_deref_freed
+  ret i32 0
+}
+
+; ASSERT UB 413: call i32 @load_deref_freed()
+
+define i32 @load_deref_ok() {
+  %a = alloca i32
+  store i32 7, ptr %a
+  %p = alloca ptr
+  store ptr %a, ptr %p
+  %v = load ptr, ptr %p, !dereferenceable !2
+  %r = load i32, ptr %v
+  ret i32 %r
+}
+
+; ASSERT EQ: i32 7 = call i32 @load_deref_ok()
+
+define i32 @load_deref_or_null_null() {
+  %p = alloca ptr
+  store ptr null, ptr %p
+  %v = load ptr, ptr %p, !dereferenceable_or_null !2
+  ret i32 0
+}
+
+; ASSERT EQ: i32 0 = call i32 @load_deref_or_null_null()
+
+define i32 @load_deref_or_null_too_small() {
+  %a = alloca i16
+  %p = alloca ptr
+  store ptr %a, ptr %p
+  %v = load ptr, ptr %p, !dereferenceable_or_null !2 ; <- UB @load_deref_or_null_too_small
+  ret i32 0
+}
+
+; ASSERT UB 444: call i32 @load_deref_or_null_too_small()
 
 ; Lifetime: a stack object is dead before llvm.lifetime.start and after
 ; llvm.lifetime.end.  Loads from it are poison (not UB); see store.ll for the
@@ -324,6 +466,11 @@ define i32 @load_after_lifetime_end() {
 
 !0 = !{}
 !1 = !{i64 8}
+!2 = !{i64 4}
+!3 = !{i8 0, i8 2}
+!4 = !{i8 0, i8 2, i8 5, i8 7}
+!5 = !{i8 -2, i8 1}
+!6 = !{i32 3}
 
 ; ---- BEGIN executable tail generated by tests/gen.py --dispatch (do not edit) ----
 ; `main N` runs case N alone, so UB in one case cannot mask another;
@@ -491,8 +638,98 @@ define i64 @ub_case_26() {
   ret i64 %r
 }
 
-; case 27 (line 320): ASSERT EQ: i32 poison = call i32 @load_after_lifetime_end()
-define i32 @ub_case_27() {
+; case 27 (line 312): ASSERT EQ: i8 poison = call i8 @load_range_out()
+define i8 @ub_case_27() {
+  %r = call i8 @load_range_out()
+  ret i8 %r
+}
+
+; case 28 (line 321): ASSERT EQ: i8 6 = call i8 @load_range_union()
+define i8 @ub_case_28() {
+  %r = call i8 @load_range_union()
+  ret i8 %r
+}
+
+; case 29 (line 330): ASSERT EQ: i8 -1 = call i8 @load_range_wrap()
+define i8 @ub_case_29() {
+  %r = call i8 @load_range_wrap()
+  ret i8 %r
+}
+
+; case 30 (line 340): ASSERT UB 336: call i8 @load_range_noundef()
+define i8 @ub_case_30() {
+  %r = call i8 @load_range_noundef()
+  ret i8 %r
+}
+
+; case 31 (line 350): ASSERT EQ: i8 1 = call i8 @load_range_vector(i32 0)
+define i8 @ub_case_31() {
+  %r = call i8 @load_range_vector(i32 0)
+  ret i8 %r
+}
+
+; case 32 (line 351): ASSERT EQ: i8 poison = call i8 @load_range_vector(i32 1)
+define i8 @ub_case_32() {
+  %r = call i8 @load_range_vector(i32 1)
+  ret i8 %r
+}
+
+; case 33 (line 363): ASSERT EQ: double poison = call double @load_nofpclass_nan()
+define double @ub_case_33() {
+  %r = call double @load_nofpclass_nan()
+  ret double %r
+}
+
+; case 34 (line 372): ASSERT EQ: double 1.5 = call double @load_nofpclass_ok()
+define double @ub_case_34() {
+  %r = call double @load_nofpclass_ok()
+  ret double %r
+}
+
+; case 35 (line 382): ASSERT UB 378: call i32 @load_nofpclass_noundef()
+define i32 @ub_case_35() {
+  %r = call i32 @load_nofpclass_noundef()
+  ret i32 %r
+}
+
+; case 36 (line 396): ASSERT UB 392: call i32 @load_deref_null()
+define i32 @ub_case_36() {
+  %r = call i32 @load_deref_null()
+  ret i32 %r
+}
+
+; case 37 (line 406): ASSERT UB 402: call i32 @load_deref_too_small()
+define i32 @ub_case_37() {
+  %r = call i32 @load_deref_too_small()
+  ret i32 %r
+}
+
+; case 38 (line 417): ASSERT UB 413: call i32 @load_deref_freed()
+define i32 @ub_case_38() {
+  %r = call i32 @load_deref_freed()
+  ret i32 %r
+}
+
+; case 39 (line 429): ASSERT EQ: i32 7 = call i32 @load_deref_ok()
+define i32 @ub_case_39() {
+  %r = call i32 @load_deref_ok()
+  ret i32 %r
+}
+
+; case 40 (line 438): ASSERT EQ: i32 0 = call i32 @load_deref_or_null_null()
+define i32 @ub_case_40() {
+  %r = call i32 @load_deref_or_null_null()
+  ret i32 %r
+}
+
+; case 41 (line 448): ASSERT UB 444: call i32 @load_deref_or_null_too_small()
+define i32 @ub_case_41() {
+  %r = call i32 @load_deref_or_null_too_small()
+  ret i32 %r
+}
+
+; case 42 (line 462): ASSERT EQ: i32 poison = call i32 @load_after_lifetime_end()
+define i32 @ub_case_42() {
   %r = call i32 @load_after_lifetime_end()
   ret i32 %r
 }
@@ -543,6 +780,21 @@ dispatch:
     i32 25, label %case25
     i32 26, label %case26
     i32 27, label %case27
+    i32 28, label %case28
+    i32 29, label %case29
+    i32 30, label %case30
+    i32 31, label %case31
+    i32 32, label %case32
+    i32 33, label %case33
+    i32 34, label %case34
+    i32 35, label %case35
+    i32 36, label %case36
+    i32 37, label %case37
+    i32 38, label %case38
+    i32 39, label %case39
+    i32 40, label %case40
+    i32 41, label %case41
+    i32 42, label %case42
   ]
 case0:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 0)
@@ -763,10 +1015,128 @@ case26:
   ret i32 0
 case27:
   call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 27)
-  %c27_r = call i32 @ub_case_27()
+  %c27_r = call i8 @ub_case_27()
   call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 27)
-  %c27_0 = sext i32 %c27_r to i64
+  %c27_0 = sext i8 %c27_r to i64
   call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c27_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case28:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 28)
+  %c28_r = call i8 @ub_case_28()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 28)
+  %c28_0 = sext i8 %c28_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c28_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case29:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 29)
+  %c29_r = call i8 @ub_case_29()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 29)
+  %c29_0 = sext i8 %c29_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c29_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case30:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 30)
+  %c30_r = call i8 @ub_case_30()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 30)
+  %c30_0 = sext i8 %c30_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c30_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case31:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 31)
+  %c31_r = call i8 @ub_case_31()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 31)
+  %c31_0 = sext i8 %c31_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c31_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case32:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 32)
+  %c32_r = call i8 @ub_case_32()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 32)
+  %c32_0 = sext i8 %c32_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c32_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case33:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 33)
+  %c33_r = call double @ub_case_33()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 33)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_fp, double %c33_r)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case34:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 34)
+  %c34_r = call double @ub_case_34()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 34)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_fp, double %c34_r)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case35:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 35)
+  %c35_r = call i32 @ub_case_35()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 35)
+  %c35_0 = sext i32 %c35_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c35_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case36:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 36)
+  %c36_r = call i32 @ub_case_36()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 36)
+  %c36_0 = sext i32 %c36_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c36_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case37:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 37)
+  %c37_r = call i32 @ub_case_37()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 37)
+  %c37_0 = sext i32 %c37_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c37_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case38:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 38)
+  %c38_r = call i32 @ub_case_38()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 38)
+  %c38_0 = sext i32 %c38_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c38_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case39:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 39)
+  %c39_r = call i32 @ub_case_39()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 39)
+  %c39_0 = sext i32 %c39_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c39_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case40:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 40)
+  %c40_r = call i32 @ub_case_40()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 40)
+  %c40_0 = sext i32 %c40_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c40_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case41:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 41)
+  %c41_r = call i32 @ub_case_41()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 41)
+  %c41_0 = sext i32 %c41_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c41_0)
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
+  ret i32 0
+case42:
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_start, i32 42)
+  %c42_r = call i32 @ub_case_42()
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_ret, i32 42)
+  %c42_0 = sext i32 %c42_r to i64
+  call i32 (ptr, ...) @printf(ptr @ub_fmt_int, i64 %c42_0)
   call i32 (ptr, ...) @printf(ptr @ub_fmt_nl)
   ret i32 0
 bad:

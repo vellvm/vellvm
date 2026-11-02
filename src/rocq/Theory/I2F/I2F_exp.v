@@ -2491,15 +2491,28 @@ Qed.
 
 
 (** * eval_gep *)
-(** GEP. The offset computation [handle_gep_h] lives in [EOU Z], a
-      parameter-free type: on related indices the two sides are literally
-      equal ([to_Z] agrees on related intptrs). *)
-Lemma I2F_handle_gep_h : forall vs vs',
+(** GEP. The steps of the address computation ([gep_steps]) live in
+      [EOUP (list (Z * Z))], a parameter-free type: on related indices the
+      two sides are literally equal ([to_Z] agrees on related intptrs). *)
+(* [break_match_goal_safe], also refusing [EOUP]-typed scrutinees (which
+     do not syntactically match [EOU _]), so that the two sides' recursive
+     calls are left for the induction hypothesis. *)
+Ltac break_match_goal_safeP :=
+  match goal with
+  | |- context [match ?X with _ => _ end] =>
+      lazymatch type of X with
+      | EOU _ => fail
+      | EOUP _ => fail
+      | _ => destruct X eqn:?
+      end
+  end.
+
+Lemma I2F_gep_steps_h : forall vs vs',
     Forall2 I2F_dvalue vs vs' ->
-    forall t off,
-      @handle_gep_h PInf t off vs = @handle_gep_h PFin t off vs'.
+    forall t,
+      @gep_steps_h PInf t vs = @gep_steps_h PFin t vs'.
 Proof.
-  intros vs vs' F; induction F; intros t off; cbn; auto.
+  intros vs vs' F; induction F; intros t; cbn; auto.
   match goal with
   | HC : I2F_dvalue ?c ?c' |- _ =>
       induction HC; cbn; auto
@@ -2511,72 +2524,68 @@ Proof.
   try (match goal with
        | HI : I2F_Iptr _ _ |- _ => red in HI; subst
        end);
-  repeat (break_goal_fast; cbn); auto.
+  repeat (break_match_goal_safeP; cbn); auto;
+  repeat match goal with
+         | IH : forall t, @gep_steps_h PInf t _ = @gep_steps_h PFin t _ |- _ =>
+             rewrite IH
+         end; auto.
 Qed.
 
-(* [break_match_goal_safe], also refusing [EOUP]-typed scrutinees (which
-     do not syntactically match [EOU _]). *)
-Ltac break_match_goal_safeP :=
-  match goal with
-  | |- context [match ?X with _ => _ end] =>
-      lazymatch type of X with
-      | EOU _ => fail
-      | EOUP _ => fail
-      | _ => destruct X eqn:?
-      end
-  end.
-
-Lemma I2F_handle_gep_ptr : forall t a a' vs vs',
-    I2F_Addr a a' ->
+Lemma I2F_gep_steps : forall t vs vs',
     Forall2 I2F_dvalue vs vs' ->
-    I2F_EOUP I2F_Addr
-      (@handle_gep_ptr PInf t a vs)
-      (@handle_gep_ptr PFin t a' vs').
+    @gep_steps PInf t vs = @gep_steps PFin t vs'.
 Proof.
-  intros * HA F.
-  destruct a, a'; destruct HA as [HI ->]; red in HI; subst.
-  inversion F; subst; cbn; [repeat constructor|].
+  intros t vs vs' F.
+  destruct F as [|v v' vs vs' HV F]; cbn; auto.
+  inversion HV; subst; cbn; auto.
   match goal with
-  | HC : I2F_dvalue ?c ?c' |- _ =>
-      inversion HC; subst; cbn; try (repeat constructor)
+  | HB : I2F_dvalue_base _ _ |- _ =>
+      inversion HB; subst; cbn; auto
   end;
-  try (match goal with
-       | HB : I2F_dvalue_base _ _ |- _ =>
-           inversion HB; subst; cbn; try (repeat constructor)
-       end);
   try (match goal with
        | HI : I2F_Iptr _ _ |- _ => red in HI; subst
        end);
-  unfold from_Z_bits;
-  (* bitwidth-literal dispatch first; the [EOU]/[EOUP]-typed scrutinees
-       are skipped, exposing the offset computations at the top *)
   repeat (break_match_goal_safeP; cbn); auto;
-  (* align the two offset computations, then reduce them in lockstep,
-       including the poison outcome *)
-  try (erewrite I2F_handle_gep_h by eauto;
-       match goal with
-       | |- context [match @handle_gep_h ?pa ?u ?o ?ws with _ => _ end] =>
-           destruct (@handle_gep_h pa u o ws) as [| | | [|]]; cbn; auto
-       end);
-  repeat (break_match_goal_safeP; cbn); repeat constructor; auto;
-  i2f_in_range_case; unfold I2F_Iptr; apply in_bounds_case; auto.
+  erewrite I2F_gep_steps_h by eauto; reflexivity.
 Qed.
 
-Lemma I2F_eval_gep t a1 a2 b1 b2 :
+(** Related pointers have the same address, so the flags are violated on
+      both sides or on neither, and the resulting addresses are equal. *)
+Lemma I2F_handle_gep_ptr : forall flags t a a' vs vs',
+    I2F_Addr a a' ->
+    Forall2 I2F_dvalue vs vs' ->
+    I2F_EOUP I2F_Addr
+      (@handle_gep_ptr PInf flags t a vs)
+      (@handle_gep_ptr PFin flags t a' vs').
+Proof.
+  intros flags t [z pr] [i pr'] vs vs' [HI ->] F; red in HI; subst.
+  unfold handle_gep_ptr.
+  eapply I2F_EOUP_bind with (RA := Logic.eq).
+  - erewrite I2F_gep_steps by eauto.
+    destruct (@gep_steps PFin t vs') as [| | | [|]]; constructor; auto.
+  - intros steps ? <-.
+    match goal with
+    | |- I2F_EOUP _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
+        replace b1 with b2 by reflexivity; destruct b2; [constructor|]
+    end.
+    apply I2F_EOUP_fmap_NoPois, I2F_int_to_ptr.
+Qed.
+
+Lemma I2F_eval_gep flags t a1 a2 b1 b2 :
   I2F_dvalue a1 b1 ->
   Forall2 I2F_dvalue a2 b2 ->
-  I2F_EOU I2F_dvalue (eval_gep t a1 a2) (eval_gep t b1 b2).
+  I2F_EOU I2F_dvalue (eval_gep flags t a1 a2) (eval_gep flags t b1 b2).
 Proof.
   intros R F.
-  inversion R; subst; cbn; try (repeat constructor).
+  inversion R; subst; cbn -[handle_gep_ptr]; try (repeat constructor).
   match goal with
   | HB : I2F_dvalue_base _ _ |- _ =>
-      inversion HB; subst; cbn; try (repeat constructor)
+      inversion HB; subst; cbn -[handle_gep_ptr]; try (repeat constructor)
   end.
-  (* Pointer: [catch_pois] turns a poisoned offset into a poison value *)
+  (* Pointer: [catch_pois] turns a poisoned result into a poison value *)
   match goal with
   | HA : I2F_Addr _ _ |- _ =>
-      destruct (I2F_handle_gep_ptr t _ _ HA F); cbn; repeat constructor; auto
+      destruct (I2F_handle_gep_ptr flags t _ _ HA F); cbn; repeat constructor; auto
   end.
 Qed.
 
@@ -3079,6 +3088,8 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
     + intros [sz t'] ? <-; cbn.
       erbind; [apply IHe |].
       intros...
+  - (* EXP_BlockAddress: a global read, like [EXP_Ident] *)
+    intros; cbn...
 Qed.
 
 Lemma I2F_denote_exp' :
