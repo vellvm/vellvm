@@ -369,6 +369,10 @@ Module VIR_Notations.
      τ custom vir_typ at level 99,
      v custom vir_exp at level 99,
      only printing).
+  (** Block address: the function and block names display as bare constr. *)
+  Notation "'blockaddress' ( f , b )" := (EXP_BlockAddress f b)
+    (in custom vir_exp at level 0, f constr at level 0, b constr at level 0,
+     only printing).
   (** [EXP_Asm] (6 args, very rare in research goals) intentionally
       not given a notation — falls through to constr display. *)
   (** Booleans: each maps to the literal value-keyed [EXP_Bool] case.
@@ -503,22 +507,22 @@ Module VIR_Notations.
 
   (** ** Float comparison. Now safe to use [true]/[false] as keywords —
         we're inside a custom entry, not constr. *)
-  Notation "'fcmp' 'false'"        := (OP_FCmp FFalse _ _ _) (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'true'"         := (OP_FCmp FTrue _ _ _)  (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'oeq' e ',' f"  := (OP_FCmp FOeq _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'ogt' e ',' f"  := (OP_FCmp FOgt _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'oge' e ',' f"  := (OP_FCmp FOge _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'olt' e ',' f"  := (OP_FCmp FOlt _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'ole' e ',' f"  := (OP_FCmp FOle _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'one' e ',' f"  := (OP_FCmp FOne _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'ord' e ',' f"  := (OP_FCmp FOrd _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'uno' e ',' f"  := (OP_FCmp FUno _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'ueq' e ',' f"  := (OP_FCmp FUeq _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'ugt' e ',' f"  := (OP_FCmp FUgt _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'uge' e ',' f"  := (OP_FCmp FUge _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'ult' e ',' f"  := (OP_FCmp FUlt _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'ule' e ',' f"  := (OP_FCmp FUle _ e f)   (in custom vir_exp at level 20, only printing).
-  Notation "'fcmp' 'une' e ',' f"  := (OP_FCmp FUne _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'false'"        := (OP_FCmp FFalse _ _ _ _) (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'true'"         := (OP_FCmp FTrue _ _ _ _)  (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'oeq' e ',' f"  := (OP_FCmp FOeq _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'ogt' e ',' f"  := (OP_FCmp FOgt _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'oge' e ',' f"  := (OP_FCmp FOge _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'olt' e ',' f"  := (OP_FCmp FOlt _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'ole' e ',' f"  := (OP_FCmp FOle _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'one' e ',' f"  := (OP_FCmp FOne _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'ord' e ',' f"  := (OP_FCmp FOrd _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'uno' e ',' f"  := (OP_FCmp FUno _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'ueq' e ',' f"  := (OP_FCmp FUeq _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'ugt' e ',' f"  := (OP_FCmp FUgt _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'uge' e ',' f"  := (OP_FCmp FUge _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'ult' e ',' f"  := (OP_FCmp FUlt _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'ule' e ',' f"  := (OP_FCmp FUle _ _ e f)   (in custom vir_exp at level 20, only printing).
+  Notation "'fcmp' 'une' e ',' f"  := (OP_FCmp FUne _ _ e f)   (in custom vir_exp at level 20, only printing).
 
   (** ** Conversions.
         LLVM surface form: [<op> <from-type> <value> to <to-type>]. The
@@ -631,7 +635,7 @@ Module VIR_Notations.
 
   (** ** Select. LLVM surface: [select i1 cond, τ a, τ b]. *)
   Notation "'select' τc c ',' τa a ',' τb b" :=
-    (OP_Select (τc, c) (τa, a) (τb, b))
+    (OP_Select _ (τc, c) (τa, a) (τb, b))
     (in custom vir_exp at level 20,
      τc custom vir_typ at level 99, c custom vir_exp at level 99,
      τa custom vir_typ at level 99, a custom vir_exp at level 99,
@@ -642,7 +646,7 @@ Module VIR_Notations.
         [vir_idx_list]; in real goals it is non-empty, so the bare-cons
         rule handles it. *)
   Notation "'getelementptr' t ',' τp p ',' idxs" :=
-    (OP_GetElementPtr t (τp, p) idxs)
+    (OP_GetElementPtr gep_no_flags t (τp, p) idxs)
     (in custom vir_exp at level 20,
      t custom vir_typ at level 99,
      τp custom vir_typ at level 99,
@@ -925,7 +929,7 @@ Module VIR_Notations.
      brs custom vir_arm_list at level 99,
      only printing).
   Notation "'indirectbr' τ v ',' brs" :=
-    (_, TERM_IndirectBr (τ, v) brs, _)
+    (_, TERM_IndirectBr (τ, v) brs _, _)
     (in custom vir_term at level 30,
      τ custom vir_typ at level 99, v custom vir_exp at level 99,
      brs custom vir_label_list at level 99,
@@ -970,7 +974,7 @@ Module VIR_Notations.
   Notation "{ p }" := p
     (in custom vir_phi at level 0, p constr, only printing).
 
-  Notation "x '=' 'phi' t a" := (x, Phi t a, _)
+  Notation "x '=' 'phi' t a" := (x, Phi _ t a, _)
     (in custom vir_phi at level 30,
      x constr at level 0,
      t custom vir_typ at level 99,
@@ -1479,7 +1483,7 @@ Section SurfaceSyntaxTest.
             {| blk_id := Name "merge";
                blk_phis := [
                  (Name "r",
-                  Phi (TYPE_I 32%positive)
+                  Phi [] (TYPE_I 32%positive)
                       [(Name "neg", EXP_Ident (ID_Local (Name "c")));
                        (Name "pos", EXP_Ident (ID_Local (Name "c")))],
                   [])
