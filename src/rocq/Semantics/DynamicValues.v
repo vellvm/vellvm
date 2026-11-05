@@ -856,6 +856,10 @@ Section DValue.
            _
        | DVALUE_Iptr i1, DVALUE_Iptr i2 =>
            eval_int_op iop i1 i2
+       | _, DVALUE_Poison             =>
+           if iop_is_div iop
+           then raise_ub "Division by poison."
+           else ret DVALUE_Poison
        | DVALUE_Poison, _             =>
            match iop with
            (* A poison dividend could be INT_MIN, and INT_MIN / -1 is UB for
@@ -874,10 +878,6 @@ Section DValue.
            | _ =>
                ret DVALUE_Poison 
            end
-       | _, DVALUE_Poison             =>
-           if iop_is_div iop
-           then raise_ub "Division by poison."
-           else ret DVALUE_Poison
        | _, _                           => raise_error "ill_typed-iop"
        end).
     destruct (Pos.eq_dec sz1 sz2); subst.
