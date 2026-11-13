@@ -105,6 +105,31 @@ Section Denotation.
     | ID_Local x  => lread x
     end.
 
+  (** ** Block addresses
+      The address of block [b] of function [f] is a pointer to a 1-byte
+      allocation of its own, made when the global environment is built (see
+      [allocate_block_addresses] in TopLevel.v) and kept under the reserved
+      global name [blockaddress_id f b].  (A zero-size allocation would not
+      do: consecutive ones share an address.)  The name cannot clash with a
+      global of the program, whose names do not contain "(". *)
+  Definition blockaddress_id (f : function_id) (b : block_id) : raw_id :=
+    Name ("blockaddress(@" ++ show_raw_id f ++ ", %" ++ show_raw_id b ++ ")").
+
+  (* The listed block whose address is [z], given each listed block's
+     address. *)
+  Definition indirectbr_target (z : Z) (targets : list (block_id * option Z)) : option block_id :=
+    option_map fst (find (fun '(_, a) => match a with Some a => Z.eqb a z | None => false end) targets).
+
+  Lemma indirectbr_target_In : forall z brs addrs b,
+      indirectbr_target z (combine brs addrs) = Some b -> In b brs.
+  Proof.
+    unfold indirectbr_target.
+    intros z brs addrs b H.
+    destruct (find _ _) as [[b' a]|] eqn:FIND; inv H.
+    apply find_some in FIND as [IN _].
+    eapply in_combine_l; eauto.
+  Qed.
+
   (** ** Denotation of expressions
       [denote_exp top o] is the main entry point for evaluating itree expressions.
       top : the type at which the expression should be evaluated (if any)
@@ -187,6 +212,8 @@ Section Denotation.
     in
     match o with
     | EXP_Ident i => lookup_id i
+
+    | EXP_BlockAddress f b => gread (blockaddress_id f b)
                 
     | EXP_Integer x =>
         match top with
@@ -264,7 +291,7 @@ Section Denotation.
         v <- denote_exp (Some dt) op ;;
         lift (eval_fneg v)
              
-    | OP_FCmp fcmp dt op1 op2 =>
+    | OP_FCmp fcmp _ dt op1 op2 =>
         v1 <- denote_exp (Some dt) op1 ;;
         v2 <- denote_exp (Some dt) op2 ;;
         lift (eval_fcmp fcmp v1 v2)
@@ -273,10 +300,10 @@ Section Denotation.
         v <- denote_exp (Some dt_from) op ;;
         convert ct dt_from v dt_to
              
-    | OP_GetElementPtr dt1 (dt2, ptrval) idxs =>
+    | OP_GetElementPtr flags dt1 (dt2, ptrval) idxs =>
         vptr <- denote_exp (Some dt2) ptrval ;;
         vs <- map_monad (fun '(dt, index) => denote_exp (Some dt) index) idxs ;;
-        lift (eval_gep dt1 vptr vs)
+        lift (eval_gep flags dt1 vptr vs)
 
      | OP_ExtractElement (dt_vec, vecop) (dt_idx, idx) =>
         vec <- denote_exp (Some dt_vec) vecop ;;
@@ -304,7 +331,7 @@ Section Denotation.
         elt <- denote_exp (Some dt_elt) eltop ;;
         lift (insert_value dt_str str elt (List.map denote_int_syntax idxs))
 
-    | OP_Select (dt, cnd) (dt1, op1) (dt2, op2) =>
+    | OP_Select _ (dt, cnd) (dt1, op1) (dt2, op2) =>
         dcond <- denote_exp (Some dt) cnd ;;
         v1    <- denote_exp (Some dt1) op1 ;;
         v2    <- denote_exp (Some dt2) op2 ;;
@@ -468,12 +495,38 @@ Section Denotation.
     ret tt.
 
   (** Evaluate a call's arguments, passing each through its call-site
-      attributes ([apply_value_attrs]); [msg] reports a violated [noundef]. *)
+      attributes ([apply_attrs]); [msg] reports a violated [noundef]. *)
   Definition denote_call_args (args : list (texp dtyp * list param_attr)) (msg : string)
     : CFGtop (list dvalue) :=
     map_monad (fun '((t, op), attrs) =>
                  v <- denote_exp' (Some t) op ;;
-                 lift (apply_value_attrs attrs msg v)) args.
+                 apply_attrs attrs msg v) args.
+
+  (** ** Operand bundles
+
+      Operand bundles belong to the call, not to the callee (LangRef: "An
+      operand bundle at a call site cannot change the implementation of the
+      called function").  Every call and invoke evaluates its bundles'
+      operands at the call ([denote_operand_bundles]); what else a bundle
+      means depends on its tag and on what is called ([bundle_check]).  So
+      far only the bundles of [llvm.assume] mean more; their checks are in
+      Attributes.v ([assume_bundle_checks]). *)
+
+  (** Evaluate the operand bundles of a call to [f], and check the ones whose
+      tag means something for [f]. *)
+  Definition denote_operand_bundles (loc : string) (f : exp dtyp) (obs : list (@operand_bundle dtyp))
+    : CFGtop unit :=
+    _ <- map_monad (fun ob =>
+                      vs <- map_monad (fun o =>
+                                         match o with
+                                         | SSA_value (t, e) => denote_exp' (Some t) e
+                                         | Metadata_string _ => ret NONE
+                                         end) (ob_ops ob) ;;
+                      match bundle_check f (ob_tag ob) with
+                      | Some check => check loc vs
+                      | None => ret tt
+                      end) obs ;;
+    ret tt.
 
   (** An instruction has only side-effects, it therefore returns [unit] *)
   Definition denote_instr
@@ -523,10 +576,14 @@ Section Denotation.
       a <- denote_exp' (Some du) ptr;;
       lift (assert_alignment a anns (err_loc tt ++ ": Load with overestimated alignment."));;
       v <- load dt a;;
-      (* the load's !nonnull / !align / !noundef metadata, which act like the
-         corresponding attributes on the loaded value *)
+      (* the load's !range, then its !nonnull / !align / !noundef metadata,
+         which act like the corresponding attributes on the loaded value (so
+         a value out of range is UB with !noundef), then !dereferenceable *)
       v <- lift (apply_value_attrs (load_metadata_attrs md)
-                   (err_loc tt ++ ": Loaded value violates !noundef.") v);;
+                   (err_loc tt ++ ": Loaded value violates !noundef.")
+                   (value_metadata_range (metadata_range md) v));;
+      assert_load_dereferenceable md v
+        (err_loc tt ++ ": Loaded value violates !dereferenceable.");;
       lwrite id v
 
     (* Store *)
@@ -543,20 +600,21 @@ Section Denotation.
     | (_, INSTR_Store _ _ _) => raise (err_loc tt ++ ": ILL-FORMED itree ERROR: Store to non-void ID")
 
     (* Call *)
-    (* TODO: technically operand bundles can affect semantics *)
-    | (pt, INSTR_Call (dt, f) args anns _) =>
+    | (pt, INSTR_Call (dt, f) args anns obs) =>
         vs <- denote_call_args args (err_loc tt ++ ": Call argument violates noundef.") ;;
+        denote_operand_bundles (err_loc tt) f obs ;;
         res <-
           match intrinsic_exp f with
           | Some s => intrinsic dt s vs varargs
           | None =>
               fv <- denote_exp' None f;;
-              call dt fv vs
+              call dt (anns_cconv anns) fv vs
           end
         ;;
-        (* the call site's function and return-value attributes *)
-        res <- lift (check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
-                       (err_loc tt ++ ": Call") res) ;;
+        (* the call site's function attributes, then its !range metadata and
+           return-value attributes *)
+        res <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
+                 (metadata_range md) (err_loc tt ++ ": Call") vs res ;;
         returned_value <-
           match res with
           | inl exc => raiseLLVM exc
@@ -576,7 +634,7 @@ Section Denotation.
         args <- load DTYPE_Pointer ptr_to_args;;
         retv <- load argty args;;
         ix <- lift (from_Z 1);;
-        args' <- lift (eval_gep argty args [DVALUE_Base (DVALUE_Iptr ix)]);;
+        args' <- lift (eval_gep gep_no_flags argty args [DVALUE_Base (DVALUE_Iptr ix)]);;
         store DTYPE_Pointer ptr_to_args args';;
         match pt with
         | IVoid _ => ret tt
@@ -684,14 +742,15 @@ Section Denotation.
 
     | TERM_Unreachable => raiseUB (err_loc tt ++ ": IMPOSSIBLE: unreachable in reachable position")
 
-    (* TODO: technically operand bundles can affect the semantics of invoke *)
-    | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns _ =>
+    | TERM_Invoke (dt, fnptrval) args to_label unwind_label anns obs =>
       uvs <- denote_call_args args (err_loc tt ++ ": Invoke argument violates noundef.") ;;
+      denote_operand_bundles (err_loc tt) fnptrval obs ;;
       fv <- denote_exp' None fnptrval ;;
-      rv <- call dt fv uvs ;;
-      (* the invoke's function and return-value attributes *)
-      rv <- lift (check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
-                    (err_loc tt ++ ": Invoke") rv) ;;
+      rv <- call dt (anns_cconv anns) fv uvs ;;
+      (* the invoke's function attributes, then its !range metadata and
+         return-value attributes *)
+      rv <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
+              (metadata_range md) (err_loc tt ++ ": Invoke") uvs rv ;;
       (* branch to to_label *)
       match rv with
       | inl exn =>
@@ -711,14 +770,32 @@ Section Denotation.
       exn <- denote_exp' (Some t) expr;;
       raiseLLVM exn
 
-    | TERM_IndirectBr (t, addr) _ =>
-      (* LangRef (indirectbr): "If 'address' is poison or undef, this
-         instruction has undefined behavior."  Jumping to a real address
-         (needs [blockaddress]) is not supported yet. *)
+    | TERM_IndirectBr (t, addr) brs fn =>
+      (* LangRef (indirectbr): "All possible destination blocks must be
+         listed in the label list, otherwise this instruction has undefined
+         behavior. This implies that jumps to labels defined in other
+         functions have undefined behavior as well. If 'address' is poison
+         or undef, this instruction has undefined behavior."  The target is
+         compared by address only, so a block address that went through
+         [ptrtoint]/[inttoptr] still works. *)
       a <- denote_exp' (Some t) addr ;;
       if dvalue_is_poison a
       then raiseUB (err_loc tt ++ ": indirectbr on a poison address.")
-      else raise (err_loc tt ++ ": Unsupport itree terminator")
+      else
+        match fn with
+        | None => raise (err_loc tt ++ ": indirectbr outside of a function")
+        | Some f =>
+            addrs <- map_monad (fun b => ba <- gread (blockaddress_id f b) ;;
+                                        ret (dvalue_ptr_address ba)) brs ;;
+            match dvalue_ptr_address a with
+            | None => raise (err_loc tt ++ ": indirectbr on a non-pointer")
+            | Some z =>
+                match indirectbr_target z (combine brs addrs) with
+                | Some b => ret (inl b)
+                | None => raiseUB (err_loc tt ++ ": indirectbr to an address that is not one of its listed blocks.")
+                end
+            end
+        end
     end.
 
   (* Denoting a list of instruction simply binds the trees together *)
@@ -726,7 +803,7 @@ Section Denotation.
     loop_monad (fun i => denote_instr i varargs) c.
 
   Definition denote_phi (bid_from : block_id) (id_p : local_id * phi dtyp * (list (metadata dtyp))) : CFGtop (local_id * dvalue) :=
-    let '(id, Phi dt args, md) := id_p in
+    let '(id, Phi _ dt args, md) := id_p in
     (* Same lazy-location scheme as [denote_instr]. *)
     let bogus := set_loc (get_file_info md) in
     let err_loc := fun (_:unit) => bogus ++ location_error_string md in
@@ -835,8 +912,10 @@ Section Denotation.
   (* The denotation of an itree function is a rocq function that takes a list of
      dvalues and returns the appropriate semantics: a function either returns
      normally with a [dvalue] or unwinds with an exception [exc]. *)
+  (* A function's denotation takes the calling convention of the call site
+     and the arguments. *)
   Definition function_denotation : Type :=
-    list dvalue -> CFGtop (exc + dvalue).
+    cconv -> list dvalue -> CFGtop (exc + dvalue).
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOU (list (A * B) * list B) :=
     match l1, l2 with
@@ -886,16 +965,20 @@ Section Denotation.
        (e.g. [noundef], [nonnull]) apply on entry and on a normal return. *)
     let '(ret_attrs, args_attrs) := dc_param_attrs (df_prototype df) in
     let fname := show_raw_id (dc_name (df_prototype df)) in
-    fun (args : list dvalue) =>
-      args <- lift (apply_args_attrs args_attrs
-                     ("Argument of " ++ fname ++ " violates noundef.") args);;
+    let fcc := anns_cconv (dc_annotations (df_prototype df)) in
+    fun (cc : cconv) (args : list dvalue) =>
+      (* the calling convention, checked on entry so that a mismatch is
+         reported at the call (see [check_cconv]) *)
+      lift (check_cconv fcc cc fname);;
+      args <- apply_args_attrs args_attrs
+               ("Argument of " ++ fname ++ " violates noundef.") args;;
       varg <- push_call_frame df args;;
       (* Catch a frame-local unwind so the result surfaces as [exc + dvalue].
          [pop_call_frame] runs on both the normal and the unwinding path, so the
          frame is always torn down before the (value-carried) unwind continues. *)
       rv <- run_exc (denote_cfg_map bmap (df_instrs df) (Some varg));;
       pop_call_frame;;
-      lift (check_call_return (dc_attrs (df_prototype df)) ret_attrs fname rv).
+      check_call_return (dc_attrs (df_prototype df)) ret_attrs None fname args rv.
 
   (* We now turn to the second knot to be tied: a top-level itree program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to
@@ -924,16 +1007,16 @@ Section Denotation.
     @mrec CallE (ExternalCallE +' _)
       (fun T call =>
          match call with
-         | Call dt fv args =>
+         | Call dt cc fv args =>
              (* UB through poison or null (see [check_callee]) *)
              lift (check_callee fv);;
              match lookup_defn fv fundefs with
              | Some f_den => (* If the call is internal *)
                  (* [f_den] already produces [exc + dvalue] (see [denote_function]),
                     so the callee's unwind crosses the [mrec] knot as this value. *)
-                 f_den args
+                 f_den cc args
              | None => inr <$> external_call dt fv args
              end
-         end) _ (Call dt f_value args).
+         end) _ (Call dt CC_Ccc f_value args).
   
 End Denotation.

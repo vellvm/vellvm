@@ -146,7 +146,8 @@ def with_sanitize_address(path, bindir):
     """A copy of `path` whose functions carry `sanitize_address`.  clang adds
     that attribute when compiling C, but not to .ll input, and the ASan pass
     only instruments functions that have it."""
-    text = re.sub(r"^(define\b.*?)\s*\{\s*$", r"\1 sanitize_address {",
+    # Function attributes go before a `personality` clause.
+    text = re.sub(r"^(define\b.*?)(\s+personality\b[^{]*?)?\s*\{\s*$", r"\1 sanitize_address\2 {",
                   open(path).read(), flags=re.M)
     tmp = os.path.join(bindir, re.sub(r"\W", "_", os.path.relpath(path, HERE)) + ".asan.ll")
     with open(tmp, "w") as f:

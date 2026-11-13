@@ -517,6 +517,13 @@ Section DValue.
         dvalue_is_poison d = false -> d <> DVALUE_Base DVALUE_Poison.
     Proof. intros d H C; subst; discriminate. Qed.
 
+    (** The address of a pointer value. *)
+    Definition dvalue_ptr_address (v : dvalue) : option Z :=
+      match v with
+      | DVALUE_Base (DVALUE_Pointer p) => Some (ptr_to_int p)
+      | _ => None
+      end.
+
     (** LangRef (Well-Defined Values): "a value is *well defined* if the
         value does not have an undef bit and is not poison ...  An aggregate
         value or vector is well defined if its elements are well defined."
@@ -698,25 +705,30 @@ Section DValue.
               else ret (tdb res)                               
                        
       | Shl nuw nsw =>
-          res <- mshl x y;;
-          
-          let res_u := munsigned res in
-          let res_u' := Z.shiftl (munsigned x) (munsigned y) in
-
           if dtyp_base_eq_dec (@mdtyp_of_int Int _) DTYPE_Iptr
           then
+            res <- mshl x y;;
+            let res_u := munsigned res in
+            let res_u' := Z.shiftl (munsigned x) (munsigned y) in
             (* TODO: Do we need to check for the unsigned case? Return result anyway? *)
             if (res_u' >? res_u)
             then raise_oom "Shl unsigned overflow on iptr."
             else
               ret (tdb res)
           else
-            (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
-         then there is overflow. *)
+            (* Check the shift amount before computing anything: both [mshl]
+               and [Z.shiftl] build the full unbounded shifted value, so
+               e.g. [shl i64 1, -1] would otherwise construct a 2^64-bit
+               integer. *)
             if option_pred (fun bw => munsigned y >=? Zpos bw) mbitwidth
             then ret (dvp mdtyp_of_int)
             else
-              
+              res <- mshl x y;;
+              let res_u := munsigned res in
+              let res_u' := Z.shiftl (munsigned x) (munsigned y) in
+
+              (* Unsigned shift x right by bitwidth - y. If shifted x != sign bit * (2^y - 1),
+                 then there is overflow. *)
               if andb nuw (res_u' >? res_u)
               then ret (dvp mdtyp_of_int)
               else

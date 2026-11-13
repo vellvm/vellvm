@@ -140,6 +140,16 @@ Proof.
   constructor; repeat constructor.
 Qed.
 
+Lemma I2F_llvm_assume : forall args1 args2,
+    Forall2 I2F_dvalue_base args1 args2 ->
+    I2F_EOU (sum_rel I2F_dvalue_base I2F_dvalue_base) (llvm_assume args1) (llvm_assume args2).
+Proof.
+  intros args1 args2 Hargs; unfold llvm_assume.
+  destruct Hargs as [|a1 a2 l1 l2 Ha Hargs]; [constructor|].
+  inversion Ha; subst; destruct Hargs; cbn;
+    repeat break_match_goal; try constructor; repeat constructor.
+Qed.
+
 Lemma I2F_llvm_vellvm_internal_throw : forall args1 args2,
     Forall2 I2F_dvalue_base args1 args2 ->
     I2F_EOU (sum_rel I2F_dvalue_base I2F_dvalue_base)
@@ -295,6 +305,8 @@ Proof.
     [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_64 | exact Hargs] | ].
   destruct (RelDec.rel_dec f2 "llvm.vellvm.internal.throw");
     [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_vellvm_internal_throw | exact Hargs] | ].
+  destruct (RelDec.rel_dec f2 "llvm.assume");
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_assume | exact Hargs] | ].
   destruct (RelDec.rel_dec f2 "llvm.va_start");
     [ simp I2FA_Intrinsic; apply I2F_llvm_va_start; auto | ].
   destruct (RelDec.rel_dec f2 "llvm.va_end");

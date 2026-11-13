@@ -106,8 +106,12 @@ Section withParams.
 
     (* Generic calls, refined by [denote_mcfg] *)
   Variant CallE : Type -> Type :=
-    | Call        : forall (t:dtyp) (f:dvalue) (args:list dvalue), CallE (exc + dvalue).
-  Definition call {E} `{CallE -< E} t f args : itree E _ := trigger (Call t f args).
+    (* [cc]: the calling convention of the call site, which must match the
+       callee's (LangRef: "The calling convention of any pair of dynamic
+       caller/callee must match, or the behavior of the program is
+       undefined.") *)
+    | Call        : forall (t:dtyp) (cc:cconv) (f:dvalue) (args:list dvalue), CallE (exc + dvalue).
+  Definition call {E} `{CallE -< E} t cc f args : itree E _ := trigger (Call t cc f args).
 
   (* ExternalCallE values are the "observable" events by which one should compare the 
        equivalence of two LLVM IR programs.  These should never be interpreted away

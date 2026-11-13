@@ -122,4 +122,5 @@ Extract Inlined Constant Archi.ppc64 => "false".
 (* (* NOTE: assumes that this file is compiled from /src *) *)
 Cd "ml/extracted".
 
-Separate Extraction ExtrOcamlIntConv TopLevel AstLib ParserHelper ShowAST ReprAST Handlers Numeric.Floats BinNums BinPos (* QCVellvm *).
+Separate Extraction ExtrOcamlIntConv TopLevel AstLib ParserHelper ShowAST ReprAST Handlers Numeric.Floats BinNums BinPos
+  LLVMAst.nofpclass_mask LLVMAst.nofpclass_mask_valid (* QCVellvm *).

@@ -98,7 +98,7 @@ define i1 @llvm.vellvm.internal.smuloverflow.i32(i32 noundef %0, i32 noundef %1)
 
 34:                                               ; preds = %17, %27, %9, %29, %21, %11, %6
   %35 = phi i1 [ %8, %6 ], [ %16, %11 ], [ %26, %21 ], [ %33, %29 ], [ false, %9 ], [ false, %27 ], [ false, %17 ]
-  ret i32 %35
+  ret i1 %35
 }
 
 define i1 @llvm.vellvm.internal.smuloverflow.i64(i64 noundef %0, i64 noundef %1) local_unnamed_addr #0 {
@@ -339,17 +339,9 @@ define void @"_ZN73_$LT$std..env..Args$u20$as$u20$core..iter..traits..iterator..
        ret void
 }
 
-; Function Attrs: inaccessiblememonly mustprogress nofree nosync nounwind willreturn
-; LangRef (llvm.assume): "If the condition is violated during execution, the
-; behavior is undefined."  A false condition reaches `unreachable` (UB); a
-; poison one is UB through `noundef`.
-define void @llvm.assume(i1 noundef %cond) {
-  br i1 %cond, label %holds, label %violated
-holds:
-  ret void
-violated:
-  unreachable
-}
+; llvm.assume is a Vellvm intrinsic (see
+; src/rocq/Semantics/IntrinsicsDefinitions.v); its operand bundles are
+; checked at the call (see src/rocq/Semantics/Attributes.v).
 
 ; Function Attrs: nounwind nonlazybind uwtable
 define void @__rust_dealloc(i8*, i64, i64) unnamed_addr #4 {
@@ -1197,4 +1189,18 @@ define { i8, i1 } @llvm.uadd.with.overflow.i8(i8 noundef %0, i8 noundef %1) loca
   %base = insertvalue {i8, i1} {i8 0, i1 0}, i8 %res, 0
   %fullres = insertvalue {i8, i1} %base, i1 %overflow, 1
   ret {i8, i1} %fullres
+}
+
+define i32 @llvm.umin.i32(i32 %a, i32 %b) {
+entry:
+  %cmp = icmp ult i32 %a, %b
+  %min = select i1 %cmp, i32 %a, i32 %b
+  ret i32 %min
+}
+
+define i64 @llvm.umin.i64(i64 %a, i64 %b) {
+entry:
+  %cmp = icmp ult i64 %a, %b
+  %min = select i1 %cmp, i64 %a, i64 %b
+  ret i64 %min
 }

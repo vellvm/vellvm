@@ -12,6 +12,7 @@
 From Vellvm Require Export
      Syntax.LLVMAst
      Syntax.CFG
+     Syntax.ModuleRefs
      Syntax.AstLib
      Syntax.RawIdMaps
      Syntax.Scope
