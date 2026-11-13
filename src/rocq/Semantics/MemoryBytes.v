@@ -197,8 +197,79 @@ Section MemoryByte.
       | DVALUE_B sz bits => memory_byte_of_dvalue_bv bits
       end in
     (byte_size + offset, N.rev_loop_acc byte_gen byte_size 0 acc).
-  
-    
+
+  (** ** Packed vectors
+
+      LangRef (vector type, "Memory Layout"): a vector [<N x iM>] is laid out
+      as the bitcast to an integer of [N * M] bits -- the elements packed
+      together without padding, element 0 in the least significant bits
+      (little endian) -- stored as that integer would be.  For byte-sized
+      elements this is the array layout, which the generic element-by-element
+      path below already produces.  It differs for non-byte-sized [iM] /
+      [bM] elements (<8 x i1> is one byte, and the elements of a <4 x i6>
+      straddle byte boundaries), so those vectors are serialized bit by bit.
+
+      When [N * M] is not a multiple of 8 LangRef leaves the position of the
+      padding unspecified; as for a non-byte-sized integer store, the value
+      goes in the low bits and the padding bits are zero. *)
+
+  (* [Some (t, M)] when [dt] is a vector of non-byte-sized [iM] / [bM] *)
+  Definition packed_vector_type (dt : dtyp) : option (dtyp_base * positive) :=
+    match dt with
+    | DTYPE_Array true _ (DTYPE_Base t) =>
+        match t with
+        | DTYPE_I m | DTYPE_B m =>
+            if N.eqb (Npos m mod 8) 0 then None else Some (t, m)
+        | _ => None
+        end
+    | _ => None
+    end.
+
+  (* The [n] memory bits [f start], ..., [f (start + n - 1)], in order. *)
+  Definition memory_bits_from (f : N -> memory_bit) (n start : N) : list memory_bit :=
+    rev_append (N.rev_loop_acc f n start []) [].
+
+  (* The bits of a [dvalue_bv], least significant first. *)
+  Definition dvalue_bv_to_memory_bits {sz : positive} (bv : dvalue_bv sz) : list memory_bit :=
+    match bv with
+    | BYTE_I x => memory_bits_from (fun i => Bit_bit (repr (extract_bit_vint x i))) (Npos sz) 0
+    | BYTE_Pointer p idx => memory_bits_from (fun i => Bit_ptr p i) (Npos sz) (Npos sz * idx)
+    | BYTE_Mixed bits => bits
+    end.
+
+  (* The [m] bits of one element of a packed vector. *)
+  Definition packed_elt_bits (m : positive) (dv : dvalue) : EOU (list memory_bit) :=
+    match dv with
+    | DVALUE_Base (DVALUE_I _ x) =>
+        ret (memory_bits_from (fun i => Bit_bit (repr (extract_bit_vint x i))) (Npos m) 0)
+    | DVALUE_Base (DVALUE_B _ bv) => ret (dvalue_bv_to_memory_bits bv)
+    | DVALUE_Base DVALUE_Poison => ret (repeat Bit_psn (Pos.to_nat m))
+    | _ => raise_error ("packed vector: element is not an integer or byte value: " ++ show dv)
+    end.
+
+  (* Eight bits as a memory byte, in the canonical form the readers expect:
+     [BYTE_I] when every bit is an integer bit, [BYTE_Mixed] otherwise. *)
+  Definition memory_byte_of_bits (bits : list memory_bit) : memory_byte :=
+    if forallb is_int_bit bits
+    then BYTE_I (repr (int_bits_to_Z bits))
+    else BYTE_Mixed 8 bits.
+
+  (* Push [n] bytes of [bits], eight bits each, onto [acc] (which is in
+     reverse order, as in [acc_dvalue_to_memory_bytes_h]). *)
+  Fixpoint acc_bits_to_memory_bytes (n : nat) (bits : list memory_bit) (acc : list memory_byte)
+    : list memory_byte :=
+    match n with
+    | O => acc
+    | S n' => acc_bits_to_memory_bytes n' (drop 8 bits) (memory_byte_of_bits (take 8 bits) :: acc)
+    end.
+
+  (* [nbytes] bytes holding [bits], zero-padded at the top. *)
+  Definition acc_packed_bits_to_memory_bytes (nbytes : N) (bits : list memory_bit) (acc : list memory_byte)
+    : list memory_byte :=
+    let pad := repeat (Bit_bit (repr 0)) (N.to_nat (8 * nbytes) - List.length bits) in
+    acc_bits_to_memory_bytes (N.to_nat nbytes) (bits ++ pad) acc.
+
+
   (* Invariants:
      [acc] the accumulated list of memory_bytes so far is in _reverse_ order.
      [offset] is the offset in bytes of the next byte to be accumulated
@@ -293,7 +364,16 @@ Section MemoryByte.
     | DTYPE_Array _vector sz elt_t =>
         match dv with
         | DVALUE_Array v elts =>
-            dvalue_extract_array_bytes _vector elt_t elts offset acc
+            match packed_vector_type dt with
+            | Some (_, m) =>
+                (* a vector of non-byte-sized elements: pack the bits *)
+                bits <- map_monad (packed_elt_bits m) elts ;;
+                let nbytes := store_size_dtyp dt in
+                let bs := acc_packed_bits_to_memory_bytes nbytes (List.concat bits) acc in
+                ret (accumulate_padding (offset + nbytes)%N tail_align bs)
+            | None =>
+                dvalue_extract_array_bytes _vector elt_t elts offset acc
+            end
         | DVALUE_Base DVALUE_Poison =>
             (* Poison inhabits every type ([DVALUE_Poison_typ_agg]), so a
                poison at aggregate type is well-typed: it serializes to the
@@ -736,6 +816,36 @@ Section MemoryByte.
      [{i8, i32}] from [[psn; X; psn; psn; psn; psn; psn; psn]] would
      otherwise yield [DVALUE_Struct false [Poison; Poison]]. *)
 
+  (* One element of a packed vector (see "Packed vectors" above) from its [m]
+     bits.  An [iM] with any poison bit is poison; pointer bits count as the
+     bits of the address, as in [memory_bytes_to_int].  A [bM] keeps its bits
+     in canonical form ([dvalue_bv_canonical]): all poison is [DVALUE_Poison],
+     all integer bits is [BYTE_I], anything else [BYTE_Mixed] -- [m] is not a
+     whole number of bytes, so it is never a [BYTE_Pointer]. *)
+  Definition packed_bits_to_dvalue (t : dtyp_base) (m : positive) (bits : list memory_bit) : dvalue :=
+    match t with
+    | DTYPE_B _ =>
+        if forallb is_poison_bit bits then DVALUE_Base DVALUE_Poison
+        else if forallb is_int_bit bits
+             then DVALUE_Base (@DVALUE_B _ m (BYTE_I (repr (int_bits_to_Z bits))))
+             else DVALUE_Base (@DVALUE_B _ m (BYTE_Mixed m bits))
+    | _ =>
+        match memory_bits_to_Z bits with
+        | raise_ret (NoPois z) => DVALUE_Base (DVALUE_I m (repr z))
+        | _ => DVALUE_Base DVALUE_Poison
+        end
+    end.
+
+  (* The first [n] elements, [m] bits each, of a packed vector. *)
+  Fixpoint packed_bits_to_elts (t : dtyp_base) (m : positive) (n : nat) (bits : list memory_bit)
+    : list dvalue :=
+    match n with
+    | O => []
+    | S n' =>
+        packed_bits_to_dvalue t m (take (Npos m) bits)
+          :: packed_bits_to_elts t m n' (drop (Npos m) bits)
+    end.
+
   Fixpoint memory_bytes_to_dvalue (dbs : list memory_byte) (dt : dtyp) : EOU dvalue :=
     (* [np] is the index of the first non-poison byte of the *whole* aggregate.
        A field or element lying entirely below it is poison, so it is answered
@@ -803,9 +913,19 @@ Section MemoryByte.
         match rest with
         | [] => ret (DVALUE_Base DVALUE_Poison)
         | _ :: _ =>
-            let stride := if vector then store_size_dtyp t else alloc_size_dtyp t in
-            elts <- array_elts_to_dvalue np stride t (N.to_nat sz) 0%N dbs ;;
-            ret (canonicalize_agg (DVALUE_Array vector) elts)
+            match packed_vector_type (DTYPE_Array vector sz t) with
+            | Some (tb, m) =>
+                (* a vector of non-byte-sized elements: unpack the bits; any
+                   padding bits above the last element are ignored, as for a
+                   non-byte-sized integer *)
+                let bits := rev_append (get_bits_of_memory_byte_list (sz * Npos m) dbs []) [] in
+                ret (canonicalize_agg (DVALUE_Array true)
+                       (packed_bits_to_elts tb m (N.to_nat sz) bits))
+            | None =>
+                let stride := if vector then store_size_dtyp t else alloc_size_dtyp t in
+                elts <- array_elts_to_dvalue np stride t (N.to_nat sz) 0%N dbs ;;
+                ret (canonicalize_agg (DVALUE_Array vector) elts)
+            end
         end
 
     | DTYPE_Struct packed fields =>

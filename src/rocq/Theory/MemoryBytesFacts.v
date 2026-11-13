@@ -229,6 +229,9 @@ Section MemoryByteFacts.
     | Some a => pad_to a x
     end.
 
+  Lemma tapad_ge : forall ta x, (x <= tapad ta x)%N.
+  Proof. intros [a|] x; cbn; unfold pad_to; lia. Qed.
+
   (** The byte-accumulating primitives all satisfy the same invariant: the
       offset advances by exactly the number of bytes appended to [acc]. *)
 
@@ -332,13 +335,117 @@ Section MemoryByteFacts.
           fields dts offset acc.
   Proof. reflexivity. Qed.
 
+  (** The packed-vector branch of the serializer (see "Packed vectors" in
+      MemoryBytes.v): the elements' bits, packed into [store_size_dtyp dt]
+      bytes, then the caller's trailing pad. *)
+  Definition packed_vector_bytes (m : positive) (dt : dtyp) (elts : list dvalue)
+    (offset : N) (ta : option N) (acc : list memory_byte) : EOU (N * list memory_byte) :=
+    bits <- map_monad (packed_elt_bits m) elts ;;
+    let nbytes := store_size_dtyp dt in
+    let bs := acc_packed_bits_to_memory_bytes nbytes (List.concat bits) acc in
+    ret (accumulate_padding (offset + nbytes)%N ta bs).
+
   Lemma ser_array_unfold : forall vec sz t p elts offset ta acc,
       acc_dvalue_to_memory_bytes_h (DTYPE_Array vec sz t)
         (DVALUE_Array p elts) offset ta acc =
-        array_bytes_loop acc_dvalue_to_memory_bytes_h ta t
-          (if vec then 0%N else (alloc_size_dtyp t - store_size_dtyp t)%N)
-          elts offset acc.
+        match packed_vector_type (DTYPE_Array vec sz t) with
+        | Some (_, m) => packed_vector_bytes m (DTYPE_Array vec sz t) elts offset ta acc
+        | None =>
+            array_bytes_loop acc_dvalue_to_memory_bytes_h ta t
+              (if vec then 0%N else (alloc_size_dtyp t - store_size_dtyp t)%N)
+              elts offset acc
+        end.
   Proof. reflexivity. Qed.
+
+  (** What [packed_vector_type] selects. *)
+  Lemma packed_vector_type_Some : forall dt tb m,
+      packed_vector_type dt = Some (tb, m) ->
+      exists sz, dt = DTYPE_Array true sz (DTYPE_Base tb)
+            /\ (tb = DTYPE_I m \/ tb = DTYPE_B m)
+            /\ (Npos m mod 8 <> 0)%N.
+  Proof.
+    intros dt tb m H.
+    destruct dt as [b | p l | v sz t]; try discriminate.
+    destruct v; try discriminate.
+    destruct t as [b | p l | v' sz' t']; try discriminate.
+    exists sz.
+    destruct b; cbn in H; try discriminate.
+    all: match type of H with
+         | context [N.eqb ?x 0] => destruct (N.eqb_spec x 0) as [E | NE]
+         end.
+    all: inversion H; subst.
+    all: split; [reflexivity | split; [auto | assumption]].
+  Qed.
+
+  Lemma store_size_packed_vector : forall dt tb m,
+      packed_vector_type dt = Some (tb, m) ->
+      exists sz, dt = DTYPE_Array true sz (DTYPE_Base tb)
+            /\ store_size_dtyp dt = ((sz * Npos m + 7) / 8)%N.
+  Proof.
+    intros dt tb m H.
+    destruct (packed_vector_type_Some _ H) as (sz & -> & [-> | ->] & _);
+      exists sz; split; try reflexivity.
+    - apply store_size_dtyp_vector_int.
+    - apply store_size_dtyp_vector_bytes.
+  Qed.
+
+  (** Any other vector is laid out element after element, at the elements'
+      store size -- an [iM] / [bM] with [M] a multiple of 8 included. *)
+  Lemma store_size_unpacked_vector : forall sz t,
+      packed_vector_type (DTYPE_Array true sz t) = None ->
+      store_size_dtyp (DTYPE_Array true sz t) = (sz * store_size_dtyp t)%N.
+  Proof.
+    intros sz t H.
+    assert (Hk : forall m, (Npos m mod 8 = 0)%N ->
+                 ((sz * Npos m + 7) / 8 = sz * ((Npos m + 7) / 8))%N).
+    { intros m Hm.
+      pose proof (N.div_mod (Npos m) 8 ltac:(lia)) as D.
+      rewrite Hm, N.add_0_r in D.
+      remember (Npos m / 8)%N as k; rewrite D.
+      replace (sz * (8 * k) + 7)%N with (7 + (sz * k) * 8)%N by lia.
+      replace (8 * k + 7)%N with (7 + k * 8)%N by lia.
+      rewrite !N.div_add by lia; reflexivity. }
+    destruct t as [b | |];
+      try (apply store_size_dtyp_vector; intros m' C; discriminate).
+    destruct b; try (apply store_size_dtyp_vector; intros m' C; discriminate);
+      cbn [packed_vector_type] in H;
+      destruct (N.eqb_spec (Npos sz0 mod 8) 0) as [E | NE]; try discriminate.
+    - rewrite store_size_dtyp_vector_int, store_size_dtyp_int; apply Hk, E.
+    - rewrite store_size_dtyp_vector_bytes, store_size_dtyp_bytes; apply Hk, E.
+  Qed.
+
+  Lemma acc_bits_to_memory_bytes_length : forall n bits acc,
+      length (acc_bits_to_memory_bytes n bits acc) = (n + length acc)%nat.
+  Proof.
+    induction n as [| n IH]; intros bits acc; cbn [acc_bits_to_memory_bytes]; [reflexivity |].
+    rewrite IH; cbn [length]; lia.
+  Qed.
+
+  Lemma acc_packed_bits_to_memory_bytes_length : forall nbytes bits acc,
+      N.of_nat (length (acc_packed_bits_to_memory_bytes nbytes bits acc))
+      = (N.of_nat (length acc) + nbytes)%N.
+  Proof.
+    intros nbytes bits acc; unfold acc_packed_bits_to_memory_bytes.
+    rewrite acc_bits_to_memory_bytes_length; lia.
+  Qed.
+
+  (** The packed branch emits the vector's store size, then [ta]'s padding. *)
+  Lemma packed_vector_bytes_spec : forall m dt elts offset ta acc offset' bs,
+      packed_vector_bytes m dt elts offset ta acc = raise_ret (offset', bs) ->
+      offset' = tapad ta (offset + store_size_dtyp dt)
+      /\ N.of_nat (length bs) = (N.of_nat (length acc) + (offset' - offset))%N.
+  Proof.
+    intros m dt elts offset ta acc offset' bs H.
+    unfold packed_vector_bytes in H.
+    destruct (map_monad (packed_elt_bits m) elts) as [| | | bits]; cbn in H; try discriminate.
+    pose proof (accumulate_padding_spec (offset + store_size_dtyp dt)%N ta
+                  (acc_packed_bits_to_memory_bytes (store_size_dtyp dt) (List.concat bits) acc))
+      as [E L].
+    injection H as Hacc; rewrite Hacc in E, L; cbn in E, L; subst offset'.
+    split; [reflexivity |].
+    rewrite L, acc_packed_bits_to_memory_bytes_length.
+    pose proof (tapad_ge ta (offset + store_size_dtyp dt)); lia.
+  Qed.
 
   Lemma ser_base_unfold : forall dtb dv offset ta acc,
       acc_dvalue_to_memory_bytes_h (DTYPE_Base dtb) (DVALUE_Base dv) offset ta acc =
@@ -361,9 +468,6 @@ Section MemoryByteFacts.
           accumulate_padding_bytes offset (store_size_dtyp (DTYPE_Array vec sz t)) acc in
         ret (accumulate_padding offset' ta bs).
   Proof. reflexivity. Qed.
-
-  Lemma tapad_ge : forall ta x, (x <= tapad ta x)%N.
-  Proof. intros [a|] x; cbn; unfold pad_to; lia. Qed.
 
   (** The offset a struct's field loop reaches after one field: align (unpacked
       only), then advance by the field's *alloc* size.  [fold_left sfe_step]
@@ -575,18 +679,25 @@ Section MemoryByteFacts.
     - (* DVALUE_Array *)
       inversion HT as [| | | vv ees ssz eet HNV HNP HFA HLen]; subst.
       rewrite ser_array_unfold in Heq.
-      destruct (array_bytes_loop_spec HFA IH _ _ _ _ Heq) as [Eo [Elen Ele]].
-      split.
-      + rewrite Eo; f_equal.
-        rewrite HLen, Nnat.N2Nat.id.
-        destruct v.
-        * rewrite store_size_dtyp_vector; cbv beta iota; lia.
-        * rewrite store_size_dtyp_array; cbv beta iota.
-          replace (store_size_dtyp eet + (alloc_size_dtyp eet - store_size_dtyp eet))%N
-            with (alloc_size_dtyp eet)
-            by (pose proof (store_le_alloc eet); lia).
-          reflexivity.
-      + rewrite Elen; lia.
+      match type of Heq with
+      | context [packed_vector_type ?d] =>
+          destruct (packed_vector_type d) as [[tb m] |] eqn:EP
+      end.
+      + (* a packed vector: exactly its store size *)
+        destruct (packed_vector_bytes_spec _ _ _ _ _ _ Heq) as [Eo Elen].
+        rewrite N.add_0_l in Eo; split; [exact Eo | rewrite Elen; lia].
+      + destruct (array_bytes_loop_spec HFA IH _ _ _ _ Heq) as [Eo [Elen Ele]].
+        split.
+        * rewrite Eo; f_equal.
+          rewrite HLen, Nnat.N2Nat.id.
+          destruct v.
+          -- rewrite store_size_unpacked_vector by exact EP; cbv beta iota; lia.
+          -- rewrite store_size_dtyp_array; cbv beta iota.
+             replace (store_size_dtyp eet + (alloc_size_dtyp eet - store_size_dtyp eet))%N
+               with (alloc_size_dtyp eet)
+               by (pose proof (store_le_alloc eet); lia).
+             reflexivity.
+        * rewrite Elen; lia.
   Qed.
 
   Lemma dvalue_to_memory_bytes_sizeof :
@@ -1603,6 +1714,16 @@ Section MemoryByteFacts.
     destruct b; cbn [memory_bit_to_bit]; destruct r; eexists; reflexivity.
   Qed.
 
+  (** [memory_bits_to_Z] only ever answers with a value or poison. *)
+  Lemma memory_bits_to_Z_total : forall bits,
+      memory_bits_to_Z bits = raise_ret Pois
+      \/ exists z, memory_bits_to_Z bits = raise_ret (NoPois z).
+  Proof.
+    intros bits; unfold memory_bits_to_Z.
+    destruct (map_monad_bit_ret bits) as [r ->]; destruct r; cbn;
+      first [left; reflexivity | right; eexists; reflexivity].
+  Qed.
+
   Lemma memory_byte_to_Z_mixed_ret : forall bits idx,
       exists r, memory_byte_to_Z (mixed_byte bits idx) = raise_ret r.
   Proof.
@@ -2179,16 +2300,28 @@ Section MemoryByteFacts.
       end.
   End ReadArrayLoop.
 
+  (** The packed-vector branch of the reader: the first [sz * m] bits, split
+      into [sz] elements. *)
+  Definition packed_vector_elts (tb : dtyp_base) (m : positive) (sz : N)
+    (dbs : list memory_byte) : list dvalue :=
+    packed_bits_to_elts tb m (N.to_nat sz)
+      (rev_append (get_bits_of_memory_byte_list (sz * Npos m) dbs []) []).
+
   Lemma read_array_unfold : forall vec sz t dbs,
       memory_bytes_to_dvalue dbs (DTYPE_Array vec sz t)
       = let '(np, rest) := poison_split dbs in
         match rest with
         | [] => ret (DVALUE_Base DVALUE_Poison)
         | _ :: _ =>
-            elts <- read_array_loop memory_bytes_to_dvalue np
-                      (if vec then store_size_dtyp t else alloc_size_dtyp t) t
-                      (N.to_nat sz) 0%N dbs ;;
-            ret (canonicalize_agg (DVALUE_Array vec) elts)
+            match packed_vector_type (DTYPE_Array vec sz t) with
+            | Some (tb, m) =>
+                ret (canonicalize_agg (DVALUE_Array true) (packed_vector_elts tb m sz dbs))
+            | None =>
+                elts <- read_array_loop memory_bytes_to_dvalue np
+                          (if vec then store_size_dtyp t else alloc_size_dtyp t) t
+                          (N.to_nat sz) 0%N dbs ;;
+                ret (canonicalize_agg (DVALUE_Array vec) elts)
+            end
         end.
   Proof. reflexivity. Qed.
 
@@ -2512,6 +2645,649 @@ Section MemoryByteFacts.
         * rewrite Hrde; reflexivity.
   Qed.
 
+  (** ** Well-formed bytes and the reader's bits *)
+
+  Definition memory_byte_wf (mb : memory_byte) : Prop :=
+    match mb with
+    | BYTE_Mixed bits => List.length bits = 8%nat
+    | _ => True
+    end.
+
+  Lemma memory_byte_bits_length : forall mb,
+      memory_byte_wf mb -> List.length (memory_byte_to_memory_bits mb) = 8%nat.
+  Proof.
+    intros [p i | x | bits] H; cbn [memory_byte_to_memory_bits memory_byte_wf] in *;
+      try exact H;
+      rewrite rev_append_rev, app_nil_r, length_rev, rev_loop_acc_length; reflexivity.
+  Qed.
+
+  (** The reader's bit list, in forward order. *)
+  Fixpoint get_bits_fwd (n : N) (dbs : list memory_byte) : list memory_bit :=
+    match dbs with
+    | [] => List.repeat Bit_psn (N.to_nat n)
+    | b :: bs =>
+        if N.ltb n 8 then take n (memory_byte_to_memory_bits b)
+        else memory_byte_to_memory_bits b ++ get_bits_fwd (n - 8) bs
+    end.
+
+  Lemma get_bits_fwd_spec : forall dbs n acc,
+      get_bits_of_memory_byte_list n dbs acc = rev_append (get_bits_fwd n dbs) acc.
+  Proof.
+    induction dbs as [| b bs IH]; intros n acc;
+      cbn [get_bits_of_memory_byte_list get_bits_fwd].
+    - destruct (N.eqb_spec n 0).
+      + subst; reflexivity.
+      + rewrite rev_loop_acc_const, rev_append_rev, rev_repeat; reflexivity.
+    - destruct (N.ltb n 8); [reflexivity |].
+      rewrite IH, !rev_append_rev, rev_app_distr, <- app_assoc; reflexivity.
+  Qed.
+
+  Lemma reader_bits_fwd : forall n dbs,
+      rev_append (get_bits_of_memory_byte_list n dbs []) [] = get_bits_fwd n dbs.
+  Proof.
+    intros n dbs; rewrite get_bits_fwd_spec, !rev_append_rev, !app_nil_r, rev_involutive.
+    reflexivity.
+  Qed.
+
+  Lemma get_bits_fwd_length : forall dbs n,
+      Forall memory_byte_wf dbs ->
+      N.of_nat (List.length (get_bits_fwd n dbs)) = n.
+  Proof.
+    induction dbs as [| b bs IH]; intros n HW; cbn [get_bits_fwd].
+    - rewrite repeat_length, Nnat.N2Nat.id; reflexivity.
+    - inversion HW as [| ? ? Hb Hbs]; subst.
+      pose proof (memory_byte_bits_length _ Hb) as HL.
+      destruct (N.ltb_spec n 8).
+      + apply take_length_exact; rewrite HL; lia.
+      + rewrite length_app, Nnat.Nat2N.inj_add, HL, IH by exact Hbs; lia.
+  Qed.
+
+  (** A whole aligned pointer chunk among the bits is a pointer slice among
+      the bytes, and the reader finds it. *)
+  (** *** Digit arithmetic
+
+      [concat_bits_Z] and [concat_bytes_Z] are both little-endian
+      concatenations of digits, of 1 and 8 bits: instances of
+      [concat_digits] (Utils/ZUtil.v). *)
+  Lemma concat_bits_Z_digits : forall l, concat_bits_Z l = concat_digits 1 l.
+  Proof. induction l as [| z l IH]; cbn; [reflexivity | now rewrite IH]. Qed.
+
+  Lemma concat_bytes_Z_digits : forall l, concat_bytes_Z l = concat_digits 8 l.
+  Proof. induction l as [| z l IH]; cbn; [reflexivity | now rewrite IH]. Qed.
+
+  Lemma extract_bit_vint_8 : forall (y : @bit_int 8) i,
+      (i < 8)%N -> extract_bit_vint y i = ((unsigned y / 2 ^ Z.of_N i) mod 2)%Z.
+  Proof.
+    intros y i Hi.
+    pose proof (unsigned_range y) as [Hlo Hhi].
+    assert (Hm : (@modulus 8 = 256)%Z) by reflexivity.
+    assert (Hp : (0 < 2 ^ Z.of_N i)%Z) by (apply Z.pow_pos_nonneg; lia).
+    unfold extract_bit_vint.
+    cbn [modu shru unsigned repr VInt_Bounded].
+    unfold Integers.modu, Integers.shru.
+    rewrite !unsigned_repr_eq, Hm.
+    rewrite Hm in Hhi.
+    rewrite (Z.mod_small (Z.of_N i)) by lia.
+    rewrite Z.shiftr_div_pow2 by lia.
+    rewrite (Z.mod_small (Integers.unsigned y / 2 ^ Z.of_N i)).
+    2:{ split; [apply Z.div_pos; lia |].
+        apply Z.le_lt_trans with (Integers.unsigned y); [| lia].
+        apply Z.div_le_upper_bound; [lia | nia]. }
+    rewrite (Z.mod_small 2) by lia.
+    apply Z.mod_small.
+    pose proof (Z.mod_pos_bound (Integers.unsigned y / 2 ^ Z.of_N i) 2 ltac:(lia)); lia.
+  Qed.
+
+  Lemma BYTE_I_bits : forall (y : @bit_int 8),
+      memory_byte_to_memory_bits (@BYTE_I Pa 8 y)
+      = List.map (fun i => Bit_bit (repr (extract_bit_vint y i))) (Nseq 0 8).
+  Proof.
+    intros y; cbn [memory_byte_to_memory_bits].
+    rewrite rev_loop_acc_app, !rev_append_rev, !app_nil_r, rev_involutive.
+    reflexivity.
+  Qed.
+
+  (** *** The reader's bits at a whole-byte width
+
+      Exactly [8 * length dbs] bits: the bytes' bits, concatenated. *)
+  Lemma get_bits_fwd_concat : forall dbs n,
+      Forall memory_byte_wf dbs ->
+      (8 * N.of_nat (List.length dbs) = n)%N ->
+      get_bits_fwd n dbs = List.concat (List.map memory_byte_to_memory_bits dbs).
+  Proof.
+    induction dbs as [| b bs IH]; intros n HW Hn; cbn [get_bits_fwd List.map List.concat].
+    - cbn [List.length] in Hn; subst n; reflexivity.
+    - apply Forall_cons_iff in HW as [Hb Hbs].
+      cbn [List.length] in Hn.
+      destruct (N.ltb_spec n 8); [lia |].
+      rewrite (IH (n - 8)%N Hbs) by lia; reflexivity.
+  Qed.
+
+
+  Lemma bit_unsigned_range : forall b : @bit_int 1, (0 <= unsigned b < 2 ^ 1)%Z.
+  Proof.
+    intros b; pose proof (unsigned_range b) as H.
+    replace (2 ^ 1)%Z with (@modulus 1) by reflexivity; exact H.
+  Qed.
+
+  Lemma memory_bits_to_Z_ints : forall bis : list (@bit_int 1),
+      memory_bits_to_Z (List.map (@Bit_bit Pa) bis)
+      = raise_ret (NoPois (concat_bits_Z (List.map unsigned bis))).
+  Proof.
+    intros bis; unfold memory_bits_to_Z.
+    assert (M : map_monad memory_bit_to_bit (List.map (@Bit_bit Pa) bis)
+                = raise_ret (NoPois (List.map unsigned bis))).
+    { induction bis as [| b bis IH]; [reflexivity |].
+      cbn [List.map]; rewrite map_monad_cons_EOUP, IH; reflexivity. }
+    rewrite M; reflexivity.
+  Qed.
+
+  (** ** Packed vectors: the bit-level round trip
+
+      The writer's packed branch cuts the elements' bits into bytes
+      ([bytes_of_bits]); the reader takes the first [sz * m] bits back
+      ([get_bits_fwd]) and splits them into elements
+      ([packed_bits_to_elts]).  The lemmas below show the bits survive, and
+      that each well-typed element is rebuilt from its own bits. *)
+
+  (* the bytes [acc_bits_to_memory_bytes] lays down, in forward order *)
+  Fixpoint bytes_of_bits (n : nat) (bits : list memory_bit) : list memory_byte :=
+    match n with
+    | O => []
+    | S n' => memory_byte_of_bits (take 8 bits) :: bytes_of_bits n' (drop 8 bits)
+    end.
+
+  Lemma acc_bits_to_memory_bytes_fwd : forall n bits acc,
+      acc_bits_to_memory_bytes n bits acc = rev (bytes_of_bits n bits) ++ acc.
+  Proof.
+    induction n as [| n IH]; intros bits acc;
+      cbn [acc_bits_to_memory_bytes bytes_of_bits rev]; [reflexivity |].
+    rewrite IH, <- app_assoc; reflexivity.
+  Qed.
+
+  (** *** Integer bits *)
+
+  Lemma all_int_bits_map : forall bits,
+      forallb is_int_bit bits = true -> exists bis, bits = List.map (@Bit_bit Pa) bis.
+  Proof.
+    induction bits as [| b bits IH]; intros H; [exists []; reflexivity |].
+    cbn [forallb] in H; apply andb_true_iff in H as [Hb Hr].
+    destruct b as [| | c]; try discriminate.
+    destruct (IH Hr) as [bis ->]; exists (c :: bis); reflexivity.
+  Qed.
+
+  Lemma forallb_int_map : forall bis, forallb is_int_bit (List.map (@Bit_bit Pa) bis) = true.
+  Proof. induction bis; cbn; auto. Qed.
+
+  Lemma int_bits_to_Z_map : forall bis,
+      int_bits_to_Z (List.map (@Bit_bit Pa) bis) = concat_bits_Z (List.map unsigned bis).
+  Proof. induction bis as [| b bis IH]; cbn; [reflexivity | now rewrite IH]. Qed.
+
+  Lemma concat_bits_Z_range : forall bis : list (@bit_int 1),
+      (0 <= concat_bits_Z (List.map unsigned bis) < 2 ^ Z.of_nat (length bis))%Z.
+  Proof.
+    induction bis as [| b bis IH]; cbn [List.map concat_bits_Z length]; [cbn; lia |].
+    pose proof (bit_unsigned_range b) as Hb.
+    rewrite Z.shiftl_mul_pow2 by lia.
+    rewrite Nat2Z.inj_succ, Z.pow_succ_r by lia.
+    replace (2 ^ 1)%Z with 2%Z in * by reflexivity.
+    lia.
+  Qed.
+
+  (* bit [i] of the concatenation is the [i]th bit *)
+  Lemma concat_bits_Z_nth : forall (bis : list (@bit_int 1)) i,
+      (i < length bis)%nat ->
+      ((concat_bits_Z (List.map unsigned bis) / 2 ^ Z.of_nat i) mod 2)%Z
+      = unsigned (nth i bis (repr 0)).
+  Proof.
+    induction bis as [| b bis IH]; intros i Hi; cbn [length] in Hi; [lia |].
+    cbn [List.map concat_bits_Z].
+    pose proof (bit_unsigned_range b) as Hb.
+    rewrite Z.shiftl_mul_pow2 by lia.
+    replace (2 ^ 1)%Z with 2%Z in * by reflexivity.
+    destruct i as [| i]; cbn [nth].
+    - replace (2 ^ Z.of_nat 0)%Z with 1%Z by reflexivity.
+      rewrite Z.div_1_r, Z.mod_add by lia.
+      apply Z.mod_small; lia.
+    - rewrite Nat2Z.inj_succ, Z.pow_succ_r by lia.
+      rewrite <- Z.div_div by (try lia; apply Z.pow_pos_nonneg; lia).
+      rewrite Z.div_add by lia.
+      rewrite (Z.div_small (unsigned b) 2) by lia; cbn [Z.add].
+      apply IH; lia.
+  Qed.
+
+  Lemma repr_unsigned_bit : forall b : @bit_int 1, repr (unsigned b) = b.
+  Proof. intros b; apply Integers.repr_unsigned. Qed.
+
+
+  (* [extract_bit_vint] really is "shift right and take the low bit", at any
+     width.  At width 1, [repr 2] is 0 and Rocq's [_ mod 0] is the identity. *)
+  Lemma extract_bit_vint_spec : forall sz (x : @bit_int sz) i,
+      (i < Npos sz)%N -> extract_bit_vint x i = ((unsigned x / 2 ^ Z.of_N i) mod 2)%Z.
+  Proof.
+    intros sz x i Hi.
+    pose proof (unsigned_range x) as [Hlo Hhi].
+    assert (Hm : (@modulus sz = 2 ^ Z.pos sz)%Z)
+      by (rewrite modulus_def; apply two_power_pos_eq).
+    assert (Hpow : (Z.pos sz < 2 ^ Z.pos sz)%Z) by (apply Z.pow_gt_lin_r; lia).
+    assert (Hp : (0 < 2 ^ Z.of_N i)%Z) by (apply Z.pow_pos_nonneg; lia).
+    unfold extract_bit_vint.
+    cbn [modu shru unsigned repr VInt_Bounded].
+    unfold Integers.modu, Integers.shru.
+    rewrite !unsigned_repr_eq.
+    rewrite Hm in *.
+    rewrite (Z.mod_small (Z.of_N i)) by lia.
+    rewrite Z.shiftr_div_pow2 by lia.
+    rewrite (Z.mod_small (Integers.unsigned x / 2 ^ Z.of_N i)).
+    2:{ split; [apply Z.div_pos; lia |].
+        apply Z.le_lt_trans with (Integers.unsigned x); [| lia].
+        apply Z.div_le_upper_bound; [lia | nia]. }
+    destruct (Pos.eq_dec sz 1) as [E1 | NE1].
+    - subst sz; assert (i = 0%N) by lia; subst i.
+      replace (2 ^ Z.pos 1)%Z with 2%Z in * by reflexivity.
+      replace (2 ^ Z.of_N 0)%Z with 1%Z by reflexivity.
+      rewrite Z.div_1_r, Z.mod_same, Zmod_0_r by lia.
+      rewrite !Z.mod_small by lia; reflexivity.
+    - assert (H2 : (2 < 2 ^ Z.pos sz)%Z).
+      { apply Z.lt_le_trans with (2 ^ 2)%Z; [cbn; lia |].
+        apply Z.pow_le_mono_r; lia. }
+      rewrite (Z.mod_small 2) by lia.
+      apply Z.mod_small.
+      pose proof (Z.mod_pos_bound (Integers.unsigned x / 2 ^ Z.of_N i) 2 ltac:(lia)); lia.
+  Qed.
+
+  Lemma memory_bits_from_map : forall f n s,
+      memory_bits_from f n s = List.map f (Nseq s (N.to_nat n)).
+  Proof.
+    intros f n s; unfold memory_bits_from.
+    rewrite rev_loop_acc_app, !rev_append_rev, !app_nil_r, rev_involutive; reflexivity.
+  Qed.
+
+  (** The bits [packed_elt_bits] lays down for an integer [x] of [m] bits. *)
+  Definition int_elt_bits {m} (x : @bit_int m) : list (@bit_int 1) :=
+    List.map (fun i => repr (extract_bit_vint x i)) (Nseq 0 (Pos.to_nat m)).
+
+  Lemma int_elt_bits_eq : forall m (x : @bit_int m),
+      memory_bits_from (fun i => Bit_bit (repr (extract_bit_vint x i))) (Npos m) 0
+      = List.map (@Bit_bit Pa) (int_elt_bits x).
+  Proof.
+    intros m x; rewrite memory_bits_from_map; unfold int_elt_bits.
+    rewrite map_map; reflexivity.
+  Qed.
+
+  Lemma int_elt_bits_length : forall m (x : @bit_int m),
+      length (int_elt_bits x) = Pos.to_nat m.
+  Proof. intros m x; unfold int_elt_bits; rewrite length_map, Nseq_length; reflexivity. Qed.
+
+  Lemma int_elt_bits_value : forall m (x : @bit_int m),
+      concat_bits_Z (List.map unsigned (int_elt_bits x)) = unsigned x.
+  Proof.
+    intros m x; unfold int_elt_bits; rewrite map_map.
+    pose proof (unsigned_range x) as [Hlo Hhi].
+    assert (Hm : (@modulus m = 2 ^ Z.pos m)%Z)
+      by (rewrite modulus_def; apply two_power_pos_eq).
+    rewrite (map_ext_in _ (fun i => ((unsigned x / 2 ^ Z.of_N i) mod 2)%Z)).
+    2:{ intros i Hi; apply In_Nseq in Hi.
+        rewrite extract_bit_vint_spec by lia.
+        cbn [unsigned repr VInt_Bounded].
+        rewrite Integers.unsigned_repr_eq.
+        replace (@modulus 1) with 2%Z by reflexivity.
+        apply Z.mod_mod; lia. }
+    rewrite concat_bits_Z_extract.
+    replace (2 ^ Z.of_N 0)%Z with 1%Z by reflexivity.
+    rewrite Z.div_1_r.
+    rewrite positive_nat_Z.
+    rewrite Hm in Hhi.
+    cbn [unsigned VInt_Bounded] in *.
+    apply Z.mod_small; lia.
+  Qed.
+
+  (* a byte of integer bits gives back exactly those bits *)
+  Lemma memory_byte_of_bits_int : forall bis, length bis = 8%nat ->
+      memory_byte_to_memory_bits (memory_byte_of_bits (List.map (@Bit_bit Pa) bis))
+      = List.map (@Bit_bit Pa) bis.
+  Proof.
+    intros bis Hl; unfold memory_byte_of_bits; rewrite forallb_int_map.
+    rewrite BYTE_I_bits.
+    transitivity (List.map (fun i => @Bit_bit Pa (nth (N.to_nat (i - 0)) bis (repr 0)))
+                    (Nseq 0 (length bis))).
+    - rewrite Hl; apply map_ext_in; intros i Hi; apply In_Nseq in Hi; f_equal.
+      rewrite extract_bit_vint_8 by lia.
+      rewrite int_bits_to_Z_map.
+      pose proof (concat_bits_Z_range bis) as Hr; rewrite Hl in Hr.
+      set (z := concat_bits_Z (List.map unsigned bis)) in *.
+      assert (Ez : unsigned (@repr (@bit_int 8) _ z) = z).
+      { cbn [unsigned repr VInt_Bounded].
+        rewrite Integers.unsigned_repr_eq.
+        replace (@modulus 8) with (2 ^ Z.of_nat 8)%Z by reflexivity.
+        apply Z.mod_small; lia. }
+      rewrite Ez; subst z.
+      replace (Z.of_N i) with (Z.of_nat (N.to_nat (i - 0))) by lia.
+      rewrite concat_bits_Z_nth by lia.
+      apply Integers.repr_unsigned.
+    - rewrite <- (map_map (fun i => nth (N.to_nat (i - 0)) bis (repr 0)) (@Bit_bit Pa)).
+      rewrite map_Nseq_nth; reflexivity.
+  Qed.
+
+
+  (** *** From bits to bytes and back *)
+
+  Lemma take_app_ge : forall {A} (l r : list A) n,
+      (N.of_nat (length l) <= n)%N -> take n (l ++ r) = l ++ take (n - N.of_nat (length l)) r.
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros r n H; cbn [app length] in *.
+    - rewrite N.sub_0_r; reflexivity.
+    - rewrite Nnat.Nat2N.inj_succ in H.
+      cbn [take]; destruct (N.eqb_spec 0 n); [lia |].
+      rewrite IH by lia; rewrite Nnat.Nat2N.inj_succ.
+      replace (N.pred n - N.of_nat (length xs))%N
+        with (n - N.succ (N.of_nat (length xs)))%N by lia; reflexivity.
+  Qed.
+
+  Lemma take_add : forall {A} (l : list A) a b,
+      take (a + b) l = take a l ++ take b (drop a l).
+  Proof.
+    intros A l; induction l as [| x xs IH]; intros a b; cbn [take drop].
+    - destruct (N.eqb 0 (a + b)), (N.eqb 0 a); reflexivity.
+    - destruct (N.eqb_spec 0 a) as [<- | Ha].
+      + rewrite N.add_0_l; reflexivity.
+      + destruct (N.eqb_spec 0 (a + b)); [lia |].
+        cbn [app]; f_equal.
+        replace (N.pred (a + b)) with (N.pred a + b)%N by lia; apply IH.
+  Qed.
+
+  Lemma memory_byte_of_bits_bits : forall c, length c = 8%nat ->
+      memory_byte_to_memory_bits (memory_byte_of_bits c) = c.
+  Proof.
+    intros c Hc.
+    destruct (forallb is_int_bit c) eqn:E.
+    - destruct (all_int_bits_map _ E) as [bis ->].
+      rewrite length_map in Hc; apply memory_byte_of_bits_int, Hc.
+    - unfold memory_byte_of_bits; rewrite E; reflexivity.
+  Qed.
+
+  Lemma memory_byte_of_bits_wf : forall c, length c = 8%nat ->
+      memory_byte_wf (memory_byte_of_bits c).
+  Proof.
+    intros c Hc; unfold memory_byte_of_bits.
+    destruct (forallb is_int_bit c); cbn [memory_byte_wf]; auto.
+  Qed.
+
+  Lemma take_8_length : forall (L : list memory_bit),
+      (8 <= length L)%nat -> length (take 8 L) = 8%nat.
+  Proof.
+    intros L H; pose proof (@take_length_exact _ L 8 ltac:(lia)); lia.
+  Qed.
+
+  Lemma drop_8_length : forall (L : list memory_bit),
+      length (drop 8 L) = (length L - 8)%nat.
+  Proof. intros L; pose proof (@length_drop_N _ L 8); lia. Qed.
+
+  Lemma bytes_of_bits_length : forall n L, length (bytes_of_bits n L) = n.
+  Proof. induction n as [| n IH]; intros L; cbn; [reflexivity | now rewrite IH]. Qed.
+
+  Lemma bytes_of_bits_wf : forall n L, (8 * n <= length L)%nat ->
+      Forall memory_byte_wf (bytes_of_bits n L).
+  Proof.
+    induction n as [| n IH]; intros L H; cbn [bytes_of_bits]; constructor.
+    - apply memory_byte_of_bits_wf, take_8_length; lia.
+    - apply IH; rewrite drop_8_length; lia.
+  Qed.
+
+  Lemma bytes_of_bits_bits : forall n L, (8 * n <= length L)%nat ->
+      List.concat (List.map memory_byte_to_memory_bits (bytes_of_bits n L))
+      = take (N.of_nat (8 * n)) L.
+  Proof.
+    induction n as [| n IH]; intros L H; cbn [bytes_of_bits List.map List.concat].
+    - rewrite take_nil; reflexivity.
+    - rewrite memory_byte_of_bits_bits by (apply take_8_length; lia).
+      rewrite IH by (rewrite drop_8_length; lia).
+      replace (N.of_nat (8 * S n)) with (8 + N.of_nat (8 * n))%N by lia.
+      rewrite take_add; reflexivity.
+  Qed.
+
+  (* the reader's first [k] bits of well-formed bytes, whatever follows *)
+  Lemma get_bits_fwd_app : forall dbs extra k,
+      Forall memory_byte_wf dbs ->
+      (k <= 8 * N.of_nat (length dbs))%N ->
+      get_bits_fwd k (dbs ++ extra)
+      = take k (List.concat (List.map memory_byte_to_memory_bits dbs)).
+  Proof.
+    induction dbs as [| b bs IH]; intros extra k HW Hk;
+      cbn [app length List.map List.concat] in *.
+    - assert (k = 0%N) by lia; subst k; rewrite take_nil.
+      destruct extra as [| b extra]; cbn [get_bits_fwd]; [reflexivity |].
+      cbn [N.ltb N.compare]; rewrite take_nil; reflexivity.
+    - apply Forall_cons_iff in HW as [Hb Hbs].
+      pose proof (memory_byte_bits_length b Hb) as Lb.
+      cbn [get_bits_fwd]; destruct (N.ltb_spec k 8).
+      + rewrite take_app_le by lia; reflexivity.
+      + rewrite take_app_ge by lia; rewrite Lb.
+        rewrite IH by (first [exact Hbs | lia]); reflexivity.
+  Qed.
+
+  (** *** Elements *)
+
+  Lemma packed_bits_to_dvalue_poison : forall t m bits,
+      bits <> [] -> forallb is_poison_bit bits = true ->
+      packed_bits_to_dvalue t m bits = DVALUE_Base DVALUE_Poison.
+  Proof.
+    intros t m [| b rest] Hne H; [contradiction |].
+    destruct b; try discriminate.
+    unfold packed_bits_to_dvalue.
+    destruct t; try (rewrite H; reflexivity);
+      rewrite memory_bits_to_Z_poison_cons; reflexivity.
+  Qed.
+
+  Lemma repeat_psn_ne : forall m, List.repeat (@Bit_psn Pa) (Pos.to_nat m) <> [].
+  Proof.
+    intros m; destruct (Pos2Nat.is_succ m) as [k Hk]; rewrite Hk; discriminate.
+  Qed.
+
+  Lemma forallb_poison_bits_repeat : forall k,
+      forallb is_poison_bit (List.repeat (@Bit_psn Pa) k) = true.
+  Proof. induction k; cbn; auto. Qed.
+
+  Lemma int_elt_bits_ne : forall m (x : @bit_int m),
+      List.map (@Bit_bit Pa) (int_elt_bits x) <> [].
+  Proof.
+    intros m x C; apply (f_equal (@length _)) in C.
+    rewrite length_map, int_elt_bits_length in C; cbn in C; lia.
+  Qed.
+
+  Lemma forallb_poison_int_bits : forall bis : list (@bit_int 1),
+      bis <> [] -> forallb is_poison_bit (List.map (@Bit_bit Pa) bis) = false.
+  Proof. intros [| b bis] H; [contradiction | reflexivity]. Qed.
+
+  Lemma map_Bit_bit_ne : forall bis : list (@bit_int 1),
+      List.map (@Bit_bit Pa) bis <> [] -> bis <> [].
+  Proof. intros [| b bis] H; [contradiction | discriminate]. Qed.
+
+  (** A well-typed element of a packed vector is rebuilt from its own bits. *)
+  Lemma packed_elt_round_trip : forall tb m e bits,
+      (tb = DTYPE_I m \/ tb = DTYPE_B m) -> (Npos m mod 8 <> 0)%N ->
+      dvalue_has_dtyp e (DTYPE_Base tb) ->
+      packed_elt_bits m e = ret bits ->
+      length bits = Pos.to_nat m /\ packed_bits_to_dvalue tb m bits = e.
+  Proof.
+    intros tb m e bits Htb Hm HT He.
+    assert (POIS : e = DVALUE_Base DVALUE_Poison ->
+                   length bits = Pos.to_nat m /\ packed_bits_to_dvalue tb m bits = e).
+    { intros ->; cbn in He; inversion He; subst.
+      split; [apply repeat_length |].
+      apply packed_bits_to_dvalue_poison;
+        [apply repeat_psn_ne | apply forallb_poison_bits_repeat]. }
+    inversion HT as [dv t Hty Hcan | t | |]; subst; [| apply POIS; reflexivity].
+    destruct (dvalue_eq_dec (DVALUE_Base dv) (DVALUE_Base DVALUE_Poison)) as [E | NE];
+      [apply POIS, E |].
+    destruct Htb as [-> | ->]; destruct dv; cbn in Hty; try discriminate;
+      try (exfalso; apply NE; reflexivity).
+    - (* an integer *)
+      apply Pos.eqb_eq in Hty; subst.
+      assert (Hb : bits = List.map (@Bit_bit Pa) (int_elt_bits x)).
+      { rewrite <- int_elt_bits_eq; unfold packed_elt_bits in He.
+        inversion He; reflexivity. }
+      subst bits; clear He.
+      split; [rewrite length_map; apply int_elt_bits_length |].
+      unfold packed_bits_to_dvalue.
+      rewrite memory_bits_to_Z_ints, int_elt_bits_value.
+      f_equal; f_equal; apply Integers.repr_unsigned.
+    - (* a byte value *)
+      apply Pos.eqb_eq in Hty; subst.
+      match type of Hcan with
+      | context [DVALUE_B ?bv] => destruct bv as [p idx | y | bs]
+      end; cbn in Hcan.
+      + exfalso; apply N.eqb_eq in Hcan; contradiction.
+      + assert (Hb : bits = List.map (@Bit_bit Pa) (int_elt_bits y)).
+        { rewrite <- int_elt_bits_eq; unfold packed_elt_bits, dvalue_bv_to_memory_bits in He.
+          inversion He; reflexivity. }
+        subst bits; clear He.
+        split; [rewrite length_map; apply int_elt_bits_length |].
+        unfold packed_bits_to_dvalue.
+        rewrite forallb_poison_int_bits by (apply map_Bit_bit_ne, int_elt_bits_ne).
+        rewrite forallb_int_map, int_bits_to_Z_map, int_elt_bits_value.
+        f_equal; f_equal; f_equal; apply Integers.repr_unsigned.
+      + cbn [packed_elt_bits dvalue_bv_to_memory_bits] in He; inversion He; subst; clear He.
+        apply andb_true_iff in Hcan as [Hcan H4].
+        apply andb_true_iff in Hcan as [Hcan H3].
+        apply andb_true_iff in Hcan as [H1 H2].
+        apply negb_true_iff in H3, H4.
+        apply N.eqb_eq in H1.
+        split; [lia |].
+        unfold packed_bits_to_dvalue; rewrite H4, H3; reflexivity.
+  Qed.
+
+  Lemma packed_bits_to_elts_concat : forall tb m elts bitss rest,
+      Forall2 (fun e b => length b = Pos.to_nat m /\ packed_bits_to_dvalue tb m b = e)
+        elts bitss ->
+      packed_bits_to_elts tb m (length elts) (List.concat bitss ++ rest) = elts.
+  Proof.
+    intros tb m elts bitss rest H; induction H as [| e b es bs [Hl Hd] H IH];
+      cbn [length packed_bits_to_elts List.concat]; [reflexivity |].
+    rewrite <- app_assoc.
+    assert (Lb : N.of_nat (length b) = Npos m) by (rewrite Hl; apply positive_nat_N).
+    rewrite take_app_exact, drop_app_exact by exact Lb.
+    rewrite Hd, IH; reflexivity.
+  Qed.
+
+  Lemma concat_length_uniform : forall tb m elts bitss,
+      Forall2 (fun e b => length b = Pos.to_nat m /\ packed_bits_to_dvalue tb m b = e)
+        elts bitss ->
+      length (List.concat bitss) = (length elts * Pos.to_nat m)%nat.
+  Proof.
+    intros tb m elts bitss H; induction H as [| e b es bs [Hl _] H IH];
+      cbn [length List.concat]; [reflexivity |].
+    rewrite length_app, IH, Hl; lia.
+  Qed.
+
+  (** *** Liveness: a vector with a live element leaves a live byte *)
+
+  Lemma get_bits_fwd_all_poison : forall dbs n,
+      forallb is_all_poison_byte dbs = true ->
+      forallb is_poison_bit (get_bits_fwd n dbs) = true.
+  Proof.
+    induction dbs as [| b bs IH]; intros n H; cbn [get_bits_fwd].
+    - apply forallb_poison_bits_repeat.
+    - cbn [forallb] in H; apply andb_true_iff in H as [Hb Hbs].
+      destruct b as [| | bits]; try discriminate; cbn [is_all_poison_byte] in Hb.
+      unfold all_poison_bits in Hb.
+      cbn [memory_byte_to_memory_bits].
+      destruct (N.ltb n 8).
+      + apply forallb_take_pres, Hb.
+      + rewrite forallb_app, Hb, IH by exact Hbs; reflexivity.
+  Qed.
+
+  Lemma packed_bits_to_elts_poison : forall tb m n bits,
+      forallb is_poison_bit bits = true ->
+      (N.of_nat n * Npos m <= N.of_nat (length bits))%N ->
+      forallb dvalue_is_poison (packed_bits_to_elts tb m n bits) = true.
+  Proof.
+    intros tb m n; induction n as [| n IH]; intros bits H Hl;
+      cbn [packed_bits_to_elts forallb]; [reflexivity |].
+    rewrite packed_bits_to_dvalue_poison.
+    - cbn [dvalue_is_poison]; rewrite IH; [reflexivity | apply forallb_drop_pres, H |].
+      rewrite length_drop_N; lia.
+    - intros C; apply (f_equal (@length _)) in C.
+      pose proof (@take_length_exact _ bits (Npos m) ltac:(lia)); rewrite C in *; cbn in *; lia.
+    - apply forallb_take_pres, H.
+  Qed.
+
+  (** *** The packed round trip *)
+
+  (* the bytes the packed branch writes, in forward order *)
+  Definition packed_fwd (nb : N) (bits : list memory_bit) : list memory_byte :=
+    bytes_of_bits (N.to_nat nb)
+      (bits ++ List.repeat (Bit_bit (repr 0)) (N.to_nat (8 * nb) - length bits)).
+
+  Lemma acc_packed_bits_fwd : forall nb bits acc,
+      acc_packed_bits_to_memory_bytes nb bits acc = rev (packed_fwd nb bits) ++ acc.
+  Proof.
+    intros nb bits acc; unfold acc_packed_bits_to_memory_bytes, packed_fwd.
+    apply acc_bits_to_memory_bytes_fwd.
+  Qed.
+
+  Lemma packed_round_trip : forall tb m sz elts bitss,
+      (tb = DTYPE_I m \/ tb = DTYPE_B m) -> (Npos m mod 8 <> 0)%N ->
+      Forall (fun e => dvalue_has_dtyp e (DTYPE_Base tb)) elts ->
+      length elts = N.to_nat sz ->
+      map_monad (packed_elt_bits m) elts = ret bitss ->
+      let fwd := packed_fwd ((sz * Npos m + 7) / 8) (List.concat bitss) in
+      Forall memory_byte_wf fwd
+      /\ N.of_nat (length fwd) = ((sz * Npos m + 7) / 8)%N
+      /\ (forall extra, packed_vector_elts tb m sz (fwd ++ extra) = elts)
+      /\ (forallb dvalue_is_poison elts = false -> forallb is_all_poison_byte fwd = false).
+  Proof.
+    intros tb m sz elts bitss Htb Hm HT Hlen Hbits.
+    apply map_monad_EOU_Forall2 in Hbits.
+    assert (H2 : Forall2 (fun e b => length b = Pos.to_nat m /\ packed_bits_to_dvalue tb m b = e)
+                   elts bitss).
+    { clear Hlen; induction Hbits as [| e b es bs Heb Hes IH]; [constructor |].
+      inversion HT as [| ? ? Hte Htes]; subst.
+      constructor; [apply (@packed_elt_round_trip _ _ _ _ Htb Hm Hte Heb) | apply IH, Htes]. }
+    intros fwd.
+    set (nb := ((sz * Npos m + 7) / 8)%N) in *.
+    set (bits := List.concat bitss) in *.
+    assert (Lbits : N.of_nat (length bits) = (sz * Npos m)%N).
+    { subst bits; rewrite (@concat_length_uniform tb m elts bitss H2), Hlen; lia. }
+    assert (Hnb : (sz * Npos m <= 8 * nb)%N).
+    { subst nb; pose proof (N.div_mod (sz * Npos m + 7) 8 ltac:(lia)).
+      pose proof (N.mod_upper_bound (sz * Npos m + 7) 8 ltac:(lia)); lia. }
+    set (L := bits ++ List.repeat (Bit_bit (repr 0)) (N.to_nat (8 * nb) - length bits)).
+    assert (LL : length L = N.to_nat (8 * nb)).
+    { subst L; rewrite length_app, repeat_length; lia. }
+    assert (Hwf : Forall memory_byte_wf fwd)
+      by (unfold fwd, packed_fwd; fold L; apply bytes_of_bits_wf; rewrite LL; lia).
+    assert (Lfwd : N.of_nat (length fwd) = nb)
+      by (unfold fwd, packed_fwd; rewrite bytes_of_bits_length; lia).
+    assert (Hread : forall extra,
+               get_bits_fwd (sz * Npos m) (fwd ++ extra) = bits).
+    { intros extra.
+      rewrite get_bits_fwd_app by (first [exact Hwf | lia]).
+      unfold fwd, packed_fwd; fold L.
+      rewrite bytes_of_bits_bits by (rewrite LL; lia).
+      rewrite take_take_le by lia.
+      subst L; apply take_app_exact; exact Lbits. }
+    split; [exact Hwf | split; [exact Lfwd | split]].
+    - intros extra; unfold packed_vector_elts.
+      rewrite reader_bits_fwd, Hread.
+      rewrite <- (app_nil_r bits), <- Hlen.
+      apply packed_bits_to_elts_concat, H2.
+    - intros Hlive.
+      destruct (forallb is_all_poison_byte fwd) eqn:Eap; [| reflexivity].
+      exfalso.
+      assert (Hp : forallb is_poison_bit (get_bits_fwd (sz * Npos m) fwd) = true)
+        by (apply get_bits_fwd_all_poison, Eap).
+      pose proof (@get_bits_fwd_length fwd (sz * Npos m) Hwf) as Lg.
+      assert (Ee : packed_bits_to_elts tb m (N.to_nat sz) (get_bits_fwd (sz * Npos m) fwd)
+                   = elts).
+      { pose proof (Hread []) as R; rewrite app_nil_r in R; rewrite R.
+        rewrite <- (app_nil_r bits), <- Hlen.
+        apply packed_bits_to_elts_concat, H2. }
+      pose proof (packed_bits_to_elts_poison tb m (N.to_nat sz) _ Hp ltac:(lia)) as Hall.
+      rewrite Ee, Hlive in Hall; discriminate.
+  Qed.
+
+
   (** The invariant the round trip is proved by.  The writer accumulates in
       reverse on top of [acc], so it contributes a block [w] that [acc] is
       appended to; [w] has the type's store size, and reading [rev w] back
@@ -2617,6 +3393,46 @@ Section MemoryByteFacts.
       pose proof Heq as Heq0.
       inversion HT as [| | | vv ees sz0 eet HNV HNP HFA HLen]; subst.
       rewrite ser_array_unfold in Heq.
+      match type of Heq with
+      | context [packed_vector_type ?d] =>
+          destruct (packed_vector_type d) as [[tb m] |] eqn:EP
+      end.
+      { (* a packed vector: [packed_round_trip] does the work *)
+        destruct (packed_vector_type_Some _ EP) as (sz1 & Edt & Htb & Hm).
+        inversion Edt; subst; clear Edt.
+        destruct (store_size_packed_vector _ EP) as (sz2 & Edt2 & Hss).
+        inversion Edt2; subst; clear Edt2.
+        unfold packed_vector_bytes in Heq.
+        destruct (map_monad (packed_elt_bits m) elts) as [| | | bitss] eqn:Ebits;
+          cbn in Heq; try discriminate.
+        injection Heq as Hacc.
+        rewrite acc_packed_bits_fwd, accumulate_padding_shape, Hss in Hacc.
+        inversion Hacc; subst; clear Hacc.
+        destruct (@packed_round_trip tb m sz2 elts bitss Htb Hm HFA HLen Ebits)
+          as (Hwf & Lfwd & Hrd & Hlive).
+        set (fwd := packed_fwd ((sz2 * Npos m + 7) / 8) (List.concat bitss)) in *.
+        set (k := N.to_nat (tapad ta (0 + (sz2 * Npos m + 7) / 8)
+                            - (0 + (sz2 * Npos m + 7) / 8))) in *.
+        exists (List.repeat poison_memory_byte k ++ rev fwd).
+        assert (Erev : rev (List.repeat poison_memory_byte k ++ rev fwd)
+                       = fwd ++ List.repeat poison_memory_byte k)
+          by (rewrite rev_app_distr, rev_involutive, rev_repeat; reflexivity).
+        assert (Hlf : forallb is_all_poison_byte fwd = false) by (apply Hlive, HNP).
+        split; [rewrite <- app_assoc; reflexivity | split; [| split]].
+        - rewrite length_app, repeat_length, length_rev, Hss.
+          pose proof (tapad_ge ta ((sz2 * Npos m + 7) / 8)) as G.
+          subst k; rewrite N.add_0_l in *; lia.
+        - rewrite Erev, read_array_unfold.
+          destruct (poison_split (fwd ++ List.repeat poison_memory_byte k))
+            as [np rest] eqn:Eps.
+          destruct rest as [| b rest].
+          + exfalso.
+            assert (Hap : all_poison_bytes (fwd ++ List.repeat poison_memory_byte k) = true)
+              by (unfold all_poison_bytes; rewrite Eps; reflexivity).
+            rewrite all_poison_bytes_forallb, forallb_app, Hlf in Hap; discriminate.
+          + rewrite EP, Hrd.
+            unfold canonicalize_agg; rewrite HNP; reflexivity.
+        - intros _; rewrite Erev, forallb_app, Hlf; reflexivity. }
       destruct (array_loop_read HFA IH HS _ _ _ _ Heq)
         as (w & Ebs & Hlen & Hle & Hlive & Hread).
       destruct (acc_dvalue_to_memory_bytes_h_spec HT ta acc Heq0) as [Eo _].
@@ -2635,6 +3451,7 @@ Section MemoryByteFacts.
             pose proof (poison_split_prefix (rev w)) as HP.
             rewrite Eps in HP; cbn [fst] in HP; exact HP. }
           specialize (Hread np [] HPre); rewrite app_nil_r, HLen in Hread.
+          rewrite EP.
           replace (if v then store_size_dtyp eet else alloc_size_dtyp eet)
             with (store_size_dtyp eet
                   + (if v then 0
@@ -2672,63 +3489,9 @@ Section MemoryByteFacts.
 
       The bytes must be well formed: a [BYTE_Mixed] byte has exactly 8
       bits.  The writer only produces such bytes. *)
-  Definition memory_byte_wf (mb : memory_byte) : Prop :=
-    match mb with
-    | BYTE_Mixed bits => List.length bits = 8%nat
-    | _ => True
-    end.
+  (* [memory_byte_wf], [get_bits_fwd] and their basic lemmas are stated
+     before [round_trip_h], where the packed-vector round trip uses them. *)
 
-  Lemma memory_byte_bits_length : forall mb,
-      memory_byte_wf mb -> List.length (memory_byte_to_memory_bits mb) = 8%nat.
-  Proof.
-    intros [p i | x | bits] H; cbn [memory_byte_to_memory_bits memory_byte_wf] in *;
-      try exact H;
-      rewrite rev_append_rev, app_nil_r, length_rev, rev_loop_acc_length; reflexivity.
-  Qed.
-
-  (** The reader's bit list, in forward order. *)
-  Fixpoint get_bits_fwd (n : N) (dbs : list memory_byte) : list memory_bit :=
-    match dbs with
-    | [] => List.repeat Bit_psn (N.to_nat n)
-    | b :: bs =>
-        if N.ltb n 8 then take n (memory_byte_to_memory_bits b)
-        else memory_byte_to_memory_bits b ++ get_bits_fwd (n - 8) bs
-    end.
-
-  Lemma get_bits_fwd_spec : forall dbs n acc,
-      get_bits_of_memory_byte_list n dbs acc = rev_append (get_bits_fwd n dbs) acc.
-  Proof.
-    induction dbs as [| b bs IH]; intros n acc;
-      cbn [get_bits_of_memory_byte_list get_bits_fwd].
-    - destruct (N.eqb_spec n 0).
-      + subst; reflexivity.
-      + rewrite rev_loop_acc_const, rev_append_rev, rev_repeat; reflexivity.
-    - destruct (N.ltb n 8); [reflexivity |].
-      rewrite IH, !rev_append_rev, rev_app_distr, <- app_assoc; reflexivity.
-  Qed.
-
-  Lemma reader_bits_fwd : forall n dbs,
-      rev_append (get_bits_of_memory_byte_list n dbs []) [] = get_bits_fwd n dbs.
-  Proof.
-    intros n dbs; rewrite get_bits_fwd_spec, !rev_append_rev, !app_nil_r, rev_involutive.
-    reflexivity.
-  Qed.
-
-  Lemma get_bits_fwd_length : forall dbs n,
-      Forall memory_byte_wf dbs ->
-      N.of_nat (List.length (get_bits_fwd n dbs)) = n.
-  Proof.
-    induction dbs as [| b bs IH]; intros n HW; cbn [get_bits_fwd].
-    - rewrite repeat_length, Nnat.N2Nat.id; reflexivity.
-    - inversion HW as [| ? ? Hb Hbs]; subst.
-      pose proof (memory_byte_bits_length _ Hb) as HL.
-      destruct (N.ltb_spec n 8).
-      + apply take_length_exact; rewrite HL; lia.
-      + rewrite length_app, Nnat.Nat2N.inj_add, HL, IH by exact Hbs; lia.
-  Qed.
-
-  (** A whole aligned pointer chunk among the bits is a pointer slice among
-      the bytes, and the reader finds it. *)
   Lemma valid_pointer_bits_of_run : forall bits p base off,
       all_pointer_bits_from p (base + off) bits = true ->
       (N.of_nat (List.length bits) + off = 8)%N ->
@@ -2984,6 +3747,43 @@ Section MemoryByteFacts.
       + eapply HR; [apply Forall_take_N, HW | exact Ee].
   Qed.
 
+  (** The packed-vector branch of the reader: every element it decodes is
+      well-typed and canonical. *)
+  Lemma packed_bits_to_dvalue_has_dtyp : forall tb m bits,
+      (tb = DTYPE_I m \/ tb = DTYPE_B m) -> (Npos m mod 8 <> 0)%N ->
+      length bits = Pos.to_nat m ->
+      dvalue_has_dtyp (packed_bits_to_dvalue tb m bits) (DTYPE_Base tb).
+  Proof.
+    intros tb m bits Htb Hm Hl.
+    destruct Htb as [-> | ->]; unfold packed_bits_to_dvalue.
+    - destruct (memory_bits_to_Z bits) as [| | | [z |]]; try apply DVALUE_Poison_typ_agg.
+      constructor; [apply Pos.eqb_refl | reflexivity].
+    - destruct (forallb is_poison_bit bits) eqn:Ep; [apply DVALUE_Poison_typ_agg |].
+      destruct (forallb is_int_bit bits) eqn:Ei;
+        (constructor; [apply Pos.eqb_refl |]); cbn [dvalue_base_canonical dvalue_bv_canonical];
+        [reflexivity |].
+      rewrite Ei, Ep.
+      assert (Hpc : is_pointer_chunk m bits = false).
+      { unfold is_pointer_chunk; destruct bits as [| [] ?]; try reflexivity.
+        destruct (N.eqb_spec (Npos m mod 8) 0); [contradiction | reflexivity]. }
+      rewrite Hpc, Hl, positive_nat_N, N.eqb_refl; reflexivity.
+  Qed.
+
+  Lemma packed_bits_to_elts_has_dtyp : forall tb m n bits,
+      (tb = DTYPE_I m \/ tb = DTYPE_B m) -> (Npos m mod 8 <> 0)%N ->
+      (N.of_nat n * Npos m <= N.of_nat (length bits))%N ->
+      Forall (fun v => dvalue_has_dtyp v (DTYPE_Base tb)) (packed_bits_to_elts tb m n bits)
+      /\ length (packed_bits_to_elts tb m n bits) = n.
+  Proof.
+    intros tb m n; induction n as [| n IH]; intros bits Htb Hm Hl;
+      cbn [packed_bits_to_elts length]; [split; [constructor | reflexivity] |].
+    destruct (IH (drop (Npos m) bits) Htb Hm) as [HF HL];
+      [rewrite length_drop_N; lia |].
+    split; [constructor; [| exact HF] | rewrite HL; reflexivity].
+    apply packed_bits_to_dvalue_has_dtyp; [exact Htb | exact Hm |].
+    pose proof (@take_length_exact _ bits (Npos m) ltac:(lia)); lia.
+  Qed.
+
   Lemma memory_bytes_to_dvalue_has_dtyp : forall dt mb dv,
       serializable dt ->
       Forall memory_byte_wf mb ->
@@ -3017,6 +3817,20 @@ Section MemoryByteFacts.
       rewrite read_array_unfold in H.
       destruct (poison_split mb) as [np rest]; destruct rest as [| b rest].
       { cbn in H; inversion H; apply DVALUE_Poison_typ_agg. }
+      destruct (packed_vector_type (DTYPE_Array vv sz t)) as [[tb m] |] eqn:EP.
+      { (* a packed vector *)
+        destruct (packed_vector_type_Some _ EP) as (sz1 & Edt & Htb & Hm).
+        inversion Edt; subst; clear Edt.
+        cbn in H; inversion H; subst dv; clear H.
+        unfold packed_vector_elts; rewrite reader_bits_fwd.
+        pose proof (@get_bits_fwd_length mb (sz1 * Npos m) HW) as Lg.
+        destruct (@packed_bits_to_elts_has_dtyp tb m (N.to_nat sz1)
+                    (get_bits_fwd (sz1 * Npos m) mb) Htb Hm ltac:(lia)) as [HF HL].
+        unfold canonicalize_agg.
+        match goal with |- context [forallb dvalue_is_poison ?l] =>
+          destruct (forallb dvalue_is_poison l) eqn:Ep end;
+          [apply DVALUE_Poison_typ_agg |].
+        apply DVALUE_Array_typ; [apply serializable_NO_VOID, HS | exact Ep | exact HF | exact HL]. }
       apply EOU_bind_ret_inv in H as (elts & Ee & H).
       cbn in H; inversion H; subst dv; clear H.
       assert (HR : forall mb' v', Forall memory_byte_wf mb' ->
@@ -3163,6 +3977,24 @@ Section MemoryByteFacts.
       eapply (HS e (or_introl eq_refl)); [exact HW | exact Es].
   Qed.
 
+  Lemma packed_fwd_wf : forall nb bits, Forall memory_byte_wf (packed_fwd nb bits).
+  Proof.
+    intros nb bits; unfold packed_fwd; apply bytes_of_bits_wf.
+    rewrite length_app, repeat_length; lia.
+  Qed.
+
+  Lemma packed_vector_bytes_wf : forall m dt elts offset ta acc r,
+      Forall memory_byte_wf acc ->
+      packed_vector_bytes m dt elts offset ta acc = ret r ->
+      Forall memory_byte_wf (snd r).
+  Proof.
+    intros m dt elts offset ta acc r HW H; unfold packed_vector_bytes in H.
+    destruct (map_monad (packed_elt_bits m) elts) as [| | | bits]; cbn in H; try discriminate.
+    inversion H; subst r; apply accumulate_padding_wf.
+    rewrite acc_packed_bits_fwd; apply Forall_app; split; [| exact HW].
+    apply Forall_rev, packed_fwd_wf.
+  Qed.
+
   Lemma acc_dvalue_to_memory_bytes_h_wf : forall dv dt offset ta acc r,
       Forall memory_byte_wf acc ->
       acc_dvalue_to_memory_bytes_h dt dv offset ta acc = ret r ->
@@ -3200,6 +4032,8 @@ Section MemoryByteFacts.
         [cbn [acc_dvalue_to_memory_bytes_h] in H; discriminate
         | cbn [acc_dvalue_to_memory_bytes_h] in H; discriminate |].
       rewrite ser_array_unfold in H.
+      destruct (packed_vector_type (DTYPE_Array vec sz t)) as [[tb m] |];
+        [eapply packed_vector_bytes_wf; [exact HW | exact H] |].
       eapply array_bytes_loop_wf; [| exact HW | exact H].
       intros e He o ta' acc' r' HW' H'.
       eapply (proj1 (Forall_forall _ _) IH e He); eauto.
@@ -3257,6 +4091,17 @@ Section MemoryByteFacts.
         FORALL (fun t => byte_layout t /\ alloc_size_dtyp t = store_size_dtyp t) dts
     | DTYPE_Struct false _ => False
     end.
+
+  (* a padding-free byte type is a whole number of bytes, so a vector of it
+     is laid out element by element, not bit-packed *)
+  Lemma byte_layout_not_packed : forall vv sz t,
+      byte_layout t -> packed_vector_type (DTYPE_Array vv sz t) = None.
+  Proof.
+    intros [|] sz t H; [| reflexivity].
+    destruct t as [b | |]; try reflexivity.
+    destruct b; cbn in H; try contradiction; try reflexivity.
+    cbn; destruct (N.eqb_spec (Npos sz0 mod 8) 0); [reflexivity | contradiction].
+  Qed.
 
   Definition same_bits (b b' : memory_byte) : Prop :=
     memory_byte_to_memory_bits b = memory_byte_to_memory_bits b'.
@@ -3316,66 +4161,6 @@ Section MemoryByteFacts.
     - rewrite ser_poison_agg in H by exact I; inversion H; reflexivity.
     - rewrite ser_poison_agg in H by exact I; inversion H; reflexivity.
   Qed.
-
-  (** *** Digit arithmetic
-
-      [concat_bits_Z] and [concat_bytes_Z] are both little-endian
-      concatenations of digits, of 1 and 8 bits: instances of
-      [concat_digits] (Utils/ZUtil.v). *)
-  Lemma concat_bits_Z_digits : forall l, concat_bits_Z l = concat_digits 1 l.
-  Proof. induction l as [| z l IH]; cbn; [reflexivity | now rewrite IH]. Qed.
-
-  Lemma concat_bytes_Z_digits : forall l, concat_bytes_Z l = concat_digits 8 l.
-  Proof. induction l as [| z l IH]; cbn; [reflexivity | now rewrite IH]. Qed.
-
-  Lemma extract_bit_vint_8 : forall (y : @bit_int 8) i,
-      (i < 8)%N -> extract_bit_vint y i = ((unsigned y / 2 ^ Z.of_N i) mod 2)%Z.
-  Proof.
-    intros y i Hi.
-    pose proof (unsigned_range y) as [Hlo Hhi].
-    assert (Hm : (@modulus 8 = 256)%Z) by reflexivity.
-    assert (Hp : (0 < 2 ^ Z.of_N i)%Z) by (apply Z.pow_pos_nonneg; lia).
-    unfold extract_bit_vint.
-    cbn [modu shru unsigned repr VInt_Bounded].
-    unfold Integers.modu, Integers.shru.
-    rewrite !unsigned_repr_eq, Hm.
-    rewrite Hm in Hhi.
-    rewrite (Z.mod_small (Z.of_N i)) by lia.
-    rewrite Z.shiftr_div_pow2 by lia.
-    rewrite (Z.mod_small (Integers.unsigned y / 2 ^ Z.of_N i)).
-    2:{ split; [apply Z.div_pos; lia |].
-        apply Z.le_lt_trans with (Integers.unsigned y); [| lia].
-        apply Z.div_le_upper_bound; [lia | nia]. }
-    rewrite (Z.mod_small 2) by lia.
-    apply Z.mod_small.
-    pose proof (Z.mod_pos_bound (Integers.unsigned y / 2 ^ Z.of_N i) 2 ltac:(lia)); lia.
-  Qed.
-
-  Lemma BYTE_I_bits : forall (y : @bit_int 8),
-      memory_byte_to_memory_bits (@BYTE_I Pa 8 y)
-      = List.map (fun i => Bit_bit (repr (extract_bit_vint y i))) (Nseq 0 8).
-  Proof.
-    intros y; cbn [memory_byte_to_memory_bits].
-    rewrite rev_loop_acc_app, !rev_append_rev, !app_nil_r, rev_involutive.
-    reflexivity.
-  Qed.
-
-  (** *** The reader's bits at a whole-byte width
-
-      Exactly [8 * length dbs] bits: the bytes' bits, concatenated. *)
-  Lemma get_bits_fwd_concat : forall dbs n,
-      Forall memory_byte_wf dbs ->
-      (8 * N.of_nat (List.length dbs) = n)%N ->
-      get_bits_fwd n dbs = List.concat (List.map memory_byte_to_memory_bits dbs).
-  Proof.
-    induction dbs as [| b bs IH]; intros n HW Hn; cbn [get_bits_fwd List.map List.concat].
-    - cbn [List.length] in Hn; subst n; reflexivity.
-    - apply Forall_cons_iff in HW as [Hb Hbs].
-      cbn [List.length] in Hn.
-      destruct (N.ltb_spec n 8); [lia |].
-      rewrite (IH (n - 8)%N Hbs) by lia; reflexivity.
-  Qed.
-
 
   (** *** Pointer bytes *)
 
@@ -3474,24 +4259,6 @@ Section MemoryByteFacts.
     induction l as [| b l IH]; intros H1 H2; [exists []; reflexivity |].
     destruct b as [p i | | x]; cbn in H1, H2; try discriminate.
     destruct (IH H1 H2) as [bis ->]; exists (x :: bis); reflexivity.
-  Qed.
-
-  Lemma memory_bits_to_Z_ints : forall bis : list (@bit_int 1),
-      memory_bits_to_Z (List.map (@Bit_bit Pa) bis)
-      = raise_ret (NoPois (concat_bits_Z (List.map unsigned bis))).
-  Proof.
-    intros bis; unfold memory_bits_to_Z.
-    assert (M : map_monad memory_bit_to_bit (List.map (@Bit_bit Pa) bis)
-                = raise_ret (NoPois (List.map unsigned bis))).
-    { induction bis as [| b bis IH]; [reflexivity |].
-      cbn [List.map]; rewrite map_monad_cons_EOUP, IH; reflexivity. }
-    rewrite M; reflexivity.
-  Qed.
-
-  Lemma bit_unsigned_range : forall b : @bit_int 1, (0 <= unsigned b < 2 ^ 1)%Z.
-  Proof.
-    intros b; pose proof (unsigned_range b) as H.
-    replace (2 ^ 1)%Z with (@modulus 1) by reflexivity; exact H.
   Qed.
 
   Lemma same_bits_int_byte : forall b z,
@@ -3976,9 +4743,10 @@ Section MemoryByteFacts.
         by (destruct vv; cbn in HL; [reflexivity | destruct HL as [_ ->]; lia]).
       assert (Hlen' : N.of_nat (List.length mb) = (N.of_nat (N.to_nat sz) * store_size_dtyp t)%N).
       { rewrite Nnat.N2Nat.id, Hlen.
-        destruct vv; [apply store_size_dtyp_vector |].
+        destruct vv; [apply store_size_unpacked_vector, byte_layout_not_packed, HLt |].
         rewrite store_size_dtyp_array; cbn in HL; destruct HL as [_ ->]; reflexivity. }
-      rewrite read_array_unfold, Hstride in H.
+      pose proof (byte_layout_not_packed vv sz t HLt) as NP.
+      rewrite read_array_unfold, NP, Hstride in H.
       pose proof (poison_split_prefix mb) as Hpre.
       destruct (poison_split mb) as [np rest] eqn:Eps; cbn [fst] in Hpre.
       destruct rest as [| b rest].
@@ -3997,7 +4765,7 @@ Section MemoryByteFacts.
       destruct (forallb dvalue_is_poison elts) eqn:Ep.
       + apply rt_bytes_poison; [exact HL | exact HW | exact Hlen | apply L1; reflexivity].
       + split; [discriminate |].
-        intros acc o bs Hw; rewrite ser_array_unfold, Hpad in Hw.
+        intros acc o bs Hw; rewrite ser_array_unfold, NP, Hpad in Hw.
         exact (L2 0%N acc o bs Hw).
   Qed.
 
