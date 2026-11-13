@@ -37,22 +37,31 @@ Section Compare.
   Defined.
   Arguments eval_icmp_base _ _ _ _ : simpl nomatch.
 
-  Definition eval_icmp (samesign:bool) (icmp : icmp) (v1 v2 : dvalue) : EOU dvalue :=
-    match v1, v2 with
-    | (DVALUE_Array true elts1), (DVALUE_Array true elts2) =>
-        let n := N.length elts1 in
-        let m := N.length elts2 in
-        if (n =? m)%N  then
-          elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
-          elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
-          val <- vec_loop (eval_icmp_base samesign icmp) (List.combine elts1' elts2') ;;
-          ret (DVALUE_Array true (List.map DVALUE_Base val))
-        else
-          raise_ub "icmp of different-length vectors"
-    | DVALUE_Base v1, DVALUE_Base v2 => DVALUE_Base <$> (eval_icmp_base samesign icmp v1 v2)
-    | _, _ => raise_error "eval_icmp_base: ill-typed icmp"
+  (* [dt] is the operands' type; at a vector type [vector_elts] expands the
+     scalar [DVALUE_Poison] to all-poison lanes. *)
+  Definition eval_icmp (samesign:bool) (icmp : icmp) (dt : dtyp) (v1 v2 : dvalue) : EOU dvalue :=
+    match dt with
+    | DTYPE_Array true sz _ =>
+        match vector_elts sz v1, vector_elts sz v2 with
+        | Some elts1, Some elts2 =>
+            let n := N.length elts1 in
+            let m := N.length elts2 in
+            if (n =? m)%N  then
+              elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+              elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
+              val <- vec_loop (eval_icmp_base samesign icmp) (List.combine elts1' elts2') ;;
+              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base val))
+            else
+              raise_ub "icmp of different-length vectors"
+        | _, _ => raise_error "eval_icmp_base: ill-typed icmp"
+        end
+    | _ =>
+        match v1, v2 with
+        | DVALUE_Base v1, DVALUE_Base v2 => DVALUE_Base <$> (eval_icmp_base samesign icmp v1 v2)
+        | _, _ => raise_error "eval_icmp_base: ill-typed icmp"
+        end
     end.
 
-  Arguments eval_icmp _ _ _ _ : simpl nomatch.
+  Arguments eval_icmp _ _ _ _ _ : simpl nomatch.
     
 End Compare.

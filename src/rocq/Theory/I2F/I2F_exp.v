@@ -776,6 +776,36 @@ Proof.
   intros l1 l2 F; induction F; cbn; constructor; auto.
 Qed.
 
+(** [dvalue_is_poison] is a shallow test, so related values answer it
+    identically; lifting that through [forallb] is what lets the reader's
+    [canonicalize_agg] step commute with refinement. *)
+Lemma I2F_dvalue_is_poison : forall v1 v2,
+    I2F_dvalue v1 v2 ->
+    @dvalue_is_poison PInf v1 = @dvalue_is_poison PFin v2.
+Proof.
+  intros * H; destruct H; [destruct H |..]; auto.
+Qed.
+
+Lemma I2F_forallb_is_poison : forall l1 l2,
+    Forall2 I2F_dvalue l1 l2 ->
+    forallb (@dvalue_is_poison PInf) l1 = forallb (@dvalue_is_poison PFin) l2.
+Proof.
+  induction 1 as [| x y xs ys Hxy H IH]; cbn; auto.
+  now rewrite (I2F_dvalue_is_poison Hxy), IH.
+Qed.
+
+Lemma I2F_canonicalize_agg :
+  forall (mk1 : list (@dvalue PInf) -> @dvalue PInf)
+         (mk2 : list (@dvalue PFin) -> @dvalue PFin) l1 l2,
+    Forall2 I2F_dvalue l1 l2 ->
+    I2F_dvalue (mk1 l1) (mk2 l2) ->
+    I2F_dvalue (@canonicalize_agg PInf mk1 l1) (@canonicalize_agg PFin mk2 l2).
+Proof.
+  intros mk1 mk2 l1 l2 HF HM; unfold canonicalize_agg.
+  rewrite (I2F_forallb_is_poison HF).
+  destruct (forallb (@dvalue_is_poison PFin) l2); auto.
+Qed.
+
 (* The [eval_*] wrappers share their vector plumbing: coerce both
      element lists to base values, run the base dispatcher pointwise,
      and rewrap. *)
@@ -799,23 +829,60 @@ Ltac i2f_vec_wrap base_lemma :=
     (eapply I2F_EOU_bind;
      [ eapply I2F_EOU_vec_loop; [eapply Forall2_combine; eauto|];
        intros; apply base_lemma; auto
-     | intros; do 2 constructor; apply Forall2_map_Base; auto ]).
+     | intros; constructor; apply I2F_canonicalize_agg; [| constructor];
+       apply Forall2_map_Base; auto ]).
+
+(* [vector_elts] normalizes a vector operand (a concrete array, or the
+   scalar poison encoding padded to the type's length) to its element
+   list; related dvalues normalize to related lists, or both fail. *)
+Lemma I2F_vector_elts : forall sz v1 v2,
+    I2F_dvalue v1 v2 ->
+    match vector_elts sz v1, vector_elts sz v2 with
+    | Some elts1, Some elts2 => Forall2 I2F_dvalue elts1 elts2
+    | None, None => True
+    | _, _ => False
+    end.
+Proof.
+  intros sz v1 v2 H; inversion H; subst; cbn.
+  - match goal with
+    | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto
+    end.
+  - auto.
+  - match goal with v : bool |- _ => destruct v end; cbn; auto.
+Qed.
+
+(* The scalar half of the [eval_*] operations: below a non-vector type
+   only two base values compute, by the scalar dispatcher [base_lemma]. *)
+Ltac i2f_scalar_case base_lemma H1 H2 :=
+  inversion H1; subst; inversion H2; subst; cbn; try (repeat constructor);
+  eapply I2F_EOU_bind; [apply base_lemma; auto | intros; repeat constructor; auto].
+
+(* The vector half: at a vector type [vector_elts] expands both operands
+   (a concrete array, or the scalar poison) to related lane lists, or
+   fails on both sides. *)
+Ltac i2f_vector_case base_lemma sz H1 H2 :=
+  let V1 := fresh "V" in
+  let V2 := fresh "V" in
+  pose proof (I2F_vector_elts sz H1) as V1;
+  pose proof (I2F_vector_elts sz H2) as V2;
+  destruct (vector_elts sz _) as [?|], (vector_elts sz _) as [?|] in V1 |- *;
+    try contradiction;
+  destruct (vector_elts sz _) as [?|], (vector_elts sz _) as [?|] in V2 |- *;
+    try contradiction;
+  try (repeat constructor; fail);
+  i2f_vec_wrap base_lemma.
 
 (** Layer 4: [eval_iop] adds the pointwise vector case on top of the
       scalar dispatcher. *)
-Lemma I2F_eval_iop a1 a2 b1 b2 iop :
+Lemma I2F_eval_iop a1 a2 b1 b2 iop dt :
   I2F_dvalue a1 b1 ->
   I2F_dvalue a2 b2 ->
-  I2F_EOU I2F_dvalue (eval_iop iop a1 a2) (eval_iop iop b1 b2).
+  I2F_EOU I2F_dvalue (eval_iop iop dt a1 a2) (eval_iop iop dt b1 b2).
 Proof.
   intros H1 H2.
-  induction H1; subst; induction H2; subst; cbn; repeat constructor.
-  2,3: break_goal_fast; eauto.
-  - (* Base × Base *)
-    eapply I2F_EOU_bind; [apply I2F_eval_iop_integer_base; auto|].
-    intros; eauto.
-  - (* Array × Array *)
-    i2f_vec_wrap I2F_eval_iop_integer_base.
+  destruct dt as [ ? | ? ? | [|] sz t ]; unfold eval_iop.
+  3: i2f_vector_case I2F_eval_iop_integer_base sz H1 H2.
+  all: i2f_scalar_case I2F_eval_iop_integer_base H1 H2.
 Qed.
 
 (* The float operations are parameter-independent: related inputs have
@@ -845,7 +912,8 @@ Proof.
     eapply I2F_EOU_bind;
       [eapply I2F_EOU_map_monad2;
        [eauto | intros; apply I2F_eval_fneg_base; auto]|].
-    intros; do 2 constructor; apply Forall2_map_Base; auto.
+    intros; constructor; apply I2F_canonicalize_agg; [| constructor];
+      apply Forall2_map_Base; auto.
 Qed.
 
 (* The infinite side's same-sign test is always true on unsigned values;
@@ -907,20 +975,16 @@ Proof.
     repeat (break_goal_fast; cbn); repeat constructor.
 Qed.
 
-Lemma I2F_eval_icmp a1 a2 b1 b2 samesign cmp :
+Lemma I2F_eval_icmp a1 a2 b1 b2 samesign cmp dt :
   I2F_dvalue a1 b1 ->
   I2F_dvalue a2 b2 ->
-  I2F_EOU I2F_dvalue (eval_icmp samesign cmp a1 a2)
-    (eval_icmp samesign cmp b1 b2).
+  I2F_EOU I2F_dvalue (eval_icmp samesign cmp dt a1 a2)
+    (eval_icmp samesign cmp dt b1 b2).
 Proof.
   intros H1 H2.
-  induction H1; induction H2; cbn; eauto.
-  all: try (i2f_vec_flags; eauto).
-  - (* Base × Base *)
-    eapply I2F_EOU_bind; [apply I2F_eval_icmp_base; auto|].
-    intros; eauto.
-  - (* Array × Array *)
-    i2f_vec_wrap I2F_eval_icmp_base.
+  destruct dt as [ ? | ? ? | [|] sz t ]; unfold eval_icmp.
+  3: i2f_vector_case I2F_eval_icmp_base sz H1 H2.
+  all: i2f_scalar_case I2F_eval_icmp_base H1 H2.
 Qed.
 
 Lemma I2F_eval_fop_base : forall c v1 v2 v1' v2',
@@ -935,19 +999,15 @@ Proof.
     destruct c; cbn; try (break_goal_fast; cbn); eauto.
 Qed.
 
-Lemma I2F_eval_fop a1 a2 b1 b2 fop :
+Lemma I2F_eval_fop a1 a2 b1 b2 fop dt :
   I2F_dvalue a1 b1 ->
   I2F_dvalue a2 b2 ->
-  I2F_EOU I2F_dvalue (eval_fop fop a1 a2) (eval_fop fop b1 b2).
+  I2F_EOU I2F_dvalue (eval_fop fop dt a1 a2) (eval_fop fop dt b1 b2).
 Proof.
   intros H1 H2.
-  induction H1; induction H2; cbn; eauto.
-  all: try (i2f_vec_flags; repeat constructor).
-  - (* Base × Base *)
-    eapply I2F_EOU_bind; [apply I2F_eval_fop_base; auto|].
-    intros; eauto.
-  - (* Array × Array *)
-    i2f_vec_wrap I2F_eval_fop_base.
+  destruct dt as [ ? | ? ? | [|] sz t ]; unfold eval_fop.
+  3: i2f_vector_case I2F_eval_fop_base sz H1 H2.
+  all: i2f_scalar_case I2F_eval_fop_base H1 H2.
 Qed.
 
 Lemma I2F_eval_fcmp_base : forall c v1 v2 v1' v2',
@@ -963,21 +1023,16 @@ Proof.
     repeat (break_goal_fast; cbn); eauto.
 Qed.
 
-Lemma I2F_eval_fcmp a1 a2 b1 b2 cmp :
+Lemma I2F_eval_fcmp a1 a2 b1 b2 cmp dt :
   I2F_dvalue a1 b1 ->
   I2F_dvalue a2 b2 ->
-  I2F_EOU I2F_dvalue (eval_fcmp cmp a1 a2)
-    (eval_fcmp cmp b1 b2).
+  I2F_EOU I2F_dvalue (eval_fcmp cmp dt a1 a2)
+    (eval_fcmp cmp dt b1 b2).
 Proof.
   intros H1 H2.
-  inversion H1; subst; inversion H2; subst; cbn;
-    try (repeat constructor).
-  all: try (i2f_vec_flags; repeat constructor).
-  - (* Base × Base *)
-    eapply I2F_EOU_bind; [apply I2F_eval_fcmp_base; auto|].
-    intros; do 2 constructor; auto.
-  - (* Array × Array *)
-    i2f_vec_wrap I2F_eval_fcmp_base.
+  destruct dt as [ ? | ? ? | [|] sz t ]; unfold eval_fcmp.
+  3: i2f_vector_case I2F_eval_fcmp_base sz H1 H2.
+  all: i2f_scalar_case I2F_eval_fcmp_base H1 H2.
 Qed.
 
 (** * Bitcast: relating the byte-serialization round-trip.
@@ -1777,15 +1832,6 @@ Proof. reflexivity. Qed.
 
 (** Deserialization: related byte lists deserialize to related values;
       aggregates recurse through the [Forall2] list combinators. *)
-(** [dvalue_is_poison] is a shallow test, so related values answer it
-    identically; lifting that through [forallb] is what lets the reader's
-    [canonicalize_agg] step commute with refinement. *)
-Lemma I2F_dvalue_is_poison : forall v1 v2,
-    I2F_dvalue v1 v2 ->
-    @dvalue_is_poison PInf v1 = @dvalue_is_poison PFin v2.
-Proof.
-  intros * H; destruct H; [destruct H |..]; auto.
-Qed.
 
 (** Related values are equally well defined: poison and poison bits sit at
     the same places on both sides. *)
@@ -1803,25 +1849,7 @@ Proof.
   - induction IH; cbn; congruence.
 Qed.
 
-Lemma I2F_forallb_is_poison : forall l1 l2,
-    Forall2 I2F_dvalue l1 l2 ->
-    forallb (@dvalue_is_poison PInf) l1 = forallb (@dvalue_is_poison PFin) l2.
-Proof.
-  induction 1 as [| x y xs ys Hxy H IH]; cbn; auto.
-  now rewrite (I2F_dvalue_is_poison Hxy), IH.
-Qed.
 
-Lemma I2F_canonicalize_agg :
-  forall (mk1 : list (@dvalue PInf) -> @dvalue PInf)
-         (mk2 : list (@dvalue PFin) -> @dvalue PFin) l1 l2,
-    Forall2 I2F_dvalue l1 l2 ->
-    I2F_dvalue (mk1 l1) (mk2 l2) ->
-    I2F_dvalue (@canonicalize_agg PInf mk1 l1) (@canonicalize_agg PFin mk2 l2).
-Proof.
-  intros mk1 mk2 l1 l2 HF HM; unfold canonicalize_agg.
-  rewrite (I2F_forallb_is_poison HF).
-  destruct (forallb (@dvalue_is_poison PFin) l2); auto.
-Qed.
 
 (** The packed-vector branch of the reader: related bits decode to related
     elements.  [memory_bits_to_Z] only answers with a value or poison
@@ -2597,15 +2625,12 @@ Lemma I2F_convert_pure cv t_from t_to a b :
   I2F_EOU I2F_dvalue (convert_pure cv t_from a t_to) (convert_pure cv t_from b t_to).
 Proof.
   intros R.
-  inversion R; subst; cbn; auto.
-  - destruct (get_base_conversion_type t_from t_to) as [[? ?]|]; cbn; auto.
-    specialize (@I2F_convert_pure_base cv d d0 b0 b' H) as HV.
-    inversion HV; subst; auto.
-  - (* The vector flavour: [i2f_vec_flags] discharges the scalar-array
-       flag (a non-vector array is a diagonal error), leaving the
-       [get_vector_conversion_type] guard. *)
-    i2f_vec_flags; auto.
-    destruct (get_vector_conversion_type t_from t_to) as [[? ?]|]; cbn; auto.
+  destruct t_from as [ ? | ? ? | [|] sz t ]; unfold convert_pure.
+  3: { (* vector: [vector_elts] expands both sides to related lanes *)
+    pose proof (I2F_vector_elts sz R) as V.
+    destruct (get_vector_conversion_type _ t_to) as [[? ?]|]; [| repeat constructor].
+    destruct (vector_elts sz a) as [?|], (vector_elts sz b) as [?|];
+      try contradiction; [| repeat constructor].
     (eapply I2F_EOU_bind;
         [ eapply I2F_EOU_map_monad2;
           [ eauto | intros; apply I2F_dvalue_to_dvalue_base; eauto ] |]).
@@ -2613,8 +2638,19 @@ Proof.
     eapply I2F_EOU_bind;
       [ eapply I2F_EOU_map_monad2 with (RB := I2F_dvalue_base); eauto |].
     intros. apply I2F_convert_pure_base; auto.
-    intros. constructor. constructor.
-    apply Forall2_map_Base; auto.
+    intros. constructor. apply I2F_canonicalize_agg; [| constructor];
+      apply Forall2_map_Base; auto. }
+  all: inversion R; subst; cbn -[get_base_conversion_type convert_pure_base];
+    try (repeat constructor).
+  all: match goal with
+       | |- context [get_base_conversion_type ?f ?t] =>
+           destruct (get_base_conversion_type f t) as [[? ?]|]
+       end; cbn -[convert_pure_base]; try (repeat constructor).
+  all: match goal with
+       | H : I2F_dvalue_base ?x ?y |- context [convert_pure_base _ ?f ?x ?t] =>
+           specialize (@I2F_convert_pure_base cv f t x y H) as HV;
+           inversion HV; subst; auto
+       end.
 Qed.
 
 Lemma I2F_convert ct t_from t_to a b :
@@ -2781,6 +2817,14 @@ Proof.
   end.
 Qed.
 
+(* A non-integer index: poison (the one other shape the element
+     operations accept, giving a poison result) or a diagonal error. *)
+Ltac i2f_poison_index R :=
+  inversion R; subst; cbn; try (repeat constructor);
+  match goal with
+  | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; repeat constructor
+  end.
+
 Lemma I2F_extract_element a1 a2 b1 b2 :
   I2F_dvalue a1 b1 ->
   I2F_dvalue a2 b2 ->
@@ -2806,7 +2850,7 @@ Proof.
       try (repeat constructor);
       try (match goal with F : Forall2 I2F_dvalue _ _ |- _ => now inversion F end).
     rewrite (I2F_dvalue_to_Z R2).
-    destruct (dvalue_to_Z b2) as [i |]; cbn; try (repeat constructor).
+    destruct (dvalue_to_Z b2) as [i |]; cbn; [| i2f_poison_index R2].
     rewrite !split_acc_eq.
     i2f_split_case i ltac:(auto).
 Qed.
@@ -2830,7 +2874,7 @@ Proof.
         inversion HB; subst; cbn; try (repeat constructor)
     end.
     rewrite (I2F_dvalue_to_Z R3).
-    destruct (dvalue_to_Z b3) as [i |]; cbn; try (repeat constructor).
+    destruct (dvalue_to_Z b3) as [i |]; cbn; [| i2f_poison_index R3].
     (* [i2f_split_case] splits the two lists against a [Forall2] it finds
        in the context; here the lists are implicit, so supply it. *)
     assert (F : Forall2 I2F_dvalue
@@ -2839,37 +2883,21 @@ Proof.
       by (apply Forall2_repeat; repeat constructor).
     rewrite !split_acc_eq.
     i2f_split_case i
-      ltac:(do 2 constructor; apply Forall2_app; [auto | constructor; auto]).
+      ltac:(constructor; apply I2F_canonicalize_agg; [| constructor];
+             (apply Forall2_app; [auto | constructor; auto])).
   - (* Vector *)
     match goal with v : bool |- _ => destruct v end; cbn;
       try (repeat constructor).
     rewrite (I2F_dvalue_to_Z R3).
-    destruct (dvalue_to_Z b3) as [i |]; cbn; try (repeat constructor).
+    destruct (dvalue_to_Z b3) as [i |]; cbn; [| i2f_poison_index R3].
     rewrite !split_acc_eq.
     i2f_split_case i
-      ltac:(do 2 constructor; apply Forall2_app; [auto | constructor; auto]).
+      ltac:(constructor; apply I2F_canonicalize_agg; [| constructor];
+             (apply Forall2_app; [auto | constructor; auto])).
 Qed.
 
 (** * shufflevector *)
 
-(* [vector_elts] normalizes a vector operand (a concrete array, or the
-   scalar poison encoding padded to the type's length) to its element
-   list; related dvalues normalize to related lists, or both fail. *)
-Lemma I2F_vector_elts : forall sz v1 v2,
-    I2F_dvalue v1 v2 ->
-    match vector_elts sz v1, vector_elts sz v2 with
-    | Some elts1, Some elts2 => Forall2 I2F_dvalue elts1 elts2
-    | None, None => True
-    | _, _ => False
-    end.
-Proof.
-  intros sz v1 v2 H; inversion H; subst; cbn.
-  - match goal with
-    | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; auto
-    end.
-  - auto.
-  - match goal with v : bool |- _ => destruct v end; cbn; auto.
-Qed.
 
 Lemma I2F_shuffle_vector dt a1 a2 a3 b1 b2 b3 :
   I2F_dvalue a1 b1 ->
@@ -2890,6 +2918,11 @@ Proof.
             | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; repeat constructor
             end).
   all: match goal with v : bool |- _ => destruct v end; cbn; try (repeat constructor).
+  match goal with
+  | |- I2F_dvalue (canonicalize_agg _ ?l1) (canonicalize_agg _ ?l2) =>
+      assert (FL : Forall2 I2F_dvalue l1 l2);
+      [| apply I2F_canonicalize_agg; [exact FL | constructor; exact FL]]
+  end.
   eapply Forall2_map_rel; eauto.
   intros idxv idxv' Ridx.
   rewrite (I2F_dvalue_to_Z Ridx).
@@ -3102,7 +3135,7 @@ Proof.
           - intros c p c' p' HC HP;
               destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn.
             apply I2F_eval_select_base_dvalue; auto. }
-        intros; do 2 constructor; auto.
+        intros; constructor; apply I2F_canonicalize_agg; [| constructor]; auto.
     + (* v1 vector *)
       match goal with v : bool |- _ => destruct v end; cbn;
         [| repeat constructor].
@@ -3118,7 +3151,7 @@ Proof.
           - intros c p c' p' HC HP;
               destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn.
             apply I2F_eval_select_base_dvalue; auto. }
-        intros; do 2 constructor; auto.
+        intros; constructor; apply I2F_canonicalize_agg; [| constructor]; auto.
       * match goal with v : bool |- _ => destruct v end; cbn;
           [| repeat constructor].
         eapply I2F_EOU_bind.
@@ -3128,7 +3161,7 @@ Proof.
           - intros c p c' p' HC HP;
               destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn.
             apply I2F_eval_select_base_dvalue; auto. }
-        intros; do 2 constructor; auto.
+        intros; constructor; apply I2F_canonicalize_agg; [| constructor]; auto.
 Qed.
     
 Lemma I2F_denote_exp :
@@ -3177,7 +3210,8 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
     erbind.
     + apply ruttc_map_monad.
       intros [d e] HIN; now apply (H (d,e)).
-    + intros * HF...
+    + (* the literal is canonicalised: [canonicalize_agg] *)
+      intros * HF; rstep; apply I2F_canonicalize_agg; [| constructor]; auto.
   - cbn; intros.
     erbind; [apply IHe1 | intros].
     erbind; [apply IHe2 | intros].
@@ -3249,7 +3283,8 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
     + apply I2F_refine_lift, I2F_EOU_refl.
     + intros [sz t'] ? <-; cbn.
       erbind; [apply IHe |].
-      intros...
+      intros ? ? HR; rstep.
+      apply I2F_canonicalize_agg; [| constructor]; apply Forall2_repeat; auto.
   - (* EXP_BlockAddress: a global read, like [EXP_Ident] *)
     intros; cbn...
 Qed.

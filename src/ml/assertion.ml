@@ -249,7 +249,7 @@ let dvalue_eq_assertion name (ty:DynamicTypes.dtyp) (expected : DV.dvalue) (got 
               expected value is not poison (handled above), so fail. *)
            failwith msg
         | _ ->
-           let v = ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq expected result in
+           let v = ocaml_of_EOU @@ Compare.eval_icmp Interpreter.params false Eq ty expected result in
            if dvalue_i1_to_bool v then () else
              failwith msg
         end

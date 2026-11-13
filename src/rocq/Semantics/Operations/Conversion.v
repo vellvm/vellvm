@@ -296,27 +296,31 @@ Section Convert.
     end.
 
   
+  (* At a vector type [t_from], [vector_elts] expands the scalar
+     [DVALUE_Poison] to all-poison lanes. *)
   Definition convert_pure (conv : pure_conversion) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : EOU dvalue :=
-    match dv with
-    | (DVALUE_Base dv) =>
-        match get_base_conversion_type t_from t_to with
-        | Some (t_from', t_to') =>
-            DVALUE_Base <$> (convert_pure_base conv t_from' dv t_to')
-        | None =>
-            raise_error "convert_pure: type mismatch"
-        end
-          
-    | (DVALUE_Array true elts1) =>
-        match get_vector_conversion_type t_from t_to with
-        | Some (t_from', t_to') =>
+    match t_from with
+    | DTYPE_Array true sz _ =>
+        match get_vector_conversion_type t_from t_to, vector_elts sz dv with
+        | Some (t_from', t_to'), Some elts1 =>
               elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
               val <- map_monad (fun v => convert_pure_base conv t_from' v t_to') elts1' ;;
-              ret (DVALUE_Array true (List.map DVALUE_Base val))
-
-        | None =>
+              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base val))
+        | None, _ =>
             raise_error "convert_pure: type or vector size mismatch"
+        | _, None => raise_error "convert_pure: invalid input dvalue"
         end
-    | _ => raise_error "convert_pure: invalid input dvalue"
+    | _ =>
+        match dv with
+        | (DVALUE_Base dv) =>
+            match get_base_conversion_type t_from t_to with
+            | Some (t_from', t_to') =>
+                DVALUE_Base <$> (convert_pure_base conv t_from' dv t_to')
+            | None =>
+                raise_error "convert_pure: type mismatch"
+            end
+        | _ => raise_error "convert_pure: invalid input dvalue"
+        end
     end.
 
   (* SAZ: TODO - clean up this logic? Is there a cleaner way, and do we really need

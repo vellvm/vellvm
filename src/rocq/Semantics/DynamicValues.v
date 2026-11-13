@@ -856,6 +856,10 @@ Section DValue.
            _
        | DVALUE_Iptr i1, DVALUE_Iptr i2 =>
            eval_int_op iop i1 i2
+       | _, DVALUE_Poison             =>
+           if iop_is_div iop
+           then raise_ub "Division by poison."
+           else ret DVALUE_Poison
        | DVALUE_Poison, _             =>
            match iop with
            (* A poison dividend could be INT_MIN, and INT_MIN / -1 is UB for
@@ -874,10 +878,6 @@ Section DValue.
            | _ =>
                ret DVALUE_Poison 
            end
-       | _, DVALUE_Poison             =>
-           if iop_is_div iop
-           then raise_ub "Division by poison."
-           else ret DVALUE_Poison
        | _, _                           => raise_error "ill_typed-iop"
        end).
     destruct (Pos.eq_dec sz1 sz2); subst.
@@ -885,28 +885,68 @@ Section DValue.
     - apply (raise_error "ill_typed-iop: integer bitwidth mismatch.").
   Defined.
 
-  (* I split the definition between the vector and other evaluations because
-     otherwise eval_iop should be recursive to allow for vector calculations,
-     but rocq can't find a fixpoint. *)
-  Definition eval_iop iop v1 v2 : EOU dvalue :=
-    match v1, v2 with
-    | (DVALUE_Base v1), (DVALUE_Base v2) =>
-        DVALUE_Base <$> (eval_iop_integer_base iop v1 v2)
-                           
-    | (DVALUE_Array true elts1), (DVALUE_Array true elts2) =>
-        let n := N.length elts1 in
-        let m := N.length elts2 in
-        if n =? m  then
-          elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
-          elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
-          ans <- vec_loop (eval_iop_integer_base iop) (List.combine elts1' elts2') ;;
-          ret (DVALUE_Array true (List.map DVALUE_Base ans))
-        else
-          raise_ub ("iop: " ++ (show iop) ++  " of different-length vectors")
+  (** ** Poison at vector type
 
-    | _, _ => raise_error "eval_iop called on illegal dvalue"
+      A vector value has two representations: a [DVALUE_Array true] of its
+      lanes, or the scalar [DVALUE_Poison] when every lane is poison.  The
+      latter is the canonical form ([canonicalize_agg] in MemoryBytes.v
+      produces it, and the [forallb ... = false] premise of
+      [DVALUE_Array_typ] requires it), and the constant [<N x T> poison]
+      denotes it too.  The value alone does not say which type a
+      [DVALUE_Poison] has, so the element-wise operations below take the
+      instruction's type: at a vector type [vector_elts] expands either
+      representation to its list of lanes.  They return the canonical form,
+      building their results with [canonicalize_agg]. *)
+  (* Canonicalising constructor for aggregates: an aggregate all of whose
+     immediate children are poison *is* poison, per [dvalue_has_dtyp].
+     Children are canonical by induction, so the shallow [dvalue_is_poison]
+     test is enough.  [forallb] stops at the first non-poison child (its
+     extracted [&&] short-circuits), so a vector with a defined lane 0 costs
+     one test.
+
+     Note this also sends an empty aggregate to poison, which is what the
+     [forallb ... = false] premises of [DVALUE_Struct_typ] / [DVALUE_Array_typ]
+     require.  The memory reader (MemoryBytes.v) and the element-wise vector
+     operations below build their results with it. *)
+  Definition canonicalize_agg (mk : list dvalue -> dvalue) (vs : list dvalue) : dvalue :=
+    if forallb dvalue_is_poison vs then DVALUE_Base DVALUE_Poison else mk vs.
+
+  Definition vector_elts sz (v : dvalue) : option (list dvalue) :=
+    match v with
+    | DVALUE_Array true elts => Some elts
+    | DVALUE_Base DVALUE_Poison =>
+        Some (repeat (DVALUE_Base DVALUE_Poison) (N.to_nat sz))
+    | _ => None
     end.
-  Arguments eval_iop _ _ _ : simpl nomatch.
+
+  (* [dt] is the operands' type.  The vector case is split off from the
+     scalar dispatcher [eval_iop_integer_base] because otherwise eval_iop
+     would have to be recursive to allow for vector calculations, but rocq
+     can't find a fixpoint. *)
+  Definition eval_iop iop (dt : dtyp) v1 v2 : EOU dvalue :=
+    match dt with
+    | DTYPE_Array true sz _ =>
+        match vector_elts sz v1, vector_elts sz v2 with
+        | Some elts1, Some elts2 =>
+            let n := N.length elts1 in
+            let m := N.length elts2 in
+            if n =? m  then
+              elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+              elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
+              ans <- vec_loop (eval_iop_integer_base iop) (List.combine elts1' elts2') ;;
+              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base ans))
+            else
+              raise_ub ("iop: " ++ (show iop) ++  " of different-length vectors")
+        | _, _ => raise_error "eval_iop called on illegal dvalue"
+        end
+    | _ =>
+        match v1, v2 with
+        | (DVALUE_Base v1), (DVALUE_Base v2) =>
+            DVALUE_Base <$> (eval_iop_integer_base iop v1 v2)
+        | _, _ => raise_error "eval_iop called on illegal dvalue"
+        end
+    end.
+  Arguments eval_iop _ _ _ _ : simpl nomatch.
 
   Definition eval_int_icmp {Int} `{VMI : VMemInt Int} (samesign:bool) icmp (x y : Int) : EOU dvalue_base :=
     c <- match icmp with
@@ -964,34 +1004,41 @@ Section DValue.
     | DVALUE_Float f1, DVALUE_Float f2   => float_op fop f1 f2
     | DVALUE_Double d1, DVALUE_Double d2 => double_op fop d1 d2
     | DVALUE_Poison, _                 => ret DVALUE_Poison
+    (* Unlike integer division, floating-point division (and remainder) by
+       poison is not UB: LangRef gives fdiv/frem no undefined behavior, so
+       the result is just poison. *)
     | DVALUE_Float _, DVALUE_Poison
     | DVALUE_Double _, DVALUE_Poison
-      =>
-        if fop_is_div fop
-        then raise_ub "Division by poison."
-        else ret DVALUE_Poison 
+      => ret DVALUE_Poison
     | _, _                               =>
         raise_error ("ill_typed-fop: " ++ (show fop) ++ " " ++ (show v1) ++ " " ++ (show v2))
     end.
 
-  Definition eval_fop (fop:fbinop) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
-    match v1, v2 with
-    | (DVALUE_Base dv1), (DVALUE_Base dv2) =>
-        DVALUE_Base <$> (eval_fop_base fop dv1 dv2)
-      
-    | (DVALUE_Array true elts1), (DVALUE_Array true elts2) =>
-        let n := N.length elts1 in
-        let m := N.length elts2 in
-        if n =? m  then
-          elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
-          elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
-          ans <- vec_loop (eval_fop_base fop) (List.combine elts1' elts2') ;;
-          ret (DVALUE_Array true (List.map DVALUE_Base ans))
-        else
-        raise_ub ("fop: " ++ (show fop) ++  " different-length vectors of type "
-                  ++ "v1 = " ++ (show v1) ++ "v2 = " ++ (show v2)
-          )
-    | _, _ => raise_error "eval_fop got illegal value"
+  (* [dt] is the operands' type; see [vector_elts]. *)
+  Definition eval_fop (fop:fbinop) (dt : dtyp) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
+    match dt with
+    | DTYPE_Array true sz _ =>
+        match vector_elts sz v1, vector_elts sz v2 with
+        | Some elts1, Some elts2 =>
+            let n := N.length elts1 in
+            let m := N.length elts2 in
+            if n =? m  then
+              elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+              elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
+              ans <- vec_loop (eval_fop_base fop) (List.combine elts1' elts2') ;;
+              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base ans))
+            else
+              raise_ub ("fop: " ++ (show fop) ++  " different-length vectors of type "
+                        ++ "v1 = " ++ (show v1) ++ "v2 = " ++ (show v2)
+                )
+        | _, _ => raise_error "eval_fop got illegal value"
+        end
+    | _ =>
+        match v1, v2 with
+        | (DVALUE_Base dv1), (DVALUE_Base dv2) =>
+            DVALUE_Base <$> (eval_fop_base fop dv1 dv2)
+        | _, _ => raise_error "eval_fop got illegal value"
+        end
     end.
   
   Definition eval_fneg_base (v:dvalue_base) : EOU dvalue_base :=
@@ -1010,7 +1057,7 @@ Section DValue.
     | DVALUE_Array true elts =>
         elts' <- map_monad dvalue_to_dvalue_base elts ;;        
         ans <- map_monad (eval_fneg_base) elts' ;;
-        ret (DVALUE_Array true (List.map DVALUE_Base ans))
+        ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base ans))
     | _ => raise_error "eval_fneg got illegal value"
     end.
   
@@ -1082,22 +1129,29 @@ Section DValue.
     | _, _ => raise_error "ill_typed-fcmp"
     end.
 
-  Definition eval_fcmp (fcmp:fcmp) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
-    match v1, v2 with
-    | (DVALUE_Base dv1), (DVALUE_Base dv2) =>
-        DVALUE_Base <$> (eval_fcmp_base fcmp dv1 dv2)
-                    
-    | (DVALUE_Array true elts1), (DVALUE_Array true elts2) =>
-        let n := N.length elts1 in
-        let m := N.length elts2 in
-        if n =? m  then
-          elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
-          elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
-          ans <- vec_loop (eval_fcmp_base fcmp) (List.combine elts1' elts2') ;;
-          ret (DVALUE_Array true (List.map DVALUE_Base ans))
-        else
-          raise_ub "fcmp of different-length vectors"
-    | _, _ => raise_error "eval_fcmp got illegal value"
+  (* [dt] is the operands' type; see [vector_elts]. *)
+  Definition eval_fcmp (fcmp:fcmp) (dt : dtyp) (v1:dvalue) (v2:dvalue) : EOU dvalue :=
+    match dt with
+    | DTYPE_Array true sz _ =>
+        match vector_elts sz v1, vector_elts sz v2 with
+        | Some elts1, Some elts2 =>
+            let n := N.length elts1 in
+            let m := N.length elts2 in
+            if n =? m  then
+              elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
+              elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
+              ans <- vec_loop (eval_fcmp_base fcmp) (List.combine elts1' elts2') ;;
+              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base ans))
+            else
+              raise_ub "fcmp of different-length vectors"
+        | _, _ => raise_error "eval_fcmp got illegal value"
+        end
+    | _ =>
+        match v1, v2 with
+        | (DVALUE_Base dv1), (DVALUE_Base dv2) =>
+            DVALUE_Base <$> (eval_fcmp_base fcmp dv1 dv2)
+        | _, _ => raise_error "eval_fcmp got illegal value"
+        end
     end.
 
   End ARITHMETIC.
@@ -1282,6 +1336,9 @@ Section DValue.
   (* get the idx'th element of a vector, return [poison] if not in bounds. *)
   (* LANGREF? : What is the behavior if [vec] is poison?  UB or return poison?
      For now we return poison if the [vec] is poison.
+     A poison index gives poison, as an out-of-range one does (LangRef:
+     "If idx exceeds the length of val ... the result is a poison value";
+     a poison index may be any value, out of range included).
    *)
   Definition extract_element (vec:dvalue) (idx:dvalue) : EOU dvalue :=
     match vec with
@@ -1295,14 +1352,20 @@ Section DValue.
             | None => ret (DVALUE_Base DVALUE_Poison)
             | Some (pre, elt, post) =>  ret elt
             end
-        | None => raise_error "extractelemnt: non-integer index"
+        | None =>
+            match idx with
+            | DVALUE_Base DVALUE_Poison => ret (DVALUE_Base DVALUE_Poison)
+            | _ => raise_error "extractelemnt: non-integer index"
+            end
         end
     | DVALUE_Base DVALUE_Poison =>
         ret (DVALUE_Base DVALUE_Poison)
     | _ => raise_error "extractelement: non-vector value"
     end.
 
-  (* Insert element needs to know the type of the vector do determine its size when the value is poison. *)
+  (* Insert element needs to know the type of the vector do determine its size when the value is poison.
+     An out-of-range or poison index makes the whole result poison (see
+     [extract_element]). *)
   Definition insert_element (vec_t:dtyp) (vec : dvalue) (elt : dvalue) (idx : dvalue) : EOU dvalue :=
     match vec_t with
     | DTYPE_Array true sz t =>
@@ -1312,9 +1375,13 @@ Section DValue.
             | Some i =>
                 match split_acc i elts with
                 | None => ret (DVALUE_Base DVALUE_Poison)
-                | Some (pre, _, post) =>  ret (DVALUE_Array true (pre ++ [elt] ++ post))
+                | Some (pre, _, post) =>  ret (canonicalize_agg (DVALUE_Array true) (pre ++ [elt] ++ post))
                 end
-            | None => raise_error "insertelement: non-integer index"
+            | None =>
+                match idx with
+                | DVALUE_Base DVALUE_Poison => ret (DVALUE_Base DVALUE_Poison)
+                | _ => raise_error "insertelement: non-integer index"
+                end
             end
         | DVALUE_Base DVALUE_Poison =>
             let elts : list dvalue := repeat (DVALUE_Base DVALUE_Poison) (N.to_nat sz) in
@@ -1322,23 +1389,17 @@ Section DValue.
             | Some i =>
                 match split_acc i elts with
                 | None => ret (DVALUE_Base DVALUE_Poison)
-                | Some (pre, _, post) =>  ret (DVALUE_Array true (pre ++ [elt] ++ post))
+                | Some (pre, _, post) =>  ret (canonicalize_agg (DVALUE_Array true) (pre ++ [elt] ++ post))
                 end
-            | None => raise_error "insertelement: non-integer index"
+            | None =>
+                match idx with
+                | DVALUE_Base DVALUE_Poison => ret (DVALUE_Base DVALUE_Poison)
+                | _ => raise_error "insertelement: non-integer index"
+                end
             end
         | _ => raise_error ("insertelement: non-vector value " ++ (show vec))%string
         end
     | _ => raise_error ("insertelemnt: non-vector type" ++ (show vec_t))%string
-    end.
-
-  (* Need to be careful to properly compute a poison at array type rather than
-     an array of poison values *)
-  Definition vector_elts sz (v : dvalue) : option (list dvalue) :=
-    match v with
-    | DVALUE_Array true elts => Some elts
-    | DVALUE_Base DVALUE_Poison =>
-        Some (repeat (DVALUE_Base DVALUE_Poison) (N.to_nat sz))
-    | _ => None
     end.
 
   (* vec_t is the (common) type of [vec1] and [vec2] 
@@ -1362,7 +1423,7 @@ Section DValue.
               | None => DVALUE_Base DVALUE_Poison
               end
             in
-            ret (DVALUE_Array true (List.map lane idxs))
+            ret (canonicalize_agg (DVALUE_Array true) (List.map lane idxs))
         | _, _, DVALUE_Base DVALUE_Poison =>
         (* entirely poison mask *)
             ret (DVALUE_Base DVALUE_Poison)

@@ -403,12 +403,9 @@ Lemma I2F_denote_instr :
         rbind (fun _ _ => True); [rstep; cbnn; easy | intros];
         rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
         apply I2F_refine_lift'.
-        pose proof @I2F_eval_iop _ (DVALUE_I sz i) _ (DVALUE_I sz i) And H1.
-        forward H0; [repeat constructor |].
-        inv H0; [inv H4 |..]; repeat constructor.
-        induction H0; repeat constructor.
-        destruct (Pos.eq_dec sz sz0); repeat constructor.
-        subst; cbn; repeat constructor.
+        eapply I2F_EOU_bind;
+          [apply I2F_eval_iop; [auto | repeat constructor] |].
+        intros; apply I2F_eval_iop; [repeat constructor | auto].
       }
       all: erbind; [apply I2F_refine_lift', I2F_eval_fop; eauto | intros].
       all: rbind (fun _ _ => True); [rstep; cbnn; easy | intros].
