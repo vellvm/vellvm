@@ -168,8 +168,17 @@ Fixpoint Store_size_dtyp (ty:dtyp) : N :=
       pad_to max_align sz
   | DTYPE_Array false sz ty' =>
       sz * (Alloc_size_dtyp ty')
+  | DTYPE_Array true sz (DTYPE_Base t) =>
+      (* LangRef (vector type, "Memory Layout"): a vector is laid out as the
+         bitcast to an integer of [sz * M] bits, i.e. its elements are packed
+         together without padding, so it occupies [ceil (sz * M / 8)] bytes.
+         For a byte-sized element this is [sz * Sizeof_dtyp_base t], as
+         before; it differs only for non-byte-sized [iM] / [bM] elements,
+         e.g. <8 x i1> is 1 byte and <2 x i12> is 3. *)
+      (sz * Bit_sizeof_dtyp_base t + 7) / 8
   | DTYPE_Array true sz ty' =>
-      (* vectors are bit-packed: elements are contiguous *)
+      (* a vector of a non-scalar is ill-formed IR; keep the elements
+         contiguous *)
       sz * (Store_size_dtyp ty')
   end.
 
@@ -229,6 +238,17 @@ Proof.
      [Store_size_dtyp] *)
   constructor; try reflexivity.
   - lia.
+  - (* a vector of anything but [iM] / [bM]: every such base type is a whole
+       number of bytes, so the packed size is [sz] times the element's *)
+    intros sz t HI HB.
+    destruct t as [b | |]; [| reflexivity | reflexivity].
+    assert (E : forall k b', b' = (8 * k)%N -> ((sz * b' + 7) / 8 = sz * k)%N).
+    { intros k b' ->.
+      replace (sz * (8 * k) + 7)%N with (7 + (sz * k) * 8)%N by lia.
+      rewrite N.div_add by lia; reflexivity. }
+    destruct b; try (exfalso; eapply HI; reflexivity); try (exfalso; eapply HB; reflexivity);
+      cbn [store_size_dtyp SizeofV Store_size_dtyp Sizeof_dtyp_base];
+      apply E; reflexivity.
   - (* [DTYPE_I sz] occupies ceil(sz/8) bytes *)
     intros sz; cbn [store_size_dtyp SizeofV Store_size_dtyp Sizeof_dtyp_base].
     apply round_up_to_eight_div; lia.

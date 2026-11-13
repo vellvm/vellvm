@@ -17,26 +17,56 @@ Section GEP.
       index, its value and what it is scaled by.  The first index steps over
       whole objects of type [t]; each later one selects an element of the
       current aggregate type: an array or vector element (the index times
-      the element size), or a struct field (its byte offset, scaled by 1).
+      the element stride, see [sequential_stride]), or a struct field (its
+      byte offset, scaled by 1).
       The address is [a] plus the sum of the steps ([gep_offset]), and the
       no-wrap flags are rules about the steps (see [gep_flags_violated]).
       A poison index makes the whole result poison.
    *)
+  (* Indexing into [t] is allowed unless [t] is a vector whose elements are
+     not byte-addressable, i.e. whose bit size is not their store size in
+     bits (<N x i1>, <N x i12>, ...).  Such an element has no address of its
+     own -- the vector is bit-packed -- and LLVM's verifier rejects the GEP
+     ("GEP into vector with non-byte-addressable element type", mirroring
+     [DataLayout::typeSizeEqualsStoreSize]).  No well-formed program
+     performs one, so the semantics may treat it as undefined behavior. *)
+  Definition gep_indexable (t : dtyp) : bool :=
+    match t with
+    | DTYPE_Array true _ ta => N.eqb (bit_sizeof_dtyp ta) (8 * store_size_dtyp ta)
+    | _ => true
+    end.
+
+  (* The distance between consecutive elements when indexing into an array
+     ([vector = false]) or a vector ([vector = true]).  Array elements sit at
+     their alloc size, but a vector is bit-packed, so its elements are
+     contiguous at their *store* size -- e.g. element 2 of <3 x i24> is at
+     byte 6, of [3 x i24] at byte 8.  The two differ for over-aligned element
+     types such as [i24].  LangRef does not say this; it is LLVM's
+     [generic_gep_type_iterator::getSequentialElementStride]
+     (GetElementPtrTypeIterator.h, llvm-project PR #75448).  [gep_indexable]
+     guarantees the vector's elements are byte-addressable, so the store
+     size is exactly where the next element's bits begin. *)
+  Definition sequential_stride (vector : bool) (ta : dtyp) : N :=
+    if vector then store_size_dtyp ta else alloc_size_dtyp ta.
+
   Fixpoint gep_steps_h (t:dtyp) (vs:list dvalue): EOUP (list (Z * Z)) :=
     match vs with
     | v :: vs' =>
+        if negb (gep_indexable t)
+        then raise_ub "getelementptr into a vector with non-byte-addressable element type"
+        else
         match v with
         | DVALUE_Base (DVALUE_I 8 i) =>
             match t with
-            | DTYPE_Array _ _ ta =>
-                cons (signed i, Z.of_N (alloc_size_dtyp ta)) <$> gep_steps_h ta vs'
+            | DTYPE_Array vec _ ta =>
+                cons (signed i, Z.of_N (sequential_stride vec ta)) <$> gep_steps_h ta vs'
             | _ => raise_error ("non-i8-indexable type")
             end
         | DVALUE_Base (DVALUE_I 32 i) =>
             let n := BinIntDef.Z.to_nat (unsigned i) in
             match t with
-            | DTYPE_Array _ _ ta =>
-                cons (signed i, Z.of_N (alloc_size_dtyp ta)) <$> gep_steps_h ta vs'
+            | DTYPE_Array vec _ ta =>
+                cons (signed i, Z.of_N (sequential_stride vec ta)) <$> gep_steps_h ta vs'
             | DTYPE_Struct false ts =>
                 match nth_error ts n with
                 | None => raise_error "overflow"
@@ -57,14 +87,14 @@ Section GEP.
             end
         | DVALUE_Base (DVALUE_I 64 i) =>
             match t with
-            | DTYPE_Array _ _ ta =>
-                cons (signed i, Z.of_N (alloc_size_dtyp ta)) <$> gep_steps_h ta vs'
+            | DTYPE_Array vec _ ta =>
+                cons (signed i, Z.of_N (sequential_stride vec ta)) <$> gep_steps_h ta vs'
             | _ => raise_error ("non-i64-indexable type")
             end
         | DVALUE_Base (DVALUE_Iptr i) =>
             match t with
-            | DTYPE_Array _ _ ta =>
-                cons (to_Z i, Z.of_N (alloc_size_dtyp ta)) <$> gep_steps_h ta vs'
+            | DTYPE_Array vec _ ta =>
+                cons (to_Z i, Z.of_N (sequential_stride vec ta)) <$> gep_steps_h ta vs'
             | _ => raise_error ("non-iptr-indexable type")
             end
         | DVALUE_Base (DVALUE_Poison) =>
