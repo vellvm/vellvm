@@ -11,87 +11,17 @@ module DV = DynamicValues
 open DV
 open Llvm_printer
 open List
-open VellvmFloats
 
-type test =
-  (* expected dvalue, dynamic type, entry, arguments *)
-  | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.dvalue list
-  | SuccessTest of function_id * DV.dvalue list
-  | FailsTest of function_id * DV.dvalue list
-  | UBTest of int * function_id * DV.dvalue list
-
-
-(* Directly converts a piece of syntax to a dtyp without going through
-   semantic interpretation. Only works on literals. *)
-let typ_to_dtyp_base (typ : LLVMAst.typ) : DynamicTypes.dtyp_base =
-  match typ with
-  | TYPE_Void -> DTYPE_Void
-  | TYPE_I i -> DTYPE_I i
-  | TYPE_FP FP_float -> DTYPE_FP FP_float
-  | TYPE_FP FP_double -> DTYPE_FP FP_double
-  | _ ->
-      failwith
-        (Printf.sprintf "Assertion includes unsupported type:\n\t %s"
-           (string_of_typ typ) )
-
-let rec typ_to_dtyp (typ : LLVMAst.typ) : DynamicTypes.dtyp =
-  match typ with
-  | TYPE_Struct dtyps -> DTYPE_Struct (false, List.map typ_to_dtyp dtyps)
-  | TYPE_Packed_struct dtyps ->
-      DTYPE_Struct (true, List.map typ_to_dtyp dtyps)
-  | TYPE_Array (sz, dtyp) -> DTYPE_Array (false, sz, typ_to_dtyp dtyp)
-  | TYPE_Vector (sz, dtyp) -> DTYPE_Array (true, sz, typ_to_dtyp dtyp)
-  | _ -> DTYPE_Base (typ_to_dtyp_base typ)
-
-let ocaml_of_EOU (c : 'x EOU.coq_EOU) : 'x =
-  match c with
-  | Coq_raise_error err -> failwith @@ Printf.sprintf "ERROR: %s" (Interpreter.ocaml_str err)
-  | Coq_raise_oom err -> failwith @@ Printf.sprintf "OOM: %s" (Interpreter.ocaml_str err)
-  | Coq_raise_ub err -> failwith @@ Printf.sprintf "UB: %s" (Interpreter.ocaml_str err)
-  | Coq_raise_ret x -> x
-
-let dvalue_to_dvalue_base_exn (dv : dvalue) : dvalue_base =
-  match dv with
-  | DVALUE_Base dv -> dv
-  | _ -> failwith "ocaml: dvalue_to_dvalue_base cast failed"
-
-let rec texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.dvalue =
-  match (typ, exp) with
-  (* Allow null pointers literals *)
-  | TYPE_Pointer _, EXP_Null ->
-      DVALUE_Base (DVALUE_Pointer Interpreter.pointer_v.null)
-  | TYPE_I bits, EXP_Integer x ->                 
-     DVALUE_Base (ocaml_of_EOU
-       (DV.coerce_integer_to_int Interpreter.params (Some bits) (Attributes.denote_int_syntax x)))
-
-  | TYPE_FP FP_float, EXP_Float f ->
-     begin match float32_of_float_syntax f with
-     | Some v ->  DVALUE_Base (DVALUE_Float v)
-     | None ->
-        let s = Camlcoq.camlstring_of_coqstring (ShowAST.show_float_syntax f) in
-        failwith @@ Printf.sprintf "assertion.ml: texp_to_dvalue failed float32 conversion: %s" s
-     end
-  | TYPE_FP FP_double, EXP_Float f ->
-     begin match float_of_float_syntax f with
-     | Some v ->  DVALUE_Base (DVALUE_Double v)
-     | None ->
-        let s = Camlcoq.camlstring_of_coqstring (ShowAST.show_float_syntax f) in
-        failwith @@ Printf.sprintf "assertion.ml: texp_to_dvalue failed float conversion: %s" s
-     end
-  | TYPE_Struct _, EXP_Struct elts ->
-      DVALUE_Struct (false, List.map texp_to_dvalue elts)
-  | TYPE_Packed_struct _, EXP_Packed_struct elts ->
-      DVALUE_Struct (true, List.map texp_to_dvalue elts)
-  | TYPE_Array (_sz, _t), EXP_Array elts ->
-     DVALUE_Array (false, List.map texp_to_dvalue elts)
-  | TYPE_Vector _, EXP_Vector elts ->
-     DVALUE_Array (true, List.map texp_to_dvalue elts)
-  | _, EXP_Poison -> (DVALUE_Base DVALUE_Poison)
-  | _, _ ->
-      failwith
-        (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
-           (string_of_typ typ) (string_of_exp exp) )
-
+let texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.dvalue =
+  let t = TypToDtyp.typ_to_dtyp [] typ in
+  let e = TypToDtyp.convert_types_closed_exp exp in 
+  begin match (Denotation.denote_closed_exp (ParamsV.coq_ParamsV IPtrInfinite.coq_IPZ) t e) with
+  | Some v -> v
+  | None -> failwith
+              (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
+                 (string_of_typ typ) (string_of_exp exp))
+end
+    
 let texp_to_function_id (_, exp) : function_id =
   match exp with
   | EXP_Ident (ID_Global id) -> id
