@@ -1,4 +1,8 @@
 (* begin hide *)
+From Stdlib Require Import
+  Ascii
+  String.
+
 From ExtLib Require Import
   Programming.Eqv
   Data.String.
@@ -48,183 +52,101 @@ Import EqvNotation.
 
        Each such intrinsic must be:
 
-        - registered by providing a [declaration typ] and added to
-          [defined_intrinsics_decls]
+        - given a constructor of [intrinsic_family] and a row of
+          [intrinsic_table], which maps its name to that constructor
 
-        - _if_ the intrinsics is a pure computation, it must be implemented as a
+        - _if_ the intrinsic is a pure computation, it must be implemented as a
           pure Gallina function of type [semantic_function] and added to
-          [defined_intrinsics]
+          [intrinsic_semantics]
 
         - _if_ it is impure, i.e. depends on the memory, as is the case for
           [memcpy], its implementation must be provided in [src/rocq/Semantics/Implementations/Memory.v]
-          and a test on its name added to [handle_intrinsicM] (for the
-          memory intrinsics, [declares] against their declarations).
+          and a case for its family added to [handle_intrinsicM].
  *)
 
-(** The declaration of an intrinsic, without attributes.  Only its name
-    matters to the semantics (see [lookup_intrinsic_declaration]). *)
-Definition intrinsic_decl (name : string) (ret : typ) (args : list typ) : declaration typ :=
-  {|
-    dc_name        := Name name;
-    dc_type        := TYPE_Function ret args false;
-    dc_param_attrs := ([], map (fun _ => []) args);
-    dc_attrs       := [];
-    dc_annotations := []
-  |}.
+(** The intrinsics with a built-in semantics.  An overloaded intrinsic is one
+    family, whatever its type mangling: [llvm.ushl.sat.i8] and
+    [llvm.ushl.sat.i64] are both [Intr_ushl_sat]. *)
+Variant intrinsic_family : Set :=
+| Intr_fabs
+| Intr_maxnum
+| Intr_minimum
+| Intr_ushl_sat
+| Intr_throw
+| Intr_assume
+| Intr_va_start
+| Intr_va_end
+| Intr_va_copy
+| Intr_memcpy
+| Intr_memmove
+| Intr_memset
+| Intr_malloc
+| Intr_free.
 
-Definition vellvm_internal_throw_decl : declaration typ :=
-  intrinsic_decl "llvm.vellvm.internal.throw" TYPE_Void [].
+(** Each family's name, and whether it is overloaded: an overloaded name is
+    followed by the mangling of its type parameters ([.f32], [.p0.p0.i64]),
+    any other name must match exactly.  The semantic functions take the types
+    from their arguments, so the mangling itself is not interpreted. *)
+Definition intrinsic_table : list (string * bool * intrinsic_family) :=
+  [ ("llvm.fabs", true, Intr_fabs);
+    ("llvm.maxnum", true, Intr_maxnum);
+    ("llvm.minimum", true, Intr_minimum);
+    ("llvm.ushl.sat", true, Intr_ushl_sat);
+    ("llvm.memcpy", true, Intr_memcpy);
+    ("llvm.memmove", true, Intr_memmove);
+    ("llvm.memset", true, Intr_memset);
+    ("malloc", false, Intr_malloc);
+    ("free", false, Intr_free);
+    ("llvm.vellvm.internal.throw", false, Intr_throw);
+    ("llvm.assume", false, Intr_assume);
+    ("llvm.va_start", false, Intr_va_start);
+    ("llvm.va_end", false, Intr_va_end);
+    ("llvm.va_copy", false, Intr_va_copy)
+  ]%string.
 
-(* A poison condition is UB in [llvm_assume] itself. *)
-Definition assume_decl : declaration typ :=
-  intrinsic_decl "llvm.assume" TYPE_Void [TYPE_I 1].
+Definition is_digit (c : ascii) : bool :=
+  match c with
+  | "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" => true
+  | _ => false
+  end%char.
 
-Definition va_start_decl : declaration typ :=
-  intrinsic_decl "llvm.va_start" TYPE_Void [TYPE_Pointer None].
+(** Does [s] start a type mangling: [i32], [f64], [p0], [v4i1]? *)
+Definition starts_mangling (s : string) : bool :=
+  match s with
+  | String c (String d _) =>
+      if (Ascii.eqb c "i" || Ascii.eqb c "f" || Ascii.eqb c "p" || Ascii.eqb c "v")%char%bool
+      then is_digit d else false
+  | _ => false
+  end.
 
-Definition va_end_decl : declaration typ :=
-  intrinsic_decl "llvm.va_end" TYPE_Void [TYPE_Pointer None].
+(** Is [name] the family name [fam], followed by a mangling if the family is
+    [overloaded]? *)
+Fixpoint names_intrinsic (overloaded : bool) (fam name : string) : bool :=
+  match fam, name with
+  | EmptyString, EmptyString => true
+  | EmptyString, String c rest =>
+      if overloaded then if Ascii.eqb c "."%char then starts_mangling rest else false
+      else false
+  | String a fam', String b name' =>
+      if Ascii.eqb a b then names_intrinsic overloaded fam' name' else false
+  | String _ _, EmptyString => false
+  end.
 
-Definition va_copy_decl : declaration typ :=
-  intrinsic_decl "llvm.va_copy" TYPE_Void [TYPE_Pointer None; TYPE_Pointer None].
+Definition lookup_intrinsic (name : string) : option intrinsic_family :=
+  option_map snd
+    (List.find (fun '(fam, overloaded, _) => names_intrinsic overloaded fam name) intrinsic_table).
 
-Definition fabs_32_decl : declaration typ :=
-  intrinsic_decl "llvm.fabs.f32" (TYPE_FP FP_float) [TYPE_FP FP_float].
-
-Definition fabs_64_decl : declaration typ :=
-  intrinsic_decl "llvm.fabs.f64" (TYPE_FP FP_double) [TYPE_FP FP_double].
-
-Definition maxnum_32_decl : declaration typ :=
-  intrinsic_decl "llvm.maxnum.f32" (TYPE_FP FP_float) [TYPE_FP FP_float; TYPE_FP FP_float].
-
-Definition maxnum_64_decl : declaration typ :=
-  intrinsic_decl "llvm.maxnum.f64" (TYPE_FP FP_double) [TYPE_FP FP_double; TYPE_FP FP_double].
-
-Definition minimum_32_decl : declaration typ :=
-  intrinsic_decl "llvm.minimum.f32" (TYPE_FP FP_float) [TYPE_FP FP_float; TYPE_FP FP_float].
-
-Definition minimum_64_decl : declaration typ :=
-  intrinsic_decl "llvm.minimum.f64" (TYPE_FP FP_double) [TYPE_FP FP_double; TYPE_FP FP_double].
-
-(* Saturated arithmetic: https://llvm.org/docs/LangRef.html#saturation-arithmetic-intrinsics *)
-Definition ushl_sat_decl (name : string) (sz : positive) : declaration typ :=
-  intrinsic_decl name (TYPE_I sz) [TYPE_I sz; TYPE_I sz].
-
-Definition ushl_sat_1_decl  := ushl_sat_decl "llvm.ushl.sat.i1" 1.
-Definition ushl_sat_8_decl  := ushl_sat_decl "llvm.ushl.sat.i8" 8.
-Definition ushl_sat_16_decl := ushl_sat_decl "llvm.ushl.sat.i16" 16.
-Definition ushl_sat_32_decl := ushl_sat_decl "llvm.ushl.sat.i32" 32.
-Definition ushl_sat_64_decl := ushl_sat_decl "llvm.ushl.sat.i64" 64.
-
-(** The memory intrinsics, under both pointer manglings ([p0i8], i.e. [i8*],
-    and [p0], i.e. [ptr], which is what current LLVM emits) and both length
-    types.  memcpy and memmove take [(dst, src, len, isvolatile)]; memset
-    takes [(dst, val, len, isvolatile)].  Their semantics is in
-    [Implementations/Memory.v]. *)
-Definition mem_pointer_manglings : list (string * typ) :=
-  [("p0i8", TYPE_Pointer (Some (TYPE_I 8))); ("p0", TYPE_Pointer None)].
-
-Definition mem_length_manglings : list (string * typ) :=
-  [("i32", TYPE_I 32); ("i64", TYPE_I 64)].
-
-(** One declaration per pointer and length mangling; [mk p pt l lt] builds
-    it from the pointer mangling [p] (type [pt]) and the length mangling [l]
-    (type [lt]). *)
-Definition mem_intrinsic_decls (mk : string -> typ -> string -> typ -> declaration typ)
-  : list (declaration typ) :=
-  flat_map (fun '(p, pt) => map (fun '(l, lt) => mk p pt l lt) mem_length_manglings)
-    mem_pointer_manglings.
-
-(** memcpy and memmove: [llvm.<op>.<p>.<p>.<l>]. *)
-Definition memtransfer_decls (op : string) : list (declaration typ) :=
-  mem_intrinsic_decls (fun p pt l lt =>
-    intrinsic_decl ("llvm." ++ op ++ "." ++ p ++ "." ++ p ++ "." ++ l)%string
-      TYPE_Void [pt; pt; lt; TYPE_I 1]).
-
-Definition memcpy_decls : list (declaration typ) := memtransfer_decls "memcpy".
-
-Definition memmove_decls : list (declaration typ) := memtransfer_decls "memmove".
-
-(** memset: [llvm.memset.<p>.<l>]. *)
-Definition memset_decls : list (declaration typ) :=
-  mem_intrinsic_decls (fun p pt l lt =>
-    intrinsic_decl ("llvm.memset." ++ p ++ "." ++ l)%string
-      TYPE_Void [pt; TYPE_I 8; lt; TYPE_I 1]).
-
-Definition malloc_decl : declaration typ :=
-  intrinsic_decl "malloc" (TYPE_Pointer (Some (TYPE_I 8))) [TYPE_I 64].
-
-Definition free_decl : declaration typ :=
-  intrinsic_decl "free" TYPE_Void [TYPE_Pointer (Some (TYPE_I 8))].
-
-(* This may seem to overlap with `defined_intrinsics`, but there are few differences:
-   1. This one is defined outside of the module and could be used at the LLVM AST generation stage without yet specifying memory model.
-   2. It includes declarations for built-in memory-dependent intrinisics such as `memcpy`.
- *)
-Definition defined_intrinsics_decls :=
-  [ (* pure intrinsics *)
-    fabs_32_decl;
-    fabs_64_decl;
-    maxnum_32_decl ;
-    maxnum_64_decl;
-    minimum_32_decl;
-    minimum_64_decl;
-    ushl_sat_1_decl;
-    ushl_sat_8_decl;
-    ushl_sat_16_decl;
-    ushl_sat_32_decl;
-    ushl_sat_64_decl]
-  ++
-  (* memory intrinsics *)
-  memcpy_decls ++ memmove_decls ++ memset_decls ++
-  [ malloc_decl;
-    free_decl;
-
-    (* exception intrinsics *)
-    vellvm_internal_throw_decl;
-
-    (* assumptions *)
-    assume_decl;
-
-    (* Vararg intrinsics *)
-    va_start_decl;
-    va_end_decl;
-    va_copy_decl
-  ].
-
-
-(* This function extracts the string of the form [llvm._] from an LLVM expression.
-   It returns None if the expression is not an intrinsic definition.
-*)
-Definition intrinsic_ident (id:ident) : option string :=
+Definition is_intrinsic (id : function_id) : bool :=
   match id with
-  | ID_Global (Name s) =>
-      if orb (orb (String.prefix "llvm." s)
-                  (Rocqlib.proj_sumbool (string_dec "malloc" s)))
-             (Rocqlib.proj_sumbool (string_dec "free" s))
-      then Some s else None
-  | _ => None
+  | Name s => match lookup_intrinsic s with Some _ => true | None => false end
+  | _ => false
   end.
-
-(* Returns `true` only if both function are named and have the same name.  *)
-Definition function_name_eq (a b:function_id) : bool :=
-  match a, b with
-  | Name aname, Name bname => String.eqb aname bname
-  | _, _ => false
-  end.
-
-(** Is [name] the name of one of [decls]? *)
-Definition declares (decls : list (declaration typ)) (name : string) : bool :=
-  existsb (fun d => function_name_eq (Name name) (dc_name d)) decls.
-
-Definition lookup_intrinsic_declaration name : option (declaration typ) :=
-  List.find (fun x => function_name_eq name (dc_name x)) defined_intrinsics_decls.
 
 Definition intrinsic_exp {T} (e:exp T) : option string :=
   match e with
   | EXP_Ident (ID_Global (Name s)) =>
-      match lookup_intrinsic_declaration (Name s) with
-      | Some x => Some s
+      match lookup_intrinsic s with
+      | Some _ => Some s
       | None => None
       end
   | _ => None
@@ -272,9 +194,6 @@ Section Intrinsics.
   Definition pure_function      := list dvalue -> EOU (dvalue + dvalue).
   Definition semantic_function  := list dvalue -> option ptr -> itree E (dvalue + dvalue).
 
-  (* An association list mapping intrinsic names to their semantic definitions *)
-  Definition intrinsic_definitions := list (declaration typ * semantic_function).
-
 
   (* Intrinsics semantic functions -------------------------------------------- *)
 
@@ -291,20 +210,12 @@ Section Intrinsics.
      which returns the NaN completely unchanged, sign included -- so
      [llvm.fabs(-NaN)] used to come back negative. *)
 
-  (* Absolute value for Float. *)
-  Definition llvm_fabs_f32 : pure_base_function :=
+  Definition llvm_fabs : pure_base_function :=
     fun args =>
       match args with
       | [DVALUE_Float d] => retr (DVALUE_Float (Float32.abs d))
-      | _ => raise_error "llvm_fabs_f32 got incorrect / ill-typed inputs"
-      end.
-
-  (* Abosulute value for Doubles. *)
-  Definition llvm_fabs_f64 : pure_base_function :=
-    fun args =>
-      match args with
       | [DVALUE_Double d] => retr (DVALUE_Double (Float.abs d))
-      | _ => raise_error "llvm_fabs_f64 got incorrect / ill-typed inputs"
+      | _ => raise_error "llvm.fabs got incorrect / ill-typed inputs"
       end.
 
   (* Is a NaN payload quiet?  The quiet bit is the top bit of the significand:
@@ -356,18 +267,12 @@ Section Intrinsics.
       else (if Float32.cmp Clt a b then b else a)
     end.
 
-  Definition llvm_maxnum_f64 : pure_base_function :=
-    fun args =>
-      match args with
-      | [DVALUE_Double a; DVALUE_Double b] => retr (DVALUE_Double (Float_maxnum a b))
-      | _ => raise_error "llvm_maxnum_f64 got incorrect / ill-typed inputs"
-      end.
-
-  Definition llvm_maxnum_f32 : pure_base_function :=
+  Definition llvm_maxnum : pure_base_function :=
     fun args =>
       match args with
       | [DVALUE_Float a; DVALUE_Float b] => retr (DVALUE_Float (Float32_maxnum a b))
-      | _ => raise_error "llvm_maxnum_f32 got incorrect / ill-typed inputs"
+      | [DVALUE_Double a; DVALUE_Double b] => retr (DVALUE_Double (Float_maxnum a b))
+      | _ => raise_error "llvm.maxnum got incorrect / ill-typed inputs"
       end.
 
   (* LANGREF (llvm.minimum): "If either operand is a NaN, returns a NaN.
@@ -394,18 +299,12 @@ Section Intrinsics.
       else (if Float32.cmp Clt a b then a else b)
     end.
 
-  Definition llvm_minimum_f64 : pure_base_function :=
-    fun args =>
-      match args with
-      | [DVALUE_Double a; DVALUE_Double b] => retr (DVALUE_Double (Float_minimum a b))
-      | _ => raise_error "llvm_minimum_f64 got incorrect / ill-typed inputs"
-      end.
-
-  Definition llvm_minimum_f32 : pure_base_function :=
+  Definition llvm_minimum : pure_base_function :=
     fun args =>
       match args with
       | [DVALUE_Float a; DVALUE_Float b] => retr (DVALUE_Float (Float32_minimum a b))
-      | _ => raise_error "llvm_minimum_f32 got incorrect / ill-typed inputs"
+      | [DVALUE_Double a; DVALUE_Double b] => retr (DVALUE_Double (Float_minimum a b))
+      | _ => raise_error "llvm.minimum got incorrect / ill-typed inputs"
       end.
 
   (* Saturated arithmetic: https://llvm.org/docs/LangRef.html#saturation-arithmetic-intrinsics *)
@@ -431,39 +330,15 @@ Section Intrinsics.
         end
       else ret (tdb res).
 
-  Definition llvm_ushl_sat_1: pure_base_function :=
+  Definition llvm_ushl_sat : pure_base_function :=
     fun args =>
       match args with
-      | [DVALUE_I 1 a; DVALUE_I 1 b] => inr <$> ushl_sat a b
-      | _ => raise_error "llvm_ushl_sat_1 got incorrect / ill-typed inputs"
-      end.
-
-  Definition llvm_ushl_sat_8: pure_base_function :=
-    fun args =>
-      match args with
-      | [DVALUE_I 8 a; DVALUE_I 8 b] => inr <$> ushl_sat a b
-      | _ => raise_error "llvm_ushl_sat_8 got incorrect / ill-typed inputs"
-      end.
-
-  Definition llvm_ushl_sat_16: pure_base_function :=
-    fun args =>
-      match args with
-      | [DVALUE_I 16 a; DVALUE_I 16 b] => inr <$> ushl_sat a b
-      | _ => raise_error "llvm_ushl_sat_16 got incorrect / ill-typed inputs"
-      end.
-
-  Definition llvm_ushl_sat_32: pure_base_function :=
-    fun args =>
-      match args with
-      | [DVALUE_I 32 a; DVALUE_I 32 b] => inr <$> ushl_sat a b
-      | _ => raise_error "llvm_ushl_sat_32 got incorrect / ill-typed inputs"
-      end.
-
-  Definition llvm_ushl_sat_64: pure_base_function :=
-    fun args =>
-      match args with
-      | [DVALUE_I 64 a; DVALUE_I 64 b] => inr <$> ushl_sat a b
-      | _ => raise_error "llvm_ushl_sat_64 got incorrect / ill-typed inputs"
+      | [DVALUE_I sz a; DVALUE_I sz' b] =>
+          match Pos.eq_dec sz' sz with
+          | left e => inr <$> ushl_sat a (eq_rect sz' (@bit_int) b sz e)
+          | right _ => raise_error "llvm.ushl.sat got operands of different widths"
+          end
+      | _ => raise_error "llvm.ushl.sat got incorrect / ill-typed inputs"
       end.
 
   Definition llvm_vellvm_internal_throw : pure_base_function :=
@@ -530,25 +405,26 @@ Section Intrinsics.
   Definition pure_base_to_semantic : pure_base_function -> semantic_function :=
     fun f => pure_to_semantic (pure_base_to_pure f).
   
-  (* Clients of Vellvm can register the names of their own intrinsics
-     definitions here. *)
-  Definition defined_intrinsics : intrinsic_definitions :=
-    [ (fabs_32_decl, pure_base_to_semantic llvm_fabs_f32) ;
-      (fabs_64_decl, pure_base_to_semantic llvm_fabs_f64) ;
-      (maxnum_32_decl , pure_base_to_semantic llvm_maxnum_f32) ;
-      (maxnum_64_decl , pure_base_to_semantic llvm_maxnum_f64);
-      (minimum_32_decl, pure_base_to_semantic llvm_minimum_f32);
-      (minimum_64_decl, pure_base_to_semantic llvm_minimum_f64);
-      (ushl_sat_1_decl, pure_base_to_semantic llvm_ushl_sat_1);
-      (ushl_sat_8_decl, pure_base_to_semantic llvm_ushl_sat_8);
-      (ushl_sat_16_decl, pure_base_to_semantic llvm_ushl_sat_16);
-      (ushl_sat_32_decl, pure_base_to_semantic llvm_ushl_sat_32);
-      (ushl_sat_64_decl, pure_base_to_semantic llvm_ushl_sat_64);
-      (vellvm_internal_throw_decl, pure_base_to_semantic llvm_vellvm_internal_throw);
-      (assume_decl, pure_base_to_semantic llvm_assume);
-      (va_start_decl, llvm_va_start);
-      (va_end_decl, llvm_va_end);
-      (va_copy_decl, llvm_va_copy)
-    ].
+  (* The semantics of each family, except for the memory intrinsics, which
+     [handle_intrinsicM] interprets. *)
+  Definition intrinsic_semantics (fam : intrinsic_family) : option semantic_function :=
+    match fam with
+    | Intr_fabs => Some (pure_base_to_semantic llvm_fabs)
+    | Intr_maxnum => Some (pure_base_to_semantic llvm_maxnum)
+    | Intr_minimum => Some (pure_base_to_semantic llvm_minimum)
+    | Intr_ushl_sat => Some (pure_base_to_semantic llvm_ushl_sat)
+    | Intr_throw => Some (pure_base_to_semantic llvm_vellvm_internal_throw)
+    | Intr_assume => Some (pure_base_to_semantic llvm_assume)
+    | Intr_va_start => Some llvm_va_start
+    | Intr_va_end => Some llvm_va_end
+    | Intr_va_copy => Some llvm_va_copy
+    | Intr_memcpy | Intr_memmove | Intr_memset | Intr_malloc | Intr_free => None
+    end.
+
+  Definition named_intrinsic_semantics (name : string) : option semantic_function :=
+    match lookup_intrinsic name with
+    | Some fam => intrinsic_semantics fam
+    | None => None
+    end.
 
 End Intrinsics.

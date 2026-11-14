@@ -96,7 +96,7 @@ Lemma I2F_allocate_declaration : forall (d : declaration dtyp),
       (@allocate_declaration PInf d) (@allocate_declaration PFin d).
 Proof.
   intros d; unfold allocate_declaration.
-  destruct (lookup_intrinsic_declaration (dc_name d)).
+  destruct (is_intrinsic (dc_name d)).
   - apply ruttc_ret; auto.
   - rbind I2F_dvalue.
     + unfold alloca; rstep.

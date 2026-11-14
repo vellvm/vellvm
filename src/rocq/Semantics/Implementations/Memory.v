@@ -338,50 +338,25 @@ Section MemoryModel.
 
   Definition NONE := DVALUE_Base DVALUE_None.
   
-  (** The names of the memcpy, memmove, and memset intrinsics, as declared
-      in [IntrinsicsDefinitions.v]. *)
-  Definition is_memcpy_name : string -> bool := declares memcpy_decls.
-
-  Definition is_memmove_name : string -> bool := declares memmove_decls.
-
-  Definition is_memset_name : string -> bool := declares memset_decls.
-
   Definition handle_intrinsicM : IntrinsicE ~> memM :=
     fun T e =>
       match e with
       | Intrinsic t name args _ =>
           args' <- lift (map_monad dvalue_to_dvalue_base (List.map snd args)) ;;
-          (* Pick all arguments, they should all be unique. *)
-          if is_memcpy_name name
-          then
-            handle_memcpy args' ;;
-            ret (inr NONE)
-          else
-          if is_memmove_name name
-          then
-            handle_memmove args' ;;
-            ret (inr NONE)
-          else
-            if is_memset_name name
-            then
-              handle_memset args' ;;
-              ret (inr NONE)
-            else
-              if (Rocqlib.proj_sumbool (string_dec name "malloc"))
-              then
-                (* NOTE: We are defaulting to 64 for now,
-                   it should be implemented as the best alignment
-                   given the size.
-                 *)
-                ptr <- handle_malloc args' 8%N;;
-                ret (inr (DVALUE_Base (DVALUE_Pointer ptr)))
-              else
-                if (Rocqlib.proj_sumbool (string_dec name "free"))
-                then
-                  handle_free args' ;;
-                  ret (inr NONE)
-                else
-                  merr ("Unknown intrinsic: " ++ name)
+          match lookup_intrinsic name with
+          | Some Intr_memcpy => handle_memcpy args' ;; ret (inr NONE)
+          | Some Intr_memmove => handle_memmove args' ;; ret (inr NONE)
+          | Some Intr_memset => handle_memset args' ;; ret (inr NONE)
+          | Some Intr_malloc =>
+              (* NOTE: We are defaulting to 64 for now,
+                 it should be implemented as the best alignment
+                 given the size.
+               *)
+              ptr <- handle_malloc args' 8%N;;
+              ret (inr (DVALUE_Base (DVALUE_Pointer ptr)))
+          | Some Intr_free => handle_free args' ;; ret (inr NONE)
+          | _ => merr ("Unknown intrinsic: " ++ name)
+          end
       end.
 
 End MemoryModel.
