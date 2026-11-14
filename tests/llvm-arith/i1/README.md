@@ -89,14 +89,12 @@ assertion, and where the result is defined it also compares the native output.
 
 ## Status
 
-As of 2026-11-14 (after the `mul nsw`, `trunc nuw`/`nsw`, `nneg` and GEP index fixes), with LLVM 23.1.2: all 1,488 generated
-cases agree with clang and llubi. Vellvm passes 1,293 of them, fails 191, and
+As of 2026-11-14 (after the `mul nsw`, `trunc nuw`/`nsw`, `nneg`, GEP index and vector index fixes), with LLVM 23.1.2: all 1,488 generated
+cases agree with clang and llubi. Vellvm passes 1,295 of them, fails 189, and
 does not parse the 4 in `switch-literals.ll` (`-test-dir` skips that file
 silently). What fails:
 
 - **`udiv`/`sdiv`/`urem`/`srem` of a poison dividend by 0** give poison, not UB.
-- **`extractelement` / `insertelement` with index `i1 true`** give poison: the
-  index is read as -1 instead of unsigned 1.
 - **`switch` cases written `i1 true` / `i1 false`** don't parse.
 - **Intrinsics at `i1`** are almost all uninterpreted calls: `libll` defines
   them only at wider types. Only `llvm.ushl.sat.i1` is handled.

@@ -2878,9 +2878,9 @@ Ltac i2f_split_case i tac :=
 
 (* Related values have equal integer interpretations as indices: the
      only convertible shape is [DVALUE_I], whose payload is shared. *)
-Lemma I2F_dvalue_to_Z : forall v v',
+Lemma I2F_vector_index : forall v v',
     I2F_dvalue v v' ->
-    @dvalue_to_Z PInf v = @dvalue_to_Z PFin v'.
+    @vector_index PInf v = @vector_index PFin v'.
 Proof.
   intros * H; inversion H; subst; cbn; auto.
   match goal with
@@ -2920,8 +2920,8 @@ Proof.
     destruct s1 as [| x xs], s2 as [| y ys]; cbn;
       try (repeat constructor);
       try (match goal with F : Forall2 I2F_dvalue _ _ |- _ => now inversion F end).
-    rewrite (I2F_dvalue_to_Z R2).
-    destruct (dvalue_to_Z b2) as [i |]; cbn; [| i2f_poison_index R2].
+    rewrite (I2F_vector_index R2).
+    destruct (vector_index b2) as [i |]; cbn; [| i2f_poison_index R2].
     rewrite !split_acc_eq.
     i2f_split_case i ltac:(auto).
 Qed.
@@ -2944,8 +2944,8 @@ Proof.
     | HB : I2F_dvalue_base _ _ |- _ =>
         inversion HB; subst; cbn; try (repeat constructor)
     end.
-    rewrite (I2F_dvalue_to_Z R3).
-    destruct (dvalue_to_Z b3) as [i |]; cbn; [| i2f_poison_index R3].
+    rewrite (I2F_vector_index R3).
+    destruct (vector_index b3) as [i |]; cbn; [| i2f_poison_index R3].
     (* [i2f_split_case] splits the two lists against a [Forall2] it finds
        in the context; here the lists are implicit, so supply it. *)
     assert (F : Forall2 I2F_dvalue
@@ -2959,8 +2959,8 @@ Proof.
   - (* Vector *)
     match goal with v : bool |- _ => destruct v end; cbn;
       try (repeat constructor).
-    rewrite (I2F_dvalue_to_Z R3).
-    destruct (dvalue_to_Z b3) as [i |]; cbn; [| i2f_poison_index R3].
+    rewrite (I2F_vector_index R3).
+    destruct (vector_index b3) as [i |]; cbn; [| i2f_poison_index R3].
     rewrite !split_acc_eq.
     i2f_split_case i
       ltac:(constructor; apply I2F_canonicalize_agg;
@@ -3001,9 +3001,8 @@ Proof.
   end.
   eapply Forall2_map_rel; eauto.
   intros idxv idxv' Ridx.
-  rewrite (I2F_dvalue_to_Z Ridx).
-  destruct (dvalue_to_Z idxv') as [i |]; [| repeat constructor].
-  destruct (i <? 0)%Z; [repeat constructor |].
+  rewrite (I2F_vector_index Ridx).
+  destruct (vector_index idxv') as [i |]; [| repeat constructor].
   pose proof (Forall2_nth_error (Forall2_app V1 V2) (Z.to_nat i)) as N.
   destruct (nth_error (elts1 ++ elts2) (Z.to_nat i)) as [?v|],
       (nth_error (elts1' ++ elts2') (Z.to_nat i)) as [v'|];

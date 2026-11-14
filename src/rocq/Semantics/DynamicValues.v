@@ -1419,10 +1419,14 @@ Section DValue.
         end
     end.
 
-  Definition dvalue_to_Z (dv : dvalue) : option Z :=
+  (* An index into a vector, for extractelement, insertelement, and the
+     shufflevector mask.  LangRef (extractelement, insertelement): "The index
+     may be a variable of any integer type, and will be treated as an
+     unsigned integer."  So [i1 true] is element 1 and [i8 -1] element 255.
+     (Contrast getelementptr, whose indices are signed: [Gep.gep_index].) *)
+  Definition vector_index (dv : dvalue) : option Z :=
     match dv with
-    (* TODO: should this be restricted to 32 / 64-bit integers? *)      
-    | DVALUE_Base (@DVALUE_I sz i2) => Some (signed i2)
+    | DVALUE_Base (DVALUE_I _ i) => Some (unsigned i)
     | _ => None
     end.
   
@@ -1439,7 +1443,7 @@ Section DValue.
         ret (DVALUE_Base DVALUE_Poison)
     (* 0-size vector, always return poison *)
     | DVALUE_Array true elts =>
-        match dvalue_to_Z idx with
+        match vector_index idx with
         | Some i =>
             match split_acc i elts with
             | None => ret (DVALUE_Base DVALUE_Poison)
@@ -1464,7 +1468,7 @@ Section DValue.
     | DTYPE_Array true sz t =>
         match vec with
         | DVALUE_Array true elts =>
-            match dvalue_to_Z idx with
+            match vector_index idx with
             | Some i =>
                 match split_acc i elts with
                 | None => ret (DVALUE_Base DVALUE_Poison)
@@ -1478,7 +1482,7 @@ Section DValue.
             end
         | DVALUE_Base DVALUE_Poison =>
             let elts : list dvalue := repeat (DVALUE_Base DVALUE_Poison) (N.to_nat sz) in
-            match dvalue_to_Z idx with
+            match vector_index idx with
             | Some i =>
                 match split_acc i elts with
                 | None => ret (DVALUE_Base DVALUE_Poison)
@@ -1506,13 +1510,12 @@ Section DValue.
         | Some elts1, Some elts2, DVALUE_Array true idxs =>
             let combined := elts1 ++ elts2 in
             let lane (idxv : dvalue) : dvalue :=
-              match dvalue_to_Z idxv with
+              match vector_index idxv with
               | Some i =>
-                  if (i <? 0)%Z then DVALUE_Base DVALUE_Poison
-                  else match nth_error combined (Z.to_nat i) with
-                       | Some v => v
-                       | None => DVALUE_Base DVALUE_Poison
-                       end
+                  match nth_error combined (Z.to_nat i) with
+                  | Some v => v
+                  | None => DVALUE_Base DVALUE_Poison
+                  end
               | None => DVALUE_Base DVALUE_Poison
               end
             in
