@@ -744,7 +744,7 @@ Section MemoryByteFacts.
 
       - [dt] must be [serializable].  [memory_bytes_to_dvalue_base] is partial:
         it raises an error on [DTYPE_Void] and on the floating-point and opaque
-        types it does not implement.  Since poison inhabits *every* type
+        types it does not implement.  Since poison inhabits every non-empty type
         ([DVALUE_Poison_typ_agg]), each of those types has well-typed values -
         e.g. poison at [DTYPE_FP FP_half], or [DVALUE_None] at [DTYPE_Void] -
         that the reader cannot produce. *)
@@ -844,11 +844,132 @@ Section MemoryByteFacts.
     replace (N.of_nat (S k)) with (1 + N.of_nat k)%N by lia; reflexivity.
   Qed.
 
-  (* an all-poison buffer reads as [DVALUE_Poison] at any aggregate type *)
+  (** ** Canonical forms (DynamicValues.v, "Canonical forms of dvalues") *)
+
+  Lemma poison_of_dtyp_base : forall db,
+      poison_of_dtyp (DTYPE_Base db) = DVALUE_Base DVALUE_Poison.
+  Proof. reflexivity. Qed.
+
+  Lemma poison_of_dtyp_nonempty : forall dt,
+      dtyp_is_empty dt = false -> poison_of_dtyp dt = DVALUE_Base DVALUE_Poison.
+  Proof. intros dt H; unfold poison_of_dtyp; rewrite H; reflexivity. Qed.
+
+  Lemma poison_of_dtyp_empty : forall dt,
+      dtyp_is_empty dt = true -> poison_of_dtyp dt = empty_dvalue_of_dtyp dt.
+  Proof. intros dt H; unfold poison_of_dtyp; rewrite H; reflexivity. Qed.
+
+  (* an empty type has exactly one value *)
+  Lemma has_dtyp_empty : forall dt dv,
+      dvalue_has_dtyp dv dt ->
+      dtyp_is_empty dt = true ->
+      dv = empty_dvalue_of_dtyp dt.
+  Proof.
+    induction dt as [db | pk dts IH | vv sz t IHt]; intros dv HT HE.
+    - discriminate.
+    - inversion HT as [| ? HNE | p fields dts' _ HF2 |]; subst;
+        [rewrite HE in HNE; discriminate |].
+      cbn [dtyp_is_empty] in HE; cbn [empty_dvalue_of_dtyp]; f_equal.
+      clear HT; induction HF2 as [| f d fs ds Hfd HF2 IHl]; [reflexivity |].
+      cbn [forallb] in HE; apply andb_true_iff in HE as [HEd HEds].
+      cbn [List.map]; f_equal.
+      + apply IH; [now left | exact Hfd | exact HEd].
+      + apply IHl; [intros u INu; apply IH; now right | exact HEds].
+    - inversion HT as [| ? HNE | | v xs sz' dt' _ _ HF HL]; subst;
+        [rewrite HE in HNE; discriminate |].
+      cbn [empty_dvalue_of_dtyp]; f_equal.
+      cbn [dtyp_is_empty] in HE; apply orb_true_iff in HE as [HZ | HEt].
+      + apply N.eqb_eq in HZ; subst sz; cbn in HL.
+        destruct xs; [reflexivity | discriminate].
+      + rewrite <- HL; clear HL HT.
+        induction HF as [| x xs Hx HF IHl]; [reflexivity |].
+        cbn [length repeat]; f_equal; [apply IHt; assumption | exact IHl].
+  Qed.
+
+  (* A well-typed aggregate value is not poison.  Either its type is empty,
+     and it is that type's one value (which is what [poison_of_dtyp] answers
+     there), or some field of non-empty type is not poison. *)
+  Lemma struct_canonical_cases : forall p fields dts,
+      dvalue_has_dtyp (DVALUE_Struct p fields) (DTYPE_Struct p dts) ->
+      DVALUE_Struct p fields = poison_of_dtyp (DTYPE_Struct p dts)
+      \/ fields_all_poison dts fields = false.
+  Proof.
+    intros p fields dts HT.
+    destruct (dtyp_is_empty (DTYPE_Struct p dts)) eqn:HE.
+    - left; rewrite (poison_of_dtyp_empty _ HE); apply has_dtyp_empty; assumption.
+    - right; inversion HT as [| | ? ? ? HNP _ |]; subst.
+      unfold agg_is_poison in HNP; rewrite HE in HNP; exact HNP.
+  Qed.
+
+  Lemma array_canonical_cases : forall v xs sz t,
+      dvalue_has_dtyp (DVALUE_Array v xs) (DTYPE_Array v sz t) ->
+      DVALUE_Array v xs = poison_of_dtyp (DTYPE_Array v sz t)
+      \/ (dtyp_is_empty t = false /\ forallb dvalue_is_poison xs = false).
+  Proof.
+    intros v xs sz t HT.
+    destruct (dtyp_is_empty (DTYPE_Array v sz t)) eqn:HE.
+    - left; rewrite (poison_of_dtyp_empty _ HE); apply has_dtyp_empty; assumption.
+    - right; inversion HT as [| | | ? ? ? ? _ HNP _ _]; subst.
+      unfold agg_is_poison in HNP; rewrite HE in HNP.
+      cbn [dtyp_is_empty] in HE; apply orb_false_iff in HE as [_ HEt].
+      split; [exact HEt | exact HNP].
+  Qed.
+
+  Lemma agg_is_poison_nonempty : forall dt vs,
+      agg_is_poison dt vs = true -> dtyp_is_empty dt = false.
+  Proof.
+    intros dt vs H; unfold agg_is_poison in H.
+    apply andb_true_iff in H as [H _]; apply negb_true_iff in H; exact H.
+  Qed.
+
+  (* the one value of an empty type is well typed ... *)
+  Lemma empty_dvalue_has_dtyp : forall dt,
+      NO_VOID dt -> dtyp_is_empty dt = true ->
+      dvalue_has_dtyp (empty_dvalue_of_dtyp dt) dt.
+  Proof.
+    induction dt as [db | pk dts IH | vv sz t IHt]; intros HNV HE.
+    - discriminate.
+    - cbn [empty_dvalue_of_dtyp]; apply DVALUE_Struct_typ.
+      + unfold agg_is_poison; rewrite HE; reflexivity.
+      + cbn [dtyp_is_empty] in HE; cbn [NO_VOID] in HNV; unfold FORALL in HNV.
+        revert IH HNV HE; induction dts as [| d ds IHds]; intros IH HNV HE;
+          cbn [List.map]; constructor.
+        * cbn [forallb] in HE; apply andb_true_iff in HE as [HEd _].
+          destruct HNV as [HNVd _].
+          apply IH; [now left | exact HNVd | exact HEd].
+        * cbn [forallb] in HE; apply andb_true_iff in HE as [_ HEds].
+          destruct HNV as [_ HNVds].
+          apply IHds; [intros u INu; apply IH; now right | exact HNVds | exact HEds].
+    - cbn [empty_dvalue_of_dtyp]; apply DVALUE_Array_typ.
+      + exact HNV.
+      + unfold agg_is_poison; rewrite HE; reflexivity.
+      + cbn [dtyp_is_empty] in HE.
+        destruct (dtyp_is_empty t) eqn:HEt.
+        * apply Forall_forall; intros x Hx; apply repeat_spec in Hx; subst x.
+          apply IHt; [exact HNV | reflexivity].
+        * rewrite orb_false_r in HE; apply N.eqb_eq in HE; subst sz; constructor.
+      + apply repeat_length.
+  Qed.
+
+  (* ... and so is poison at any type *)
+  Lemma poison_of_dtyp_has_dtyp : forall dt,
+      NO_VOID dt -> dvalue_has_dtyp (poison_of_dtyp dt) dt.
+  Proof.
+    intros dt HNV; unfold poison_of_dtyp.
+    destruct (dtyp_is_empty dt) eqn:HE;
+      [apply empty_dvalue_has_dtyp; assumption | apply DVALUE_Poison_typ_agg; exact HE].
+  Qed.
+
+  (* a well-typed value that is [poison_of_dtyp] of its type, tested by
+     decidable equality *)
+  Lemma dvalue_poison_of_dtyp_dec : forall (dv : dvalue) dt,
+      {dv = poison_of_dtyp dt} + {dv <> poison_of_dtyp dt}.
+  Proof. intros; apply dvalue_eq_dec. Qed.
+
+  (* an all-poison buffer reads as poison at any aggregate type *)
   Lemma read_repeat_poison_agg : forall dt L,
       match dt with DTYPE_Base _ => False | _ => True end ->
       memory_bytes_to_dvalue (List.repeat poison_memory_byte L) dt
-      = ret (DVALUE_Base DVALUE_Poison).
+      = ret (poison_of_dtyp dt).
   Proof.
     intros dt L H; destruct dt as [db | pk dts | vv sz t]; [contradiction | |];
       cbn [memory_bytes_to_dvalue]; rewrite poison_split_repeat;
@@ -2170,7 +2291,7 @@ Section MemoryByteFacts.
           let asz := alloc_size_dtyp dt in
           let rest_bytes := drop asz dbs' in
           f <- (if N.leb (start + ssz) np
-                then ret (DVALUE_Base DVALUE_Poison)
+                then ret (poison_of_dtyp dt)
                 else rd (take ssz dbs') dt) ;;
           rest <- read_struct_loop (start + asz) dts rest_bytes ;;
           ret (f :: rest)
@@ -2181,9 +2302,9 @@ Section MemoryByteFacts.
       memory_bytes_to_dvalue dbs (DTYPE_Struct packed dts)
       = let '(np, rest) := poison_split dbs in
         match rest with
-        | [] => ret (DVALUE_Base DVALUE_Poison)
+        | [] => ret (poison_of_dtyp (DTYPE_Struct packed dts))
         | _ :: _ =>
-            (canonicalize_agg (DVALUE_Struct packed))
+            (canonicalize_agg (DTYPE_Struct packed dts))
               <$> (read_struct_loop memory_bytes_to_dvalue np
                      (if packed then None
                       else Some (max_preferred_dtyp_alignment dts))
@@ -2277,7 +2398,7 @@ Section MemoryByteFacts.
       exists w, bs = w ++ acc
              /\ N.of_nat (length w) = tapad ta (store_size_dtyp dt)
              /\ memory_bytes_to_dvalue (rev w) dt = ret dv
-             /\ (dv <> DVALUE_Base DVALUE_Poison ->
+             /\ (dv <> poison_of_dtyp dt ->
                  forallb is_all_poison_byte (rev w) = false).
 
   (** The reader's array/vector loop, lifted the same way. *)
@@ -2293,7 +2414,7 @@ Section MemoryByteFacts.
       | O => ret []
       | S n' =>
           e <- (if N.leb (offset + store_size_dtyp t) np
-                then ret (DVALUE_Base DVALUE_Poison)
+                then ret (poison_of_dtyp t)
                 else rd (take (store_size_dtyp t) dbs) t) ;;
           rest <- read_array_loop n' (offset + stride)%N (drop stride dbs) ;;
           ret (e :: rest)
@@ -2311,16 +2432,16 @@ Section MemoryByteFacts.
       memory_bytes_to_dvalue dbs (DTYPE_Array vec sz t)
       = let '(np, rest) := poison_split dbs in
         match rest with
-        | [] => ret (DVALUE_Base DVALUE_Poison)
+        | [] => ret (poison_of_dtyp (DTYPE_Array vec sz t))
         | _ :: _ =>
             match packed_vector_type (DTYPE_Array vec sz t) with
             | Some (tb, m) =>
-                ret (canonicalize_agg (DVALUE_Array true) (packed_vector_elts tb m sz dbs))
+                ret (canonicalize_agg (DTYPE_Array vec sz t) (packed_vector_elts tb m sz dbs))
             | None =>
                 elts <- read_array_loop memory_bytes_to_dvalue np
                           (if vec then store_size_dtyp t else alloc_size_dtyp t) t
                           (N.to_nat sz) 0%N dbs ;;
-                ret (canonicalize_agg (DVALUE_Array vec) elts)
+                ret (canonicalize_agg (DTYPE_Array vec sz t) elts)
             end
         end.
   Proof. reflexivity. Qed.
@@ -2328,7 +2449,7 @@ Section MemoryByteFacts.
   Lemma read_array_loop_cons : forall rd np stride t n offset dbs,
       read_array_loop rd np stride t (S n) offset dbs
       = (e <- (if N.leb (offset + store_size_dtyp t) np
-               then ret (DVALUE_Base DVALUE_Poison)
+               then ret (poison_of_dtyp t)
                else rd (take (store_size_dtyp t) dbs) t) ;;
          rest <- read_array_loop rd np stride t n (offset + stride)%N
                    (drop stride dbs) ;;
@@ -2383,7 +2504,7 @@ Section MemoryByteFacts.
          let dbs' := drop padding dbs in
          let start := (offset + padding)%N in
          f <- (if N.leb (start + store_size_dtyp dt) np
-               then ret (DVALUE_Base DVALUE_Poison)
+               then ret (poison_of_dtyp dt)
                else rd (take (store_size_dtyp dt) dbs') dt) ;;
          rest <- read_struct_loop rd np pad (start + alloc_size_dtyp dt) dts
                    (drop (alloc_size_dtyp dt) dbs') ;;
@@ -2408,7 +2529,7 @@ Section MemoryByteFacts.
         exists w, bs = w ++ acc
                /\ N.of_nat (length w) = (offset' - offset)%N
                /\ (offset <= offset')%N
-               /\ (forallb dvalue_is_poison fields = false ->
+               /\ (fields_all_poison dts fields = false ->
                    forallb is_all_poison_byte (rev w) = false)
                /\ (forall np extra,
                      forallb is_all_poison_byte
@@ -2432,7 +2553,7 @@ Section MemoryByteFacts.
       split; [now rewrite <- app_assoc | split; [| split; [| split]]].
       + rewrite length_app, !repeat_length; lia.
       + lia.
-      + cbn [forallb]; discriminate.
+      + cbn [fields_all_poison]; discriminate.
       + intros np extra Hpre; reflexivity.
     - (* one field, then the rest *)
       inversion HR as [| ? ? Hrt HRtl]; subst; clear HR.
@@ -2481,8 +2602,10 @@ Section MemoryByteFacts.
       + rewrite !length_app; lia.
       + lia.
       + intros Hnp; rewrite Erev, !forallb_app.
-        cbn [forallb] in Hnp; apply andb_false_iff in Hnp as [Hf | Hfs].
-        * rewrite (Hlivef (dvalue_is_poison_false Hf)).
+        cbn [fields_all_poison] in Hnp; apply andb_false_iff in Hnp as [Hf | Hfs].
+        * apply orb_false_iff in Hf as [Hne Hf].
+          rewrite (poison_of_dtyp_nonempty _ Hne) in Hlivef.
+          rewrite (Hlivef (dvalue_is_poison_false Hf)).
           rewrite andb_false_l, andb_false_r; reflexivity.
         * rewrite (Hliver Hfs), !andb_false_r; reflexivity.
       + intros np extra Hpre.
@@ -2532,8 +2655,8 @@ Section MemoryByteFacts.
                        (store_size_dtyp dt) Lwf'). }
             rewrite <- Etake.
             apply forallb_sub with (n := (np - offset)%N); [lia | exact Hpre]. }
-          assert (Hfp : f = DVALUE_Base DVALUE_Poison).
-          { destruct (dvalue_eq_dec f (DVALUE_Base DVALUE_Poison)) as [E | NE];
+          assert (Hfp : f = poison_of_dtyp dt).
+          { destruct (dvalue_poison_of_dtyp_dec f dt) as [E | NE];
               [exact E |].
             exfalso; rewrite (Hlivef NE) in Hwf; discriminate. }
           rewrite Hfp; reflexivity.
@@ -2550,7 +2673,8 @@ Section MemoryByteFacts.
         exists w, bs = w ++ acc
                /\ N.of_nat (length w) = (offset' - offset)%N
                /\ (offset <= offset')%N
-               /\ (forallb dvalue_is_poison elts = false ->
+               /\ (dtyp_is_empty t = false ->
+                   forallb dvalue_is_poison elts = false ->
                    forallb is_all_poison_byte (rev w) = false)
                /\ (forall np extra,
                      forallb is_all_poison_byte
@@ -2600,10 +2724,11 @@ Section MemoryByteFacts.
              | split; [| split; [| split]]].
       + rewrite !length_app; lia.
       + lia.
-      + intros Hnp; rewrite Erev, !forallb_app.
+      + intros Hne Hnp; rewrite Erev, !forallb_app.
         cbn [forallb] in Hnp; apply andb_false_iff in Hnp as [He | Hes].
-        * rewrite (Hlivee (dvalue_is_poison_false He)); reflexivity.
-        * rewrite (Hliver Hes), !andb_false_r; reflexivity.
+        * rewrite (poison_of_dtyp_nonempty _ Hne) in Hlivee.
+          rewrite (Hlivee (dvalue_is_poison_false He)); reflexivity.
+        * rewrite (Hliver Hne Hes), !andb_false_r; reflexivity.
       + intros np extra Hpre.
         rewrite Erev in Hpre |- *.
         rewrite <- !app_assoc in Hpre |- *.
@@ -2637,8 +2762,8 @@ Section MemoryByteFacts.
                        (store_size_dtyp t) Lwe'). }
             rewrite <- Etake.
             apply forallb_sub with (n := (np - offset)%N); [lia | exact Hpre]. }
-          assert (Hep : e = DVALUE_Base DVALUE_Poison).
-          { destruct (dvalue_eq_dec e (DVALUE_Base DVALUE_Poison)) as [E | NE];
+          assert (Hep : e = poison_of_dtyp t).
+          { destruct (dvalue_poison_of_dtyp_dec e t) as [E | NE];
               [exact E |].
             exfalso; rewrite (Hlivee NE) in Hwe; discriminate. }
           rewrite Hep; reflexivity.
@@ -3302,7 +3427,7 @@ Section MemoryByteFacts.
              (* carried along for the aggregate cases: a live value always
                 leaves a live byte, which is what justifies the reader
                 skipping fields that fall below its [np] *)
-             /\ (dv <> DVALUE_Base DVALUE_Poison ->
+             /\ (dv <> poison_of_dtyp dt ->
                  forallb is_all_poison_byte (rev w) = false).
   Proof.
     intros dv; induction dv using dvalue_ind; intros dt HT HS ta acc offset' bs Heq.
@@ -3329,7 +3454,7 @@ Section MemoryByteFacts.
              cbn [memory_bytes_to_dvalue].
              rewrite take_app_exact by exact Lblk.
              rewrite read_base_block by assumption; reflexivity.
-          -- intros Hne.
+          -- intros Hne; rewrite poison_of_dtyp_base in Hne.
              rewrite rev_app_distr, rev_involutive, rev_repeat, forallb_app.
              rewrite base_block_not_all_poison
                by (first [exact HS | exact HB | exact HC
@@ -3342,7 +3467,7 @@ Section MemoryByteFacts.
              cbn [memory_bytes_to_dvalue].
              rewrite take_all by lia.
              rewrite read_base_block by assumption; reflexivity.
-          -- intros Hne; rewrite rev_involutive.
+          -- intros Hne; rewrite poison_of_dtyp_base in Hne; rewrite rev_involutive.
              apply base_block_not_all_poison;
                first [exact HS | exact HB | exact HC
                      | intros C; apply Hne; f_equal; exact C].
@@ -3352,16 +3477,20 @@ Section MemoryByteFacts.
         inversion Heq; subst; clear Heq.
         eexists; split; [reflexivity | split; [| split]].
         * rewrite repeat_length, Nnat.N2Nat.id; reflexivity.
-        * rewrite rev_repeat; apply read_repeat_poison_agg; exact I.
-        * intros C; exfalso; apply C; reflexivity.
+        * rewrite rev_repeat, read_repeat_poison_agg by exact I.
+          rewrite poison_of_dtyp_nonempty by assumption; reflexivity.
+        * intros C; exfalso; apply C; symmetry.
+          apply poison_of_dtyp_nonempty; assumption.
       + (* poison at an array/vector type *)
         inversion HT; subst.
         rewrite ser_poison_agg in Heq by exact I.
         inversion Heq; subst; clear Heq.
         eexists; split; [reflexivity | split; [| split]].
         * rewrite repeat_length, Nnat.N2Nat.id; reflexivity.
-        * rewrite rev_repeat; apply read_repeat_poison_agg; exact I.
-        * intros C; exfalso; apply C; reflexivity.
+        * rewrite rev_repeat, read_repeat_poison_agg by exact I.
+          rewrite poison_of_dtyp_nonempty by assumption; reflexivity.
+        * intros C; exfalso; apply C; symmetry.
+          apply poison_of_dtyp_nonempty; assumption.
     - (* [DVALUE_Struct]: the loop lemma does the work; here we only have to
          get past [poison_split]'s fast path and [canonicalize_agg]. *)
       pose proof Heq as Heq0.
@@ -3375,11 +3504,15 @@ Section MemoryByteFacts.
       + rewrite read_struct_unfold.
         destruct (poison_split (rev w)) as [np rest] eqn:Eps.
         destruct rest as [| b rest].
-        * (* the block cannot be all poison: some field is live *)
+        * (* an all-poison block: the struct is the one value of an empty
+             type; otherwise some field is live, and the block is not all
+             poison *)
+          destruct (struct_canonical_cases HT) as [HEq | HNP'];
+            [rewrite <- HEq; reflexivity |].
           exfalso.
           assert (Hap : all_poison_bytes (rev w) = true)
             by (unfold all_poison_bytes; rewrite Eps; reflexivity).
-          rewrite all_poison_bytes_forallb, (Hlive HNP) in Hap; discriminate.
+          rewrite all_poison_bytes_forallb, (Hlive HNP') in Hap; discriminate.
         * assert (HPre : forallb is_all_poison_byte
                            (take (np - 0) (rev w ++ [])) = true).
           { rewrite app_nil_r, N.sub_0_r.
@@ -3388,7 +3521,8 @@ Section MemoryByteFacts.
           specialize (Hread np [] HPre); rewrite app_nil_r in Hread.
           rewrite Hread; cbn.
           unfold canonicalize_agg; rewrite HNP; reflexivity.
-      + intros _; apply Hlive; exact HNP.
+      + intros Hne; destruct (struct_canonical_cases HT) as [HEq | HNP'];
+          [exfalso; exact (Hne HEq) | apply Hlive; exact HNP'].
     - (* [DVALUE_Array]: same shape as the struct, with a uniform stride *)
       pose proof Heq as Heq0.
       inversion HT as [| | | vv ees sz0 eet HNV HNP HFA HLen]; subst.
@@ -3417,7 +3551,6 @@ Section MemoryByteFacts.
         assert (Erev : rev (List.repeat poison_memory_byte k ++ rev fwd)
                        = fwd ++ List.repeat poison_memory_byte k)
           by (rewrite rev_app_distr, rev_involutive, rev_repeat; reflexivity).
-        assert (Hlf : forallb is_all_poison_byte fwd = false) by (apply Hlive, HNP).
         split; [rewrite <- app_assoc; reflexivity | split; [| split]].
         - rewrite length_app, repeat_length, length_rev, Hss.
           pose proof (tapad_ge ta ((sz2 * Npos m + 7) / 8)) as G.
@@ -3426,13 +3559,17 @@ Section MemoryByteFacts.
           destruct (poison_split (fwd ++ List.repeat poison_memory_byte k))
             as [np rest] eqn:Eps.
           destruct rest as [| b rest].
-          + exfalso.
+          + destruct (array_canonical_cases HT) as [HEq | [_ HNP']];
+              [rewrite <- HEq; reflexivity |].
+            exfalso.
             assert (Hap : all_poison_bytes (fwd ++ List.repeat poison_memory_byte k) = true)
               by (unfold all_poison_bytes; rewrite Eps; reflexivity).
-            rewrite all_poison_bytes_forallb, forallb_app, Hlf in Hap; discriminate.
+            rewrite all_poison_bytes_forallb, forallb_app, (Hlive HNP') in Hap; discriminate.
           + rewrite EP, Hrd.
             unfold canonicalize_agg; rewrite HNP; reflexivity.
-        - intros _; rewrite Erev, forallb_app, Hlf; reflexivity. }
+        - intros Hne; destruct (array_canonical_cases HT) as [HEq | [_ HNP']];
+            [exfalso; exact (Hne HEq) |].
+          rewrite Erev, forallb_app, (Hlive HNP'); reflexivity. }
       destruct (array_loop_read HFA IH HS _ _ _ _ Heq)
         as (w & Ebs & Hlen & Hle & Hlive & Hread).
       destruct (acc_dvalue_to_memory_bytes_h_spec HT ta acc Heq0) as [Eo _].
@@ -3441,10 +3578,12 @@ Section MemoryByteFacts.
       + rewrite read_array_unfold.
         destruct (poison_split (rev w)) as [np rest] eqn:Eps.
         destruct rest as [| b rest].
-        * exfalso.
+        * destruct (array_canonical_cases HT) as [HEq | [HNE HNP']];
+            [rewrite <- HEq; reflexivity |].
+          exfalso.
           assert (Hap : all_poison_bytes (rev w) = true)
             by (unfold all_poison_bytes; rewrite Eps; reflexivity).
-          rewrite all_poison_bytes_forallb, (Hlive HNP) in Hap; discriminate.
+          rewrite all_poison_bytes_forallb, (Hlive HNE HNP') in Hap; discriminate.
         * assert (HPre : forallb is_all_poison_byte
                            (take (np - 0) (rev w ++ [])) = true).
           { rewrite app_nil_r, N.sub_0_r.
@@ -3459,7 +3598,8 @@ Section MemoryByteFacts.
             by (pose proof (store_le_alloc eet); destruct v; lia).
           rewrite Hread; cbn.
           unfold canonicalize_agg; rewrite HNP; reflexivity.
-      + intros _; apply Hlive; exact HNP.
+      + intros Hne; destruct (array_canonical_cases HT) as [HEq | [HNE HNP']];
+          [exfalso; exact (Hne HEq) | apply Hlive; assumption].
   Qed.
 
   Lemma memory_bytes_round_trip1 :
@@ -3675,26 +3815,26 @@ Section MemoryByteFacts.
     - (* [DTYPE_I] *)
       unfold absorb_pois, catch_pois in H.
       destruct (memory_bytes_to_int sz dbs) as [| | | [x |]]; cbn in H;
-        inversion H; subst; [| apply DVALUE_Poison_typ_agg].
+        inversion H; subst; [| (apply DVALUE_Poison_typ_agg; reflexivity)].
       constructor; [apply Pos.eqb_refl | reflexivity].
     - (* [DTYPE_Pointer] *)
       unfold absorb_pois, catch_pois in H.
       destruct (memory_bytes_to_pointer dbs) as [| | | [p |]]; cbn in H;
-        inversion H; subst; [| apply DVALUE_Poison_typ_agg].
+        inversion H; subst; [| (apply DVALUE_Poison_typ_agg; reflexivity)].
       constructor; reflexivity.
     - (* [DTYPE_FP] *)
       destruct fp; cbn in HS; try contradiction;
         unfold absorb_pois, catch_pois in H;
         destruct (map_monad memory_byte_to_Z dbs) as [| | | [zs |]]; cbn in H;
-        inversion H; subst; try apply DVALUE_Poison_typ_agg;
+        inversion H; subst; try (apply DVALUE_Poison_typ_agg; reflexivity);
         constructor; reflexivity.
     - (* [DTYPE_B] *)
       destruct (all_poison_bytes dbs).
-      { cbn in H; inversion H; subst; apply DVALUE_Poison_typ_agg. }
+      { cbn in H; inversion H; subst; (apply DVALUE_Poison_typ_agg; reflexivity). }
       destruct (memory_bytes_to_byte_value sz dbs) as [| | | bv] eqn:Eb;
         cbn in H; try discriminate.
       destruct (dvalue_bv_all_poison bv) eqn:Ep; inversion H; subst;
-        [apply DVALUE_Poison_typ_agg |].
+        [(apply DVALUE_Poison_typ_agg; reflexivity) |].
       constructor; [apply Pos.eqb_refl |].
       cbn [dvalue_base_canonical].
       eapply memory_bytes_to_byte_value_canonical; eauto.
@@ -3705,11 +3845,12 @@ Section MemoryByteFacts.
   Lemma read_struct_loop_has_dtyp : forall rd np pad dts offset dbs vs,
       (forall t, In t dts -> forall mb v, Forall memory_byte_wf mb ->
                  rd mb t = ret v -> dvalue_has_dtyp v t) ->
+      (forall t, In t dts -> NO_VOID t) ->
       Forall memory_byte_wf dbs ->
       read_struct_loop rd np pad offset dts dbs = ret vs ->
       Forall2 dvalue_has_dtyp vs dts.
   Proof.
-    intros rd np pad; induction dts as [| t ts IH]; intros offset dbs vs HR HW H.
+    intros rd np pad; induction dts as [| t ts IH]; intros offset dbs vs HR HNV HW H.
     - cbn in H; inversion H; constructor.
     - cbn [read_struct_loop] in H; cbv zeta in H.
       apply EOU_bind_ret_inv in H as (f & Ef & H).
@@ -3719,31 +3860,35 @@ Section MemoryByteFacts.
       + match type of Ef with
         | (if ?c then _ else _) = _ => destruct c
         end.
-        * cbn in Ef; inversion Ef; apply DVALUE_Poison_typ_agg.
+        * cbn -[poison_of_dtyp] in Ef; inversion Ef.
+          apply poison_of_dtyp_has_dtyp, HNV; now left.
         * eapply HR; [now left | | exact Ef].
           apply Forall_take_N, Forall_drop_N, HW.
-      + eapply IH; [intros u Hu; apply HR; now right | | exact Er].
+      + eapply IH; [intros u Hu; apply HR; now right
+                   | intros u Hu; apply HNV; now right | | exact Er].
         apply Forall_drop_N, Forall_drop_N, HW.
   Qed.
 
   Lemma read_array_loop_has_dtyp : forall rd np stride t n offset dbs vs,
       (forall mb v, Forall memory_byte_wf mb -> rd mb t = ret v -> dvalue_has_dtyp v t) ->
+      NO_VOID t ->
       Forall memory_byte_wf dbs ->
       read_array_loop rd np stride t n offset dbs = ret vs ->
       Forall (fun v => dvalue_has_dtyp v t) vs /\ List.length vs = n.
   Proof.
-    intros rd np stride t; induction n as [| n IH]; intros offset dbs vs HR HW H.
+    intros rd np stride t; induction n as [| n IH]; intros offset dbs vs HR HNV HW H.
     - cbn in H; inversion H; split; [constructor | reflexivity].
     - rewrite read_array_loop_cons in H.
       apply EOU_bind_ret_inv in H as (e & Ee & H).
       apply EOU_bind_ret_inv in H as (rest & Er & H).
       cbn in H; inversion H; subst vs; clear H.
-      destruct (IH _ _ _ HR (Forall_drop_N _ HW) Er) as [HF HL].
+      destruct (IH _ _ _ HR HNV (Forall_drop_N _ HW) Er) as [HF HL].
       split; [constructor; [| exact HF] | cbn; rewrite HL; reflexivity].
       match type of Ee with
       | (if ?c then _ else _) = _ => destruct c
       end.
-      + cbn in Ee; inversion Ee; apply DVALUE_Poison_typ_agg.
+      + cbn -[poison_of_dtyp] in Ee; inversion Ee.
+        apply poison_of_dtyp_has_dtyp, HNV.
       + eapply HR; [apply Forall_take_N, HW | exact Ee].
   Qed.
 
@@ -3756,9 +3901,9 @@ Section MemoryByteFacts.
   Proof.
     intros tb m bits Htb Hm Hl.
     destruct Htb as [-> | ->]; unfold packed_bits_to_dvalue.
-    - destruct (memory_bits_to_Z bits) as [| | | [z |]]; try apply DVALUE_Poison_typ_agg.
+    - destruct (memory_bits_to_Z bits) as [| | | [z |]]; try (apply DVALUE_Poison_typ_agg; reflexivity).
       constructor; [apply Pos.eqb_refl | reflexivity].
-    - destruct (forallb is_poison_bit bits) eqn:Ep; [apply DVALUE_Poison_typ_agg |].
+    - destruct (forallb is_poison_bit bits) eqn:Ep; [(apply DVALUE_Poison_typ_agg; reflexivity) |].
       destruct (forallb is_int_bit bits) eqn:Ei;
         (constructor; [apply Pos.eqb_refl |]); cbn [dvalue_base_canonical dvalue_bv_canonical];
         [reflexivity |].
@@ -3801,22 +3946,27 @@ Section MemoryByteFacts.
     - (* struct *)
       rewrite read_struct_unfold in H.
       destruct (poison_split mb) as [np rest]; destruct rest as [| b rest].
-      { cbn in H; inversion H; apply DVALUE_Poison_typ_agg. }
+      { cbn -[poison_of_dtyp] in H; inversion H.
+        apply poison_of_dtyp_has_dtyp, serializable_NO_VOID, HS. }
       destruct (read_struct_loop memory_bytes_to_dvalue np
                   (if pk then None else Some (max_preferred_dtyp_alignment dts)) 0%N dts mb)
         as [| | | vs] eqn:Ev; cbn in H; try discriminate.
       inversion H; subst dv; clear H.
       unfold canonicalize_agg.
-      destruct (forallb dvalue_is_poison vs) eqn:Ep; [apply DVALUE_Poison_typ_agg |].
+      destruct (agg_is_poison (DTYPE_Struct pk dts) vs) eqn:Ep;
+        [apply DVALUE_Poison_typ_agg, (agg_is_poison_nonempty _ _ Ep) |].
       apply DVALUE_Struct_typ; [exact Ep |].
-      eapply read_struct_loop_has_dtyp; [| exact HW | exact Ev].
-      intros u Hu mb' v' HW' H'.
       apply FORALL_forall in HS.
-      eapply IH; [exact Hu | eapply Forall_forall; [exact HS | exact Hu] | exact HW' | exact H'].
+      eapply read_struct_loop_has_dtyp; [| | exact HW | exact Ev].
+      + intros u Hu mb' v' HW' H'.
+        eapply IH; [exact Hu | eapply Forall_forall; [exact HS | exact Hu] | exact HW' | exact H'].
+      + intros u Hu; apply serializable_NO_VOID.
+        eapply Forall_forall; [exact HS | exact Hu].
     - (* array / vector *)
       rewrite read_array_unfold in H.
       destruct (poison_split mb) as [np rest]; destruct rest as [| b rest].
-      { cbn in H; inversion H; apply DVALUE_Poison_typ_agg. }
+      { cbn -[poison_of_dtyp] in H; inversion H.
+        apply poison_of_dtyp_has_dtyp, serializable_NO_VOID, HS. }
       destruct (packed_vector_type (DTYPE_Array vv sz t)) as [[tb m] |] eqn:EP.
       { (* a packed vector *)
         destruct (packed_vector_type_Some _ EP) as (sz1 & Edt & Htb & Hm).
@@ -3827,19 +3977,21 @@ Section MemoryByteFacts.
         destruct (@packed_bits_to_elts_has_dtyp tb m (N.to_nat sz1)
                     (get_bits_fwd (sz1 * Npos m) mb) Htb Hm ltac:(lia)) as [HF HL].
         unfold canonicalize_agg.
-        match goal with |- context [forallb dvalue_is_poison ?l] =>
-          destruct (forallb dvalue_is_poison l) eqn:Ep end;
-          [apply DVALUE_Poison_typ_agg |].
+        match goal with |- context [agg_is_poison ?d ?l] =>
+          destruct (agg_is_poison d l) eqn:Ep end;
+          [apply DVALUE_Poison_typ_agg, (agg_is_poison_nonempty _ _ Ep) |].
         apply DVALUE_Array_typ; [apply serializable_NO_VOID, HS | exact Ep | exact HF | exact HL]. }
       apply EOU_bind_ret_inv in H as (elts & Ee & H).
       cbn in H; inversion H; subst dv; clear H.
       assert (HR : forall mb' v', Forall memory_byte_wf mb' ->
                      memory_bytes_to_dvalue mb' t = ret v' -> dvalue_has_dtyp v' t)
         by (intros mb' v' HW' H'; eapply IHt; eauto).
-      destruct (@read_array_loop_has_dtyp memory_bytes_to_dvalue _ _ t _ _ mb elts HR HW Ee)
+      destruct (@read_array_loop_has_dtyp memory_bytes_to_dvalue _ _ t _ _ mb elts HR
+                  (serializable_NO_VOID _ HS) HW Ee)
         as [HF HL].
       unfold canonicalize_agg.
-      destruct (forallb dvalue_is_poison elts) eqn:Ep; [apply DVALUE_Poison_typ_agg |].
+      destruct (agg_is_poison (DTYPE_Array vv sz t) elts) eqn:Ep;
+        [apply DVALUE_Poison_typ_agg, (agg_is_poison_nonempty _ _ Ep) |].
       apply DVALUE_Array_typ; [apply serializable_NO_VOID, HS | exact Ep | exact HF | exact HL].
   Qed.
 
@@ -4474,12 +4626,64 @@ Section MemoryByteFacts.
 
   (** *** The round trip at one type
 
-      [rt_bytes dt mb dv]: if [dv] (read from [mb]) is poison then [mb] was
-      all poison, and writing [dv] back reproduces [mb]'s bits.  The first
+      [rt_bytes dt mb dv]: if [dv] (read from [mb]) is poison -- at an empty
+      type, the type's one value -- then [mb] was all poison, and writing
+      [dv] back reproduces [mb]'s bits.  The first
       half is what an aggregate needs when [canonicalize_agg] turns a value
       of all-poison elements into [DVALUE_Poison]. *)
+  Lemma packed_extent_store : forall dts,
+      FORALL (fun t => byte_layout t /\ alloc_size_dtyp t = store_size_dtyp t) dts ->
+      struct_fields_extent true dts
+      = fold_right (fun t acc => (store_size_dtyp t + acc)%N) 0%N dts.
+  Proof.
+    intros dts H; unfold struct_fields_extent; cbv beta iota.
+    rewrite fold_left_add_right, N.add_0_l.
+    induction dts as [| t ts IH]; [reflexivity |].
+    cbn [FORALL fold_right] in H |- *; destruct H as [[_ Ht] Hs].
+    rewrite Ht, IH by exact Hs; reflexivity.
+  Qed.
+
+  (* padding-free byte types are serializable, and the empty ones among
+     them occupy no bytes *)
+  Lemma byte_layout_serializable : forall dt, byte_layout dt -> serializable dt.
+  Proof.
+    induction dt as [db | pk dts IH | vv sz t IHt]; intros HL.
+    - destruct db; cbn in HL; try contradiction; exact I.
+    - destruct pk; cbn in HL; [| contradiction].
+      cbn [serializable].
+      revert IH HL; induction dts as [| d ds IHds]; intros IH HL;
+        cbn [FORALL fold_right] in HL |- *; [exact I |].
+      destruct HL as [[HLd _] HLs]; split.
+      + apply IH; [now left | exact HLd].
+      + apply IHds; [intros u Hu; apply IH; now right | exact HLs].
+    - cbn [serializable]; apply IHt; destruct vv; cbn in HL; tauto.
+  Qed.
+
+  Lemma byte_layout_empty_store_size : forall dt,
+      byte_layout dt -> dtyp_is_empty dt = true -> store_size_dtyp dt = 0%N.
+  Proof.
+    induction dt as [db | pk dts IH | vv sz t IHt]; intros HL HE.
+    - discriminate.
+    - destruct pk; cbn in HL; [| contradiction].
+      rewrite store_size_dtyp_Packed_struct, (packed_extent_store _ HL).
+      cbn [dtyp_is_empty] in HE.
+      revert IH HL HE; induction dts as [| d ds IHds]; intros IH HL HE; [reflexivity |].
+      cbn [FORALL fold_right] in HL; destruct HL as [[HLd _] HLs].
+      cbn [forallb] in HE; apply andb_true_iff in HE as [HEd HEs].
+      cbn [fold_right].
+      rewrite (IH d (or_introl eq_refl) HLd HEd), IHds;
+        [reflexivity | intros u Hu; apply IH; now right | exact HLs | exact HEs].
+    - assert (HLt : byte_layout t) by (destruct vv; cbn in HL; tauto).
+      assert (Es : store_size_dtyp (DTYPE_Array vv sz t) = (sz * store_size_dtyp t)%N).
+      { destruct vv; [apply store_size_unpacked_vector, byte_layout_not_packed, HLt |].
+        rewrite store_size_dtyp_array; cbn in HL; destruct HL as [_ ->]; reflexivity. }
+      rewrite Es; cbn [dtyp_is_empty] in HE; apply orb_true_iff in HE as [HZ | HEt].
+      + apply N.eqb_eq in HZ; subst sz; reflexivity.
+      + rewrite (IHt HLt HEt); lia.
+  Qed.
+
   Definition rt_bytes (dt : dtyp) (mb : list memory_byte) (dv : dvalue) : Prop :=
-    (dv = DVALUE_Base DVALUE_Poison -> forallb is_all_poison_byte mb = true) /\
+    (dv = poison_of_dtyp dt -> forallb is_all_poison_byte mb = true) /\
     (forall acc o bs,
         acc_dvalue_to_memory_bytes_h dt dv 0%N None acc = ret (o, bs) ->
         exists w, bs = w ++ acc /\ Forall2 same_bits mb (rev w)).
@@ -4488,10 +4692,23 @@ Section MemoryByteFacts.
       byte_layout dt -> Forall memory_byte_wf mb ->
       N.of_nat (List.length mb) = store_size_dtyp dt ->
       forallb is_all_poison_byte mb = true ->
-      rt_bytes dt mb (DVALUE_Base DVALUE_Poison).
+      rt_bytes dt mb (poison_of_dtyp dt).
   Proof.
     intros dt mb HL HW Hlen HP; split; [intros _; exact HP |].
-    intros acc o bs H; apply write_poison_layout in H; [| exact HL].
+    intros acc o bs H.
+    destruct (dtyp_is_empty dt) eqn:HE.
+    { (* an empty type: no bytes are read, and none are written back *)
+      rewrite (poison_of_dtyp_empty _ HE) in H.
+      pose proof (byte_layout_serializable _ HL) as HS.
+      destruct (@round_trip_h _ _
+                  (empty_dvalue_has_dtyp _ (serializable_NO_VOID _ HS) HE)
+                  HS None acc o bs H) as (w & Ebs & Lw & _).
+      rewrite (byte_layout_empty_store_size _ HL HE) in Lw, Hlen; cbn [tapad] in Lw.
+      destruct w; [| cbn in Lw; lia].
+      destruct mb; [| cbn in Hlen; lia].
+      exists []; split; [exact Ebs | constructor]. }
+    rewrite (poison_of_dtyp_nonempty _ HE) in H.
+    apply write_poison_layout in H; [| exact HL].
     eexists; split; [exact H |].
     rewrite rev_repeat, <- Hlen, Nnat.Nat2N.id.
     apply same_bits_all_poison; assumption.
@@ -4522,7 +4739,7 @@ Section MemoryByteFacts.
       destruct (memory_bytes_to_pointer_slice mb) as [[p k] |] eqn:Es;
         [destruct (pointer_chunk_aligned sz k) |]; cbn in Eb; inversion Eb; subst bv;
         [discriminate | |]; eapply bits_value_all_poison; eauto.
-    - split; [discriminate |].
+    - split; [rewrite poison_of_dtyp_base; discriminate |].
       intros acc o bs Hw; apply write_base_block in Hw.
       eexists; split; [exact Hw |].
       rewrite rev_involutive; cbn [base_byte_gen].
@@ -4558,7 +4775,8 @@ Section MemoryByteFacts.
       forallb is_all_poison_byte (take (np - offset) dbs) = true ->
       read_array_loop memory_bytes_to_dvalue np (store_size_dtyp t) t n offset dbs
       = ret elts ->
-      (forallb dvalue_is_poison elts = true -> forallb is_all_poison_byte dbs = true) /\
+      (dtyp_is_empty t = false ->
+       forallb dvalue_is_poison elts = true -> forallb is_all_poison_byte dbs = true) /\
       (forall offset' acc o bs,
           array_bytes_loop acc_dvalue_to_memory_bytes_h None t 0%N elts offset' acc
           = ret (o, bs) ->
@@ -4585,7 +4803,7 @@ Section MemoryByteFacts.
       (* the element: read, or skipped as lying in the poison prefix *)
       assert (He : rt_bytes t (take ssz dbs) e).
       { destruct (N.leb_spec (offset + ssz) np) as [Hle | Hgt].
-        - cbn in Ee; inversion Ee; subst e.
+        - cbn -[poison_of_dtyp] in Ee; inversion Ee; subst e.
           apply rt_bytes_poison; [exact HL | exact HWc | exact Hcl |].
           rewrite <- (@drop_nil _ dbs) at 1.
           apply forallb_sub with (n := (np - offset)%N); [lia | exact Hpre].
@@ -4599,10 +4817,11 @@ Section MemoryByteFacts.
       destruct (IH (offset + ssz)%N (drop ssz dbs) rest HL Hel HWt Htl Hpre' Er)
         as [IH1 IH2].
       split.
-      + cbn [forallb]; intros Hp; apply andb_true_iff in Hp as [Hp1 Hp2].
+      + intros Hne; cbn [forallb]; intros Hp; apply andb_true_iff in Hp as [Hp1 Hp2].
         rewrite <- (@take_drop_app _ ssz dbs), forallb_app.
-        apply andb_true_iff; split;
-          [apply (proj1 He), dvalue_is_poison_true, Hp1 | apply IH1, Hp2].
+        apply andb_true_iff; split; [| apply IH1; assumption].
+        apply (proj1 He); rewrite (poison_of_dtyp_nonempty _ Hne).
+        apply dvalue_is_poison_true, Hp1.
       + intros offset' acc o bs Hw.
         rewrite array_bytes_loop_cons in Hw.
         apply EOU_bind_ret_inv in Hw as ([coff cbs] & Ec & Hw).
@@ -4626,7 +4845,7 @@ Section MemoryByteFacts.
       = fold_right (fun t acc => (store_size_dtyp t + acc)%N) 0%N dts ->
       forallb is_all_poison_byte (take (np - offset) dbs) = true ->
       read_struct_loop memory_bytes_to_dvalue np None offset dts dbs = ret vs ->
-      (forallb dvalue_is_poison vs = true -> forallb is_all_poison_byte dbs = true) /\
+      (fields_all_poison dts vs = true -> forallb is_all_poison_byte dbs = true) /\
       (forall offset' acc o bs,
           struct_bytes_loop acc_dvalue_to_memory_bytes_h None None vs dts offset' acc
           = ret (o, bs) ->
@@ -4655,7 +4874,7 @@ Section MemoryByteFacts.
       assert (HWt : Forall memory_byte_wf (drop ssz dbs)) by (apply Forall_drop_N, HW).
       assert (Hf : rt_bytes t (take ssz dbs) f).
       { destruct (N.leb_spec (offset + ssz) np) as [Hle | Hgt].
-        - cbn in Ef; inversion Ef; subst f.
+        - cbn -[poison_of_dtyp] in Ef; inversion Ef; subst f.
           apply rt_bytes_poison; [exact HLt | exact HWc | exact Hcl |].
           rewrite <- (@drop_nil _ dbs) at 1.
           apply forallb_sub with (n := (np - offset)%N); [lia | exact Hpre].
@@ -4668,10 +4887,15 @@ Section MemoryByteFacts.
       destruct (IH (offset + ssz)%N (drop ssz dbs) rest HLs
                   (fun u Hu => Hel u (or_intror Hu)) HWt Htl Hpre' Er) as [IH1 IH2].
       split.
-      + cbn [forallb]; intros Hp; apply andb_true_iff in Hp as [Hp1 Hp2].
+      + cbn [fields_all_poison]; intros Hp; apply andb_true_iff in Hp as [Hp1 Hp2].
         rewrite <- (@take_drop_app _ ssz dbs), forallb_app.
-        apply andb_true_iff; split;
-          [apply (proj1 Hf), dvalue_is_poison_true, Hp1 | apply IH1, Hp2].
+        apply andb_true_iff; split; [| apply IH1, Hp2].
+        destruct (dtyp_is_empty t) eqn:HEt.
+        * (* a field of empty type occupies no bytes *)
+          unfold ssz; rewrite (byte_layout_empty_store_size _ HLt HEt), take_nil.
+          reflexivity.
+        * apply (proj1 Hf); rewrite (poison_of_dtyp_nonempty _ HEt).
+          apply dvalue_is_poison_true, Hp1.
       + intros offset' acc o bs Hw.
         rewrite struct_bytes_loop_cons in Hw; cbn [accumulate_padding] in Hw.
         apply EOU_bind_ret_inv in Hw as ([coff cbs] & Ec & Hw).
@@ -4682,18 +4906,6 @@ Section MemoryByteFacts.
         exists (w2 ++ w1); split; [rewrite app_assoc; reflexivity |].
         rewrite rev_app_distr, <- (@take_drop_app _ ssz dbs).
         apply Forall2_app; assumption.
-  Qed.
-
-  Lemma packed_extent_store : forall dts,
-      FORALL (fun t => byte_layout t /\ alloc_size_dtyp t = store_size_dtyp t) dts ->
-      struct_fields_extent true dts
-      = fold_right (fun t acc => (store_size_dtyp t + acc)%N) 0%N dts.
-  Proof.
-    intros dts H; unfold struct_fields_extent; cbv beta iota.
-    rewrite fold_left_add_right, N.add_0_l.
-    induction dts as [| t ts IH]; [reflexivity |].
-    cbn [FORALL fold_right] in H |- *; destruct H as [[_ Ht] Hs].
-    rewrite Ht, IH by exact Hs; reflexivity.
   Qed.
 
   (** *** The theorem *)
@@ -4712,7 +4924,7 @@ Section MemoryByteFacts.
       pose proof (poison_split_prefix mb) as Hpre.
       destruct (poison_split mb) as [np rest] eqn:Eps; cbn [fst] in Hpre.
       destruct rest as [| b rest].
-      { cbn in H; inversion H; subst dv.
+      { cbn -[poison_of_dtyp] in H; inversion H; subst dv.
         apply rt_bytes_poison; [exact HL | exact HW | exact Hlen |].
         rewrite <- all_poison_bytes_forallb; unfold all_poison_bytes; rewrite Eps; reflexivity. }
       destruct (read_struct_loop memory_bytes_to_dvalue np None 0%N dts mb)
@@ -4730,9 +4942,16 @@ Section MemoryByteFacts.
       destruct (@read_struct_loop_bytes np dts 0%N mb vs HL Hel HW Hlen'
                   ltac:(rewrite N.sub_0_r; exact Hpre) Ev) as [L1 L2].
       unfold canonicalize_agg.
-      destruct (forallb dvalue_is_poison vs) eqn:Ep.
-      + apply rt_bytes_poison; [exact HL | exact HW | exact Hlen | apply L1; reflexivity].
-      + split; [discriminate |].
+      destruct (agg_is_poison (DTYPE_Struct true dts) vs) eqn:Ep.
+      + rewrite <- (poison_of_dtyp_nonempty _ (agg_is_poison_nonempty _ _ Ep)).
+        apply rt_bytes_poison; [exact HL | exact HW | exact Hlen | apply L1].
+        unfold agg_is_poison in Ep; apply andb_true_iff in Ep as [_ Ep]; exact Ep.
+      + split.
+        { (* a struct is [poison_of_dtyp] only at an empty type, which has no bytes *)
+          destruct (dtyp_is_empty (DTYPE_Struct true dts)) eqn:HE;
+            [| rewrite (poison_of_dtyp_nonempty _ HE); discriminate].
+          intros _; rewrite (byte_layout_empty_store_size (DTYPE_Struct true dts) HL HE) in Hlen.
+          destruct mb; [reflexivity | cbn in Hlen; lia]. }
         intros acc o bs Hw; rewrite ser_struct_unfold in Hw.
         exact (L2 0%N acc o bs Hw).
     - assert (HLt : byte_layout t) by (destruct vv; cbn in HL; tauto).
@@ -4750,7 +4969,7 @@ Section MemoryByteFacts.
       pose proof (poison_split_prefix mb) as Hpre.
       destruct (poison_split mb) as [np rest] eqn:Eps; cbn [fst] in Hpre.
       destruct rest as [| b rest].
-      { cbn in H; inversion H; subst dv.
+      { cbn -[poison_of_dtyp] in H; inversion H; subst dv.
         apply rt_bytes_poison; [exact HL | exact HW | exact Hlen |].
         rewrite <- all_poison_bytes_forallb; unfold all_poison_bytes; rewrite Eps; reflexivity. }
       apply EOU_bind_ret_inv in H as (elts & Ee & H).
@@ -4762,9 +4981,17 @@ Section MemoryByteFacts.
       destruct (@read_array_loop_bytes t np (N.to_nat sz) 0%N mb elts HLt Hel HW Hlen'
                   ltac:(rewrite N.sub_0_r; exact Hpre) Ee) as [L1 L2].
       unfold canonicalize_agg.
-      destruct (forallb dvalue_is_poison elts) eqn:Ep.
-      + apply rt_bytes_poison; [exact HL | exact HW | exact Hlen | apply L1; reflexivity].
-      + split; [discriminate |].
+      destruct (agg_is_poison (DTYPE_Array vv sz t) elts) eqn:Ep.
+      + pose proof (agg_is_poison_nonempty _ _ Ep) as HNE.
+        rewrite <- (poison_of_dtyp_nonempty _ HNE).
+        apply rt_bytes_poison; [exact HL | exact HW | exact Hlen | apply L1].
+        * cbn [dtyp_is_empty] in HNE; apply orb_false_iff in HNE as [_ HNE]; exact HNE.
+        * unfold agg_is_poison in Ep; apply andb_true_iff in Ep as [_ Ep]; exact Ep.
+      + split.
+        { destruct (dtyp_is_empty (DTYPE_Array vv sz t)) eqn:HE;
+            [| rewrite (poison_of_dtyp_nonempty _ HE); discriminate].
+          intros _; rewrite (byte_layout_empty_store_size (DTYPE_Array vv sz t) HL HE) in Hlen.
+          destruct mb; [reflexivity | cbn in Hlen; lia]. }
         intros acc o bs Hw; rewrite ser_array_unfold, NP, Hpad in Hw.
         exact (L2 0%N acc o bs Hw).
   Qed.

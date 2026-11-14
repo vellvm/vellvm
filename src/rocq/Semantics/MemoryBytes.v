@@ -354,7 +354,7 @@ Section MemoryByte.
             let pad := if packed then None else Some (max_preferred_dtyp_alignment dts) in
             accumulate_struct_bytes pad fields dts offset acc
         | DVALUE_Base DVALUE_Poison =>
-            (* Poison inhabits every type ([DVALUE_Poison_typ_agg]), so a
+            (* Poison inhabits every non-empty type ([DVALUE_Poison_typ_agg]), so a
                poison at aggregate type is well-typed: it serializes to the
                type's worth of poison bytes. *)
             let '(offset', bs) := accumulate_padding_bytes offset (store_size_dtyp dt) acc in
@@ -375,7 +375,7 @@ Section MemoryByte.
                 dvalue_extract_array_bytes _vector elt_t elts offset acc
             end
         | DVALUE_Base DVALUE_Poison =>
-            (* Poison inhabits every type ([DVALUE_Poison_typ_agg]), so a
+            (* Poison inhabits every non-empty type ([DVALUE_Poison_typ_agg]), so a
                poison at aggregate type is well-typed: it serializes to the
                type's worth of poison bytes. *)
             let '(offset', bs) := accumulate_padding_bytes offset (store_size_dtyp dt) acc in
@@ -392,7 +392,7 @@ Section MemoryByte.
 
       *** Why the type is needed
       The value alone does not determine the layout: [DVALUE_Poison] inhabits
-      every type ([DVALUE_Poison_typ_agg]), so its width comes from [dt], and
+      every non-empty type ([DVALUE_Poison_typ_agg]), so its width comes from [dt], and
       so does every padding decision inside an aggregate.
 
       *** The layout law
