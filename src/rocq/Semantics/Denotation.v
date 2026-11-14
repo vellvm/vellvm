@@ -509,7 +509,7 @@ Section Denotation.
     : CFGtop (list (dtyp * dvalue)) :=
     map_monad (fun '((t, op), attrs) =>
                  v <- denote_exp' (Some t) op ;;
-                 v' <- apply_attrs attrs msg v ;;
+                 v' <- apply_attrs attrs msg t v ;;
                  ret (t, v')) args.
 
   (** ** Operand bundles
@@ -591,7 +591,7 @@ Section Denotation.
          a value out of range is UB with !noundef), then !dereferenceable *)
       v <- lift (apply_value_attrs (load_metadata_attrs md)
                    (err_loc tt ++ ": Loaded value violates !noundef.")
-                   (value_metadata_range (metadata_range md) v));;
+                   dt (value_metadata_range (metadata_range md) dt v));;
       assert_load_dereferenceable md v
         (err_loc tt ++ ": Loaded value violates !dereferenceable.");;
       lwrite id v
@@ -624,7 +624,7 @@ Section Denotation.
         (* the call site's function attributes, then its !range metadata and
            return-value attributes *)
         res <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
-                 (metadata_range md) (err_loc tt ++ ": Call") (List.map snd vs) res ;;
+                 (metadata_range md) (err_loc tt ++ ": Call") dt (List.map snd vs) res ;;
         returned_value <-
           match res with
           | inl exc => raiseLLVM exc
@@ -760,7 +760,7 @@ Section Denotation.
       (* the invoke's function attributes, then its !range metadata and
          return-value attributes *)
       rv <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
-              (metadata_range md) (err_loc tt ++ ": Invoke") (List.map snd uvs) rv ;;
+              (metadata_range md) (err_loc tt ++ ": Invoke") dt (List.map snd uvs) rv ;;
       (* branch to to_label *)
       match rv with
       | inl exn =>
@@ -972,19 +972,19 @@ Section Denotation.
     let '(ret_attrs, args_attrs) := dc_param_attrs (df_prototype df) in
     let fname := show_raw_id (dc_name (df_prototype df)) in
     let fcc := anns_cconv (dc_annotations (df_prototype df)) in
-    fun (cc : cconv) (ret_t : dtyp) (targs : list (dtyp * dvalue)) =>
+    fun (cc : cconv) (ret_t : dtyp) (args : list (dtyp * dvalue)) =>
       (* the calling convention, checked on entry so that a mismatch is
          reported at the call (see [check_cconv]) *)
       lift (check_cconv fcc cc fname);;
       args <- apply_args_attrs args_attrs
-               ("Argument of " ++ fname ++ " violates noundef.") (List.map snd targs);;
-      varg <- push_call_frame df (List.combine (List.map fst targs) args);;
+               ("Argument of " ++ fname ++ " violates noundef.") args;;
+      varg <- push_call_frame df args;;
       (* Catch a frame-local unwind so the result surfaces as [exc + dvalue].
          [pop_call_frame] runs on both the normal and the unwinding path, so the
          frame is always torn down before the (value-carried) unwind continues. *)
       rv <- run_exc (denote_cfg_map bmap (df_instrs df) (Some varg));;
       pop_call_frame;;
-      check_call_return (dc_attrs (df_prototype df)) ret_attrs None fname args rv.
+      check_call_return (dc_attrs (df_prototype df)) ret_attrs None fname ret_t (List.map snd args) rv.
 
   (* We now turn to the second knot to be tied: a top-level itree program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to
