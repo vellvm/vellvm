@@ -105,29 +105,43 @@ Lemma I2F_fp_class b1 b2 :
   I2F_dvalue_base b1 b2 -> @fp_class PInf b1 = @fp_class PFin b2.
 Proof. intros H; inversion H; subst; cbn; auto. Qed.
 
-Lemma I2F_value_nofpclass mask v1 v2 :
+Lemma I2F_value_nofpclass mask dt v1 v2 :
   I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_nofpclass PInf mask v1) (@value_nofpclass PFin mask v2).
+  I2F_dvalue (@value_nofpclass PInf mask dt v1) (@value_nofpclass PFin mask dt v2).
 Proof.
-  induction 1 as [b1 b2 HB | p s1 s2 F IH | vec s1 s2 F IH] using I2F_dvalue_ind; cbn.
-  - rewrite (I2F_fp_class HB).
-    destruct (@fp_class PFin b2); [| constructor; auto].
-    destruct (Z.land mask z =? 0)%Z; repeat constructor; auto.
-  - constructor; induction IH; cbn; constructor; auto; inv F; auto.
-  - constructor; induction IH; cbn; constructor; auto; inv F; auto.
+  (* [value_nofpclass] recurses on the type, so it computes once the type's
+     head constructor is known *)
+  intros H; revert dt.
+  induction H as [b1 b2 HB | p s1 s2 F IH | vec s1 s2 F IH] using I2F_dvalue_ind;
+    intros dt.
+  - destruct dt; cbn;
+      (rewrite (I2F_fp_class HB);
+       destruct (@fp_class PFin b2); [| constructor; auto];
+       destruct (Z.land mask z =? 0)%Z; repeat constructor; auto).
+  - (* struct: each field at its own type, then canonicalised; a value
+       whose shape does not match the type is left alone *)
+    destruct dt as [? | q dts | ? ? ?]; cbn -[canonicalize_agg];
+      try (constructor; exact F).
+    apply I2F_canonicalize_agg.
+    revert dts IH; induction F as [| x y xs ys Rxy F IHl]; intros dts IH;
+      inv IH; destruct dts as [| t ts]; cbn; constructor; auto.
+  - destruct dt as [? | ? ? | ? ? t]; cbn -[canonicalize_agg];
+      try (constructor; exact F).
+    apply I2F_canonicalize_agg.
+    clear F; induction IH; cbn; constructor; auto.
 Qed.
 
-Lemma I2F_value_attr_nofpclass attrs v1 v2 :
+Lemma I2F_value_attr_nofpclass attrs dt v1 v2 :
   I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_attr_nofpclass PInf attrs v1) (@value_attr_nofpclass PFin attrs v2).
+  I2F_dvalue (@value_attr_nofpclass PInf attrs dt v1) (@value_attr_nofpclass PFin attrs dt v2).
 Proof.
   intros H; unfold value_attr_nofpclass.
   destruct (find_option attr_nofpclass attrs); auto using I2F_value_nofpclass.
 Qed.
 
-Lemma I2F_value_attrs_poison attrs v1 v2 :
+Lemma I2F_value_attrs_poison attrs dt v1 v2 :
   I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_attrs_poison PInf attrs v1) (@value_attrs_poison PFin attrs v2).
+  I2F_dvalue (@value_attrs_poison PInf attrs dt v1) (@value_attrs_poison PFin attrs dt v2).
 Proof.
   intros H; unfold value_attrs_poison.
   apply I2F_value_attr_nofpclass, I2F_value_attr_range, I2F_value_attr_align,
@@ -137,13 +151,13 @@ Qed.
 (** Applying value attributes: related values give the same [noundef]
     verdict ([I2F_dvalue_well_defined]), so both sides pass on related
     values, or the infinite side raises UB. *)
-Lemma I2F_apply_value_attrs attrs msg v1 v2 :
+Lemma I2F_apply_value_attrs attrs msg dt v1 v2 :
   I2F_dvalue v1 v2 ->
   I2F_EOU I2F_dvalue
-    (@apply_value_attrs PInf attrs msg v1) (@apply_value_attrs PFin attrs msg v2).
+    (@apply_value_attrs PInf attrs msg dt v1) (@apply_value_attrs PFin attrs msg dt v2).
 Proof.
   intros H; unfold apply_value_attrs; cbv zeta.
-  pose proof (I2F_value_attrs_poison attrs H) as HP.
+  pose proof (I2F_value_attrs_poison attrs dt H) as HP.
   match goal with
   | |- I2F_EOU _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
       assert (EQ : b1 = b2)
@@ -163,15 +177,15 @@ Proof.
   repeat break_match_goal; auto.
 Qed.
 
-Lemma I2F_value_metadata_range r v1 v2 :
+Lemma I2F_value_metadata_range r dt v1 v2 :
   I2F_dvalue v1 v2 ->
-  I2F_dvalue (@value_metadata_range PInf r v1) (@value_metadata_range PFin r v2).
+  I2F_dvalue (@value_metadata_range PInf r dt v1) (@value_metadata_range PFin r dt v2).
 Proof.
   intros H.
-  destruct r as [rs|]; cbn; auto.
+  destruct r as [rs|]; cbn -[canonicalize_agg]; auto.
   inversion H; subst; try (apply I2F_value_metadata_range_base; auto).
   destruct v; [| apply I2F_value_metadata_range_base; auto].
-  constructor.
+  apply I2F_canonicalize_agg.
   match goal with
   | HF : Forall2 I2F_dvalue _ _ |- _ =>
       induction HF; cbn; constructor; auto using I2F_value_metadata_range_base

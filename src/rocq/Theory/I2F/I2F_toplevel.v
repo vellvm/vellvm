@@ -152,7 +152,8 @@ Proof.
       rbind I2F_dvalue.
       * destruct (g_exp g).
         -- apply I2F_denote_exp.
-        -- apply ruttc_ret; repeat constructor.
+        -- (* no initializer: poison at the global's type *)
+           apply ruttc_ret, I2F_poison_of_dtyp.
       * intros uv1 uv2 Huv; unfold store; rstep.
 Qed.
 
@@ -229,10 +230,10 @@ Proof.
 Qed.
 
 Lemma I2F_build_main_args : forall (args : list string),
-    I2F_refine_MCFG (Forall2 I2F_dvalue)
+    I2F_refine_MCFG I2F_targs
       (@build_main_args PInf args) (@build_main_args PFin args).
 Proof.
-  intros args; unfold build_main_args.
+  intros args; unfold build_main_args, I2F_targs.
   rbind I2F_dvalue; [apply I2F_allocate_args | ].
   intros v1 v2 Hv; apply ruttc_ret.
   repeat constructor; auto.
@@ -282,9 +283,10 @@ Qed.
 Lemma I2F_putchar_denotation :
   I2F_function_denotation (@putchar_denotation PInf) (@putchar_denotation PFin).
 Proof.
-  intros cc args1 args2 Hargs.
+  intros cc ret_t args1 args2 Hargs; unfold I2F_targs in Hargs.
   unfold putchar_denotation; cbn.
-  destruct Hargs as [| u1 u2 args1 args2 Hu Hargs]; [apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto|].
+  destruct Hargs as [| [t1 u1] [t2 u2] args1 args2 Hu Hargs]; [apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto|].
+  destruct Hu as [_ Hu]; cbn in Hu.
   destruct Hargs; cbn; [ | unfold raise; apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto].
   unfold ITree.map.
   destruct Hu as [b1 b2 Hb | | ]; try (rbind (fun _ _ => False); [apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto | intros ?? []]); [].
@@ -329,10 +331,11 @@ Qed.
 Lemma I2F_puts_denotation :
   I2F_function_denotation (@puts_denotation PInf) (@puts_denotation PFin).
 Proof.
-  intros cc args1 args2 Hargs.
+  intros cc ret_t args1 args2 Hargs; unfold I2F_targs in Hargs.
   unfold puts_denotation.
-  destruct Hargs as [| u1 u2 args1 args2 Hu Hargs];
+  destruct Hargs as [| [t1 u1] [t2 u2] args1 args2 Hu Hargs];
     [apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto|].
+  destruct Hu as [_ Hu]; cbn in Hu.
   destruct Hargs; [ | unfold raise; apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto].
   destruct Hu as [b1 b2 Hb | | ];
     try (rbind (fun _ _ => False); [apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto | intros ?? []]); [].
@@ -403,9 +406,9 @@ Qed.
     ([inr],[inr]) via [ret]). *)
 Lemma I2F_denote_vellvm :
   forall (ret_typ : dtyp) (entry : function_id)
-    (args1 : list (@dvalue PInf)) (args2 : list (@dvalue PFin))
+    (args1 : list (dtyp * @dvalue PInf)) (args2 : list (dtyp * @dvalue PFin))
     (mcfg : CFG.mcfg dtyp),
-    Forall2 I2F_dvalue args1 args2 ->
+    I2F_targs args1 args2 ->
     I2F_refine_MCFG I2F_dvalue
       (@denote_vellvm PInf ret_typ entry args1 mcfg)
       (@denote_vellvm PFin ret_typ entry args2 mcfg).
@@ -436,10 +439,10 @@ Qed.
     The final assembly. *)
 Lemma I2F_interpreter_gen :
   forall (ret_typ : dtyp) (entry : function_id)
-    (arg_gen1 : @MCFGtop PInf (list (@dvalue PInf)))
-    (arg_gen2 : @MCFGtop PFin (list (@dvalue PFin)))
+    (arg_gen1 : @MCFGtop PInf (list (dtyp * @dvalue PInf)))
+    (arg_gen2 : @MCFGtop PFin (list (dtyp * @dvalue PFin)))
     (prog : ll_toplevel_entities),
-    I2F_refine_MCFG (Forall2 I2F_dvalue) arg_gen1 arg_gen2 ->
+    I2F_refine_MCFG I2F_targs arg_gen1 arg_gen2 ->
     I2F_refine_MCFGbot (prod_rel I2F_FusedS I2F_dvalue)
       (@interpreter_gen PInf ret_typ entry arg_gen1 prog)
       (@interpreter_gen PFin ret_typ entry arg_gen2 prog).

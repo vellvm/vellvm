@@ -1080,7 +1080,7 @@ Proof.
   unfold handle_intrinsicM.
   eapply I2F_memS_bind.
   { apply I2F_memS_lift.
-    eapply I2F_EOU_map_monad2; [exact Hargs |].
+    eapply I2F_EOU_map_monad2; [exact (I2F_targs_snd Hargs) |].
     intros a1 a2 Ha; apply I2F_dvalue_to_dvalue_base; auto. }
   intros args1' args2' Hargs'.
   destruct (is_memcpy_name f2).
