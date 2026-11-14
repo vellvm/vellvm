@@ -794,16 +794,58 @@ Proof.
   now rewrite (I2F_dvalue_is_poison Hxy), IH.
 Qed.
 
-Lemma I2F_canonicalize_agg :
-  forall (mk1 : list (@dvalue PInf) -> @dvalue PInf)
-         (mk2 : list (@dvalue PFin) -> @dvalue PFin) l1 l2,
+(** Canonical forms are type directed (DynamicValues.v, "Canonical forms of
+    dvalues"), and a [dtyp] is shared between the two instantiations: so
+    related fields are poison together, the one value of an empty type is
+    related to itself, and both sides canonicalise the same way. *)
+Lemma I2F_fields_all_poison : forall dts l1 l2,
     Forall2 I2F_dvalue l1 l2 ->
-    I2F_dvalue (mk1 l1) (mk2 l2) ->
-    I2F_dvalue (@canonicalize_agg PInf mk1 l1) (@canonicalize_agg PFin mk2 l2).
+    @fields_all_poison PInf dts l1 = @fields_all_poison PFin dts l2.
 Proof.
-  intros mk1 mk2 l1 l2 HF HM; unfold canonicalize_agg.
-  rewrite (I2F_forallb_is_poison HF).
-  destruct (forallb (@dvalue_is_poison PFin) l2); auto.
+  intros dts l1 l2 F; revert dts.
+  induction F as [| x y xs ys Hxy F IH]; intros [| t ts]; cbn; auto.
+  now rewrite (I2F_dvalue_is_poison Hxy), IH.
+Qed.
+
+Lemma I2F_agg_is_poison : forall dt l1 l2,
+    Forall2 I2F_dvalue l1 l2 ->
+    @agg_is_poison PInf dt l1 = @agg_is_poison PFin dt l2.
+Proof.
+  intros dt l1 l2 F; unfold agg_is_poison.
+  destruct dt; [reflexivity | |].
+  - now rewrite (I2F_fields_all_poison _ F).
+  - now rewrite (I2F_forallb_is_poison F).
+Qed.
+
+Lemma I2F_canonicalize_agg :
+  forall dt l1 l2,
+    Forall2 I2F_dvalue l1 l2 ->
+    I2F_dvalue (@canonicalize_agg PInf dt l1) (@canonicalize_agg PFin dt l2).
+Proof.
+  intros dt l1 l2 HF; unfold canonicalize_agg.
+  rewrite (I2F_agg_is_poison dt HF).
+  destruct (@agg_is_poison PFin dt l2); [repeat constructor |].
+  destruct dt; repeat constructor; auto.
+Qed.
+
+Lemma I2F_empty_dvalue_of_dtyp : forall dt,
+    I2F_dvalue (@empty_dvalue_of_dtyp PInf dt) (@empty_dvalue_of_dtyp PFin dt).
+Proof.
+  induction dt as [db | pk dts IH | vv sz t IHt] using dtyp_ind; cbn [empty_dvalue_of_dtyp].
+  - repeat constructor.
+  - constructor.
+    induction dts as [| d ds IHds]; cbn [List.map]; constructor.
+    + apply IH; now left.
+    + apply IHds; intros u Hu; apply IH; now right.
+  - constructor.
+    induction (N.to_nat sz); cbn [repeat]; constructor; auto.
+Qed.
+
+Lemma I2F_poison_of_dtyp : forall dt,
+    I2F_dvalue (@poison_of_dtyp PInf dt) (@poison_of_dtyp PFin dt).
+Proof.
+  intros dt; unfold poison_of_dtyp.
+  destruct (dtyp_is_empty dt); [apply I2F_empty_dvalue_of_dtyp | repeat constructor].
 Qed.
 
 (* The [eval_*] wrappers share their vector plumbing: coerce both
@@ -829,7 +871,7 @@ Ltac i2f_vec_wrap base_lemma :=
     (eapply I2F_EOU_bind;
      [ eapply I2F_EOU_vec_loop; [eapply Forall2_combine; eauto|];
        intros; apply base_lemma; auto
-     | intros; constructor; apply I2F_canonicalize_agg; [| constructor];
+     | intros; constructor; apply I2F_canonicalize_agg;
        apply Forall2_map_Base; auto ]).
 
 (* [vector_elts] normalizes a vector operand (a concrete array, or the
@@ -895,9 +937,9 @@ Proof.
   intros * H; inversion H; subst; cbn; repeat constructor.
 Qed.
 
-Lemma I2F_eval_fneg a b :
+Lemma I2F_eval_fneg dt a b :
   I2F_dvalue a b ->
-  I2F_EOU I2F_dvalue (eval_fneg a) (eval_fneg b).
+  I2F_EOU I2F_dvalue (eval_fneg dt a) (eval_fneg dt b).
 Proof.
   intros H.
   inversion H; subst; cbn; eauto.
@@ -912,7 +954,7 @@ Proof.
     eapply I2F_EOU_bind;
       [eapply I2F_EOU_map_monad2;
        [eauto | intros; apply I2F_eval_fneg_base; auto]|].
-    intros; constructor; apply I2F_canonicalize_agg; [| constructor];
+    intros; constructor; apply I2F_canonicalize_agg;
       apply Forall2_map_Base; auto.
 Qed.
 
@@ -1906,6 +1948,11 @@ Proof.
   apply I2F_get_bits_of_memory_byte_list; [exact F | constructor].
 Qed.
 
+(* Poison at a type ([poison_of_dtyp]) on both sides, or a goal that
+   constructors close. *)
+Ltac i2f_poison :=
+  first [ constructor; apply I2F_poison_of_dtyp | repeat constructor ].
+
 Lemma I2F_memory_bytes_to_dvalue : forall t dbs dbs',
     Forall2 I2F_memory_byte dbs dbs' ->
     I2F_EOU I2F_dvalue
@@ -1914,7 +1961,7 @@ Lemma I2F_memory_bytes_to_dvalue : forall t dbs dbs',
 Proof.
   intros t; induction t using dtyp_ind; intros dbs dbs' F.
   - (* DTYPE_Base *)
-    cbn.
+    cbn -[poison_of_dtyp canonicalize_agg].
     eapply I2F_EOU_bind;
       [apply I2F_memory_bytes_to_dvalue_base, Forall2_take; auto|].
     intros; do 2 constructor; auto.
@@ -1927,15 +1974,15 @@ Proof.
        below mentions [fields] and the induction on [fields] stops
        [fold goL] from matching.  The two flavours then have identical
        scripts. *)
-    destruct p; cbn.
+    destruct p; cbn -[poison_of_dtyp canonicalize_agg].
     + (* packed *)
       destruct (I2F_poison_split F) as [EN FS].
       destruct (poison_split dbs) as [np1 r1].
       destruct (poison_split dbs') as [np2 r2].
       cbn in EN, FS; subst np2.
-      destruct FS as [| x y xs ys Hxy FS]; cbn.
+      destruct FS as [| x y xs ys Hxy FS]; cbn -[poison_of_dtyp canonicalize_agg].
       * (* every byte poison: both canonicalise to [DVALUE_Poison] *)
-        repeat constructor.
+        i2f_poison.
       * match goal with
         | |- context [?L 0%N fields dbs] => set (goL := L)
         end.
@@ -1951,8 +1998,8 @@ Proof.
           | IHu : forall u, In u fields -> _ |- _ => revert IHu
           end.
           induction fields as [| u fs IHf]; intros IH offset us vs FV.
-          - unfold goL, goR; cbn; repeat constructor.
-          - unfold goL, goR; cbn; fold goL; fold goR.
+          - unfold goL, goR; cbn -[poison_of_dtyp canonicalize_agg]; i2f_poison.
+          - unfold goL, goR; cbn -[poison_of_dtyp canonicalize_agg]; fold goL; fold goR.
             eapply I2F_EOU_bind with (RA := I2F_dvalue).
             { (* the skip test is the same term on both sides once [cbn] has
                  reduced the [Sizeof] projections, so one [destruct] serves *)
@@ -1960,7 +2007,7 @@ Proof.
               | |- I2F_EOU _ (if ?c then _ else _) _ => destruct c
               end.
               - (* field lies entirely below the first non-poison byte *)
-                repeat constructor.
+                i2f_poison.
               - apply IH; [now left | apply Forall2_take, Forall2_drop; auto]. }
             intros f1 f2 Hf.
             eapply I2F_EOU_bind with (RA := Forall2 I2F_dvalue);
@@ -1973,7 +2020,7 @@ Proof.
         }
         specialize (GO 0%N dbs dbs' F).
         revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
-          intros m1 m2 GO; destruct GO; cbn;
+          intros m1 m2 GO; destruct GO; cbn -[poison_of_dtyp canonicalize_agg];
           first [ constructor; apply I2F_canonicalize_agg; auto
                 | repeat constructor ].
     + (* unpacked *)
@@ -1981,9 +2028,9 @@ Proof.
       destruct (poison_split dbs) as [np1 r1].
       destruct (poison_split dbs') as [np2 r2].
       cbn in EN, FS; subst np2.
-      destruct FS as [| x y xs ys Hxy FS]; cbn.
+      destruct FS as [| x y xs ys Hxy FS]; cbn -[poison_of_dtyp canonicalize_agg].
       * (* every byte poison: both canonicalise to [DVALUE_Poison] *)
-        repeat constructor.
+        i2f_poison.
       * match goal with
         | |- context [?L 0%N fields dbs] => set (goL := L)
         end.
@@ -1999,8 +2046,8 @@ Proof.
           | IHu : forall u, In u fields -> _ |- _ => revert IHu
           end.
           induction fields as [| u fs IHf]; intros IH offset us vs FV.
-          - unfold goL, goR; cbn; repeat constructor.
-          - unfold goL, goR; cbn; fold goL; fold goR.
+          - unfold goL, goR; cbn -[poison_of_dtyp canonicalize_agg]; i2f_poison.
+          - unfold goL, goR; cbn -[poison_of_dtyp canonicalize_agg]; fold goL; fold goR.
             eapply I2F_EOU_bind with (RA := I2F_dvalue).
             { (* the skip test is the same term on both sides once [cbn] has
                  reduced the [Sizeof] projections, so one [destruct] serves *)
@@ -2008,7 +2055,7 @@ Proof.
               | |- I2F_EOU _ (if ?c then _ else _) _ => destruct c
               end.
               - (* field lies entirely below the first non-poison byte *)
-                repeat constructor.
+                i2f_poison.
               - apply IH; [now left | apply Forall2_take, Forall2_drop; auto]. }
             intros f1 f2 Hf.
             eapply I2F_EOU_bind with (RA := Forall2 I2F_dvalue);
@@ -2021,7 +2068,7 @@ Proof.
         }
         specialize (GO 0%N dbs dbs' F).
         revert GO; generalize (goL 0%N fields dbs) (goR 0%N fields dbs');
-          intros m1 m2 GO; destruct GO; cbn;
+          intros m1 m2 GO; destruct GO; cbn -[poison_of_dtyp canonicalize_agg];
           first [ constructor; apply I2F_canonicalize_agg; auto
                 | repeat constructor ].
   - (* DTYPE_Array / vector.  Same shape as the struct case; [destruct v]
@@ -2037,11 +2084,10 @@ Proof.
       destruct (poison_split dbs') as [np2 r2].
       cbn in EN, FS; subst np2.
       destruct FS as [| x y xs ys Hxy FS]; cbv beta iota zeta.
-      * repeat constructor.
+      * i2f_poison.
       * destruct (packed_vector_type (DTYPE_Array true sz t)) as [[tb m] |] eqn:EP.
-        { constructor; apply I2F_canonicalize_agg;
-            [apply I2F_packed_vector_elts, F | constructor; apply I2F_packed_vector_elts, F]. }
-        cbn.
+        { constructor; apply I2F_canonicalize_agg, I2F_packed_vector_elts, F. }
+        cbn -[poison_of_dtyp canonicalize_agg].
         match goal with
         | |- context [?L (N.to_nat sz) 0%N dbs] => set (goL := L)
         end.
@@ -2052,14 +2098,14 @@ Proof.
                    Forall2 I2F_memory_byte us vs ->
                    I2F_EOU (Forall2 I2F_dvalue) (goL n offset us) (goR n offset vs)).
         { intros n; induction n as [| n IHn]; intros offset us vs FV.
-          - unfold goL, goR; cbn; repeat constructor.
-          - unfold goL, goR; cbn; fold goL; fold goR.
+          - unfold goL, goR; cbn -[poison_of_dtyp canonicalize_agg]; i2f_poison.
+          - unfold goL, goR; cbn -[poison_of_dtyp canonicalize_agg]; fold goL; fold goR.
             eapply I2F_EOU_bind with (RA := I2F_dvalue).
             { match goal with
               | |- I2F_EOU _ (if ?c then _ else _) _ => destruct c
               end.
               - (* element lies entirely below the first non-poison byte *)
-                repeat constructor.
+                i2f_poison.
               - apply IHt; now apply Forall2_take. }
             intros e1 e2 He.
             eapply I2F_EOU_bind with (RA := Forall2 I2F_dvalue);
@@ -2067,17 +2113,17 @@ Proof.
             intros w1 w2 Hw; do 2 constructor; auto. }
         specialize (GO (N.to_nat sz) 0%N dbs dbs' F).
         revert GO; generalize (goL (N.to_nat sz) 0%N dbs) (goR (N.to_nat sz) 0%N dbs');
-          intros m1 m2 GO; destruct GO; cbn;
+          intros m1 m2 GO; destruct GO; cbn -[poison_of_dtyp canonicalize_agg];
           first [ constructor; apply I2F_canonicalize_agg; auto
                 | repeat constructor ].
     + (* array: elements at their alloc size *)
-      cbn.
+      cbn -[poison_of_dtyp canonicalize_agg].
       destruct (I2F_poison_split F) as [EN FS].
       destruct (poison_split dbs) as [np1 r1].
       destruct (poison_split dbs') as [np2 r2].
       cbn in EN, FS; subst np2.
-      destruct FS as [| x y xs ys Hxy FS]; cbn.
-      * repeat constructor.
+      destruct FS as [| x y xs ys Hxy FS]; cbn -[poison_of_dtyp canonicalize_agg].
+      * i2f_poison.
       * match goal with
         | |- context [?L (N.to_nat sz) 0%N dbs] => set (goL := L)
         end.
@@ -2088,14 +2134,14 @@ Proof.
                    Forall2 I2F_memory_byte us vs ->
                    I2F_EOU (Forall2 I2F_dvalue) (goL n offset us) (goR n offset vs)).
         { intros n; induction n as [| n IHn]; intros offset us vs FV.
-          - unfold goL, goR; cbn; repeat constructor.
-          - unfold goL, goR; cbn; fold goL; fold goR.
+          - unfold goL, goR; cbn -[poison_of_dtyp canonicalize_agg]; i2f_poison.
+          - unfold goL, goR; cbn -[poison_of_dtyp canonicalize_agg]; fold goL; fold goR.
             eapply I2F_EOU_bind with (RA := I2F_dvalue).
             { match goal with
               | |- I2F_EOU _ (if ?c then _ else _) _ => destruct c
               end.
               - (* element lies entirely below the first non-poison byte *)
-                repeat constructor.
+                i2f_poison.
               - apply IHt; now apply Forall2_take. }
             intros e1 e2 He.
             eapply I2F_EOU_bind with (RA := Forall2 I2F_dvalue);
@@ -2103,7 +2149,7 @@ Proof.
             intros w1 w2 Hw; do 2 constructor; auto. }
         specialize (GO (N.to_nat sz) 0%N dbs dbs' F).
         revert GO; generalize (goL (N.to_nat sz) 0%N dbs) (goR (N.to_nat sz) 0%N dbs');
-          intros m1 m2 GO; destruct GO; cbn;
+          intros m1 m2 GO; destruct GO; cbn -[poison_of_dtyp canonicalize_agg];
           first [ constructor; apply I2F_canonicalize_agg; auto
                 | repeat constructor ].
 Qed.
@@ -2638,7 +2684,7 @@ Proof.
     eapply I2F_EOU_bind;
       [ eapply I2F_EOU_map_monad2 with (RB := I2F_dvalue_base); eauto |].
     intros. apply I2F_convert_pure_base; auto.
-    intros. constructor. apply I2F_canonicalize_agg; [| constructor];
+    intros. constructor. apply I2F_canonicalize_agg;
       apply Forall2_map_Base; auto. }
   all: inversion R; subst; cbn -[get_base_conversion_type convert_pure_base];
     try (repeat constructor).
@@ -2883,7 +2929,7 @@ Proof.
       by (apply Forall2_repeat; repeat constructor).
     rewrite !split_acc_eq.
     i2f_split_case i
-      ltac:(constructor; apply I2F_canonicalize_agg; [| constructor];
+      ltac:(constructor; apply I2F_canonicalize_agg;
              (apply Forall2_app; [auto | constructor; auto])).
   - (* Vector *)
     match goal with v : bool |- _ => destruct v end; cbn;
@@ -2892,7 +2938,7 @@ Proof.
     destruct (dvalue_to_Z b3) as [i |]; cbn; [| i2f_poison_index R3].
     rewrite !split_acc_eq.
     i2f_split_case i
-      ltac:(constructor; apply I2F_canonicalize_agg; [| constructor];
+      ltac:(constructor; apply I2F_canonicalize_agg;
              (apply Forall2_app; [auto | constructor; auto])).
 Qed.
 
@@ -2918,10 +2964,15 @@ Proof.
             | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; cbn; repeat constructor
             end).
   all: match goal with v : bool |- _ => destruct v end; cbn; try (repeat constructor).
+  (* the result type counts the mask's lanes: the same number on both sides *)
+  match goal with
+  | HF : Forall2 I2F_dvalue ?x _ |- context [Datatypes.length ?x] =>
+      rewrite (Forall2_length HF)
+  end.
   match goal with
   | |- I2F_dvalue (canonicalize_agg _ ?l1) (canonicalize_agg _ ?l2) =>
       assert (FL : Forall2 I2F_dvalue l1 l2);
-      [| apply I2F_canonicalize_agg; [exact FL | constructor; exact FL]]
+      [| apply I2F_canonicalize_agg; exact FL]
   end.
   eapply Forall2_map_rel; eauto.
   intros idxv idxv' Ridx.
@@ -2942,26 +2993,26 @@ Lemma I2F_extract_value dt a b idxs :
 Proof.
   revert dt a b.
   generalize (map denote_int_syntax idxs) as l; clear idxs.
-  induction l as [| i l IH]; intros dt a b R; cbn; auto.
-  destruct dt as [ dtb | p ts | [|] sz t ]; cbn; try (repeat constructor).
+  induction l as [| i l IH]; intros dt a b R; cbn -[poison_of_dtyp canonicalize_agg]; auto.
+  destruct dt as [ dtb | p ts | [|] sz t ]; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor).
   - (* struct type *)
-    destruct (split [] i ts) as [[[pre_t sub_t] post_t] |]; cbn;
+    destruct (split [] i ts) as [[[pre_t sub_t] post_t] |]; cbn -[poison_of_dtyp canonicalize_agg];
       try (repeat constructor).
-    inversion R; subst; cbn; try (repeat constructor).
+    inversion R; subst; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor).
     + match goal with
       | HB : I2F_dvalue_base _ _ |- _ =>
-          inversion HB; subst; cbn; try (repeat constructor)
+          inversion HB; subst; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor)
       end.
-      apply IH; repeat constructor.
+      apply IH, I2F_poison_of_dtyp.
     + i2f_split_case i ltac:(apply IH; auto).
   - (* array type *)
-    inversion R; subst; cbn; try (repeat constructor).
+    inversion R; subst; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor).
     + match goal with
       | HB : I2F_dvalue_base _ _ |- _ =>
-          inversion HB; subst; cbn; try (repeat constructor)
+          inversion HB; subst; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor)
       end.
-      apply IH; repeat constructor.
-    + match goal with v : bool |- _ => destruct v end; cbn;
+      apply IH, I2F_poison_of_dtyp.
+    + match goal with v : bool |- _ => destruct v end; cbn -[poison_of_dtyp canonicalize_agg];
         try (repeat constructor).
       i2f_split_case i ltac:(apply IH; auto).
 Qed.
@@ -2976,112 +3027,47 @@ Lemma I2F_insert_value idxs :
       (insert_value dt b1 b2 (map denote_int_syntax idxs)).
 Proof.
   generalize (map denote_int_syntax idxs) as l; clear idxs.
-  induction l as [| i l IH]; intros dt a1 a2 b1 b2 R1 R2; cbn; auto.
-  destruct dt as [ dtb | p ts | [|] sz t ]; cbn; try (repeat constructor).
+  induction l as [| i l IH]; intros dt a1 a2 b1 b2 R1 R2; cbn -[poison_of_dtyp canonicalize_agg]; auto.
+  destruct dt as [ dtb | p ts | [|] sz t ]; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor).
   - (* struct type *)
-    destruct (split [] i ts) as [[[pre_t sub_t] post_t] |]; cbn;
+    destruct (split [] i ts) as [[[pre_t sub_t] post_t] |]; cbn -[poison_of_dtyp canonicalize_agg];
       try (repeat constructor).
-    inversion R1; subst; cbn; try (repeat constructor).
+    inversion R1; subst; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor).
     + match goal with
       | HB : I2F_dvalue_base _ _ |- _ =>
-          inversion HB; subst; cbn; try (repeat constructor)
+          inversion HB; subst; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor)
       end.
-      eapply I2F_EOU_bind; [apply IH; [repeat constructor | auto] |].
-      intros; do 2 constructor.
-      apply Forall2_app; [apply Forall2_map2; intros; repeat constructor |].
-      constructor; [auto | apply Forall2_map2; intros; repeat constructor].
+      eapply I2F_EOU_bind; [apply IH; [apply I2F_poison_of_dtyp | auto] |].
+      intros; constructor; apply I2F_canonicalize_agg.
+      apply Forall2_app; [apply Forall2_map2; intros; apply I2F_poison_of_dtyp |].
+      constructor; [auto | apply Forall2_map2; intros; apply I2F_poison_of_dtyp].
     + i2f_split_case i
         ltac:(eapply I2F_EOU_bind; [apply IH; auto|];
-              intros; do 2 constructor;
+              intros; constructor; apply I2F_canonicalize_agg;
               apply Forall2_app; [auto | constructor; auto]).
   - (* array type *)
-    inversion R1; subst; cbn; try (repeat constructor).
+    inversion R1; subst; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor).
     + match goal with
       | HB : I2F_dvalue_base _ _ |- _ =>
-          inversion HB; subst; cbn; try (repeat constructor)
+          inversion HB; subst; cbn -[poison_of_dtyp canonicalize_agg]; try (repeat constructor)
       end.
-      destruct (split_indices i sz) as [[pre post] |]; cbn;
+      destruct (split_indices i sz) as [[pre post] |]; cbn -[poison_of_dtyp canonicalize_agg];
         try (repeat constructor).
-      eapply I2F_EOU_bind; [apply IH; [repeat constructor | auto] |].
-      intros; do 2 constructor.
-      apply Forall2_app; [apply Forall2_repeatN; repeat constructor |].
-      constructor; [auto | apply Forall2_repeatN; repeat constructor].
-    + match goal with v : bool |- _ => destruct v end; cbn;
+      eapply I2F_EOU_bind; [apply IH; [apply I2F_poison_of_dtyp | auto] |].
+      intros; constructor; apply I2F_canonicalize_agg.
+      apply Forall2_app; [apply Forall2_repeatN; apply I2F_poison_of_dtyp |].
+      constructor; [auto | apply Forall2_repeatN; apply I2F_poison_of_dtyp].
+    + match goal with v : bool |- _ => destruct v end; cbn -[poison_of_dtyp canonicalize_agg];
         try (repeat constructor).
       i2f_split_case i
         ltac:(eapply I2F_EOU_bind; [apply IH; auto|];
-              intros; do 2 constructor;
+              intros; constructor; apply I2F_canonicalize_agg;
               apply Forall2_app; [auto | constructor; auto]).
 Qed.
   
 (** * eval_select *)
 (** The scalar select: the shared [i1] test picks a side; the poison
       condition computes the (equal) result type of the first operand. *)
-
-(** [dtyp_of_dvalue] computes in the parameter-free [EOU dtyp]: on
-      related values the two sides are literally equal (related scalars
-      carry equal payloads, and aggregates share their annotations). *)
-Lemma I2F_dtyp_of_dvalue_base_eq : forall v v',
-    I2F_dvalue_base v v' ->
-    @dtyp_of_dvalue_base PInf v = @dtyp_of_dvalue_base PFin v'.
-Proof.
-  intros * H; inversion H; subst; cbn; auto.
-Qed.
-
-Lemma I2F_dtyp_of_dvalue_eq : forall v v',
-    I2F_dvalue v v' ->
-    @dtyp_of_dvalue PInf v = @dtyp_of_dvalue PFin v'.
-Proof.
-  induction v using dvalue_ind; intros v' R; inversion R; subst;
-    clear R; cbn; auto.
-  - (* Base *)
-    match goal with
-    | HB : I2F_dvalue_base _ _ |- _ =>
-        now rewrite (I2F_dtyp_of_dvalue_base_eq HB)
-    end.
-  - (* Struct: the two [map_monad]s are equal *)
-    match goal with
-    | F2 : Forall2 I2F_dvalue ?l1 ?l2 |- _ =>
-        assert (MM : map_monad (@dtyp_of_dvalue PInf) l1
-                     = map_monad (@dtyp_of_dvalue PFin) l2);
-        [| rewrite MM; reflexivity ]
-    end.
-    match goal with
-    | F2 : Forall2 I2F_dvalue _ _, IH : Forall _ _ |- _ =>
-        revert IH; induction F2 as [| u u' us us' HU HUS IHUS]
-    end; intros FIH; cbn; auto.
-    inversion FIH; subst.
-    match goal with
-    | HP : forall _, I2F_dvalue u _ -> _ |- _ => rewrite (HP _ HU)
-    end.
-    rewrite IHUS by assumption; reflexivity.
-  - (* Array *)
-    match goal with
-    | F2 : Forall2 I2F_dvalue _ _ |- _ =>
-        inversion F2 as [| u u' us us' HU HUS]; subst
-    end; cbn; auto.
-    match goal with
-    | IHl : Forall _ (_ :: _) |- _ => inversion IHl as [| ? ? HP HPS]; subst
-    end.
-    rewrite (HP _ HU).
-    destruct (@dtyp_of_dvalue PFin u') as [ ? | ? | ? | t ]; cbn; auto.
-    destruct (@NO_VOID_dec t); cbn; auto.
-    assert (EQF : forallb (fun e => match @dtyp_of_dvalue PInf e with
-                                 | raise_ret t' => dtyp_eqb t t' | _ => false end) us
-                  = forallb (fun e => match @dtyp_of_dvalue PFin e with
-                                   | raise_ret t' => dtyp_eqb t t' | _ => false end) us').
-    { clear - HUS HPS.
-      induction HUS; cbn; auto.
-      inversion HPS; subst.
-      match goal with
-      | HQ : forall _, I2F_dvalue _ _ -> _ |- _ => rewrite (HQ _ ltac:(eassumption))
-      end.
-      rewrite IHHUS by assumption; reflexivity. }
-    rewrite EQF.
-    assert (LEN : Datatypes.length us = Datatypes.length us')
-      by (eapply Forall2_length; eauto).
-    cbn; rewrite LEN; reflexivity.
-Qed.
 
 Lemma I2F_eval_select_base_dvalue : forall c c' v1 v2 v1' v2',
     I2F_dvalue_base c c' ->
@@ -3105,8 +3091,13 @@ Lemma I2F_eval_select dt a1 a2 a3 b1 b2 b3 :
 Proof.
   intros R1 R2 R3.
   inversion R1; subst; cbn; try ((repeat constructor); eauto; fail).
-  - (* Base condition *)
-    now apply I2F_eval_select_base_dvalue.
+  - (* Base condition: poison selects poison at the result type *)
+    match goal with
+    | HB : I2F_dvalue_base _ _ |- _ => pose proof HB as HB'; inversion HB; subst
+    end;
+      cbn -[poison_of_dtyp eval_select_base_dvalue];
+      first [ constructor; apply I2F_poison_of_dtyp
+            | now apply I2F_eval_select_base_dvalue ].
   - (* Vector of conditions *)
     match goal with v : bool |- _ => destruct v end; cbn;
       [| repeat constructor; eauto].
@@ -3135,7 +3126,7 @@ Proof.
           - intros c p c' p' HC HP;
               destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn.
             apply I2F_eval_select_base_dvalue; auto. }
-        intros; constructor; apply I2F_canonicalize_agg; [| constructor]; auto.
+        intros; constructor; apply I2F_canonicalize_agg; auto.
     + (* v1 vector *)
       match goal with v : bool |- _ => destruct v end; cbn;
         [| repeat constructor].
@@ -3151,7 +3142,7 @@ Proof.
           - intros c p c' p' HC HP;
               destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn.
             apply I2F_eval_select_base_dvalue; auto. }
-        intros; constructor; apply I2F_canonicalize_agg; [| constructor]; auto.
+        intros; constructor; apply I2F_canonicalize_agg; auto.
       * match goal with v : bool |- _ => destruct v end; cbn;
           [| repeat constructor].
         eapply I2F_EOU_bind.
@@ -3161,7 +3152,7 @@ Proof.
           - intros c p c' p' HC HP;
               destruct p as [x y], p' as [x' y'], HP as [HX HY]; cbn.
             apply I2F_eval_select_base_dvalue; auto. }
-        intros; constructor; apply I2F_canonicalize_agg; [| constructor]; auto.
+        intros; constructor; apply I2F_canonicalize_agg; auto.
 Qed.
     
 Lemma I2F_denote_exp :
@@ -3183,35 +3174,40 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
     + apply ruttc_map_monad.
       intros [d e] HIN; now apply (H (d,e)).
     + intros * HF...
-  - cbn; intros []...
-  - cbn; intros []...
-  - cbn; intros. 
+  - (* EXP_Undef: poison at the literal's type *)
+    intros [d|]; cbn -[poison_of_dtyp]; [rstep; apply I2F_poison_of_dtyp | idtac]...
+  - (* EXP_Poison *)
+    intros [d|]; cbn -[poison_of_dtyp]; [rstep; apply I2F_poison_of_dtyp | idtac]...
+  - (* EXP_Struct: the literal is canonicalised ([canonicalize_agg]), at a
+       type read off its fields, the same on both sides *)
+    cbn -[canonicalize_agg]; intros.
     erbind.
     + apply ruttc_map_monad.
       intros [d e] HIN; now apply (H (d,e)).
-    + intros * HF...
+    + intros * HF; rstep; apply I2F_canonicalize_agg; auto.
   - (* EXP_Packed_struct: the [dtyp] guard is a pure, parameter-free
          computation, related to itself by reflexivity of [I2F_EOU] ---
          no case analysis on the type. *)
-    cbn; intros.
+    cbn -[canonicalize_agg]; intros.
     erbind.
     + apply I2F_refine_lift, I2F_EOU_refl.
     + intros [] [] _.
       erbind.
       * apply ruttc_map_monad.
         intros [d e] HIN; now apply (H (d,e)).
-      * intros * HF...
-  - cbn; intros.
+      * intros * HF; rstep; apply I2F_canonicalize_agg; auto.
+  - (* EXP_Array *)
+    cbn -[canonicalize_agg]; intros.
     erbind.
     + apply ruttc_map_monad.
       intros [d e] HIN; now apply (H (d,e)).
-    + intros * HF...
-  - cbn; intros.
+    + intros * HF; rstep; apply I2F_canonicalize_agg; auto.
+  - (* EXP_Vector *)
+    cbn -[canonicalize_agg]; intros.
     erbind.
     + apply ruttc_map_monad.
       intros [d e] HIN; now apply (H (d,e)).
-    + (* the literal is canonicalised: [canonicalize_agg] *)
-      intros * HF; rstep; apply I2F_canonicalize_agg; [| constructor]; auto.
+    + intros * HF; rstep; apply I2F_canonicalize_agg; auto.
   - cbn; intros.
     erbind; [apply IHe1 | intros].
     erbind; [apply IHe2 | intros].
@@ -3281,10 +3277,10 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
     destruct elt; cbn; intros.
     erbind.
     + apply I2F_refine_lift, I2F_EOU_refl.
-    + intros [sz t'] ? <-; cbn.
+    + intros [sz t'] ? <-; cbn -[canonicalize_agg].
       erbind; [apply IHe |].
       intros ? ? HR; rstep.
-      apply I2F_canonicalize_agg; [| constructor]; apply Forall2_repeat; auto.
+      apply I2F_canonicalize_agg; apply Forall2_repeat; auto.
   - (* EXP_BlockAddress: a global read, like [EXP_Ident] *)
     intros; cbn...
 Qed.

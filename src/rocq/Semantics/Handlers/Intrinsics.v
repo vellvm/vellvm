@@ -75,7 +75,7 @@ Section Intrinsics.
       match e in IntrinsicE Y return X = Y -> itree E Y with
       | Intrinsic _ fname args varargs =>
           match assoc fname defs_assoc with
-          | Some f => fun pf => f args varargs
+          | Some f => fun pf => f (List.map snd args) varargs
           | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) _ pf
           end
       end eq_refl.

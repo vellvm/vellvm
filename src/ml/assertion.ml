@@ -14,10 +14,10 @@ open List
 
 type test =
   (* expected dvalue, dynamic type, entry, arguments *)
-  | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.dvalue list
-  | SuccessTest of function_id * DV.dvalue list
-  | FailsTest of function_id * DV.dvalue list
-  | UBTest of int * function_id * DV.dvalue list
+  | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * (DynamicTypes.dtyp * DV.dvalue) list
+  | SuccessTest of function_id * (DynamicTypes.dtyp * DV.dvalue) list
+  | FailsTest of function_id * (DynamicTypes.dtyp * DV.dvalue) list
+  | UBTest of int * function_id * (DynamicTypes.dtyp * DV.dvalue) list
 
 let ocaml_of_EOU (c : 'x EOU.coq_EOU) : 'x =
   match c with
@@ -48,7 +48,8 @@ let instr_to_call_data instr =
   match instr with
   | INSTR_Call (fn, args, _, _) ->
       ( texp_to_function_id fn
-      , List.map (fun x -> texp_to_dvalue (fst x)) args )
+      , (* each argument with the type the call passes it at *)
+        List.map (fun x -> (typ_to_dtyp (fst (fst x)), texp_to_dvalue (fst x))) args )
   | _ ->
       failwith "Assertion includes unsupported instruction (must be a call)"
 
@@ -180,6 +181,16 @@ let dvalue_eq_assertion name (ty:DynamicTypes.dtyp) (expected : DV.dvalue) (got 
     Printf.sprintf "ASSERT EQ failed: \ngot:\n\t%s\nasserted:\n\t%s"
       (Interpreter.string_of_dvalue result) (Interpreter.string_of_dvalue expected) 
   in
+  (* Whatever the expected value, the result must be a value of the
+     asserted type in canonical form (DynamicValues.v, "Canonical forms of
+     dvalues"): e.g. an aggregate whose fields are all poison must be
+     poison itself.  A result that compares equal but is not canonical is a
+     bug in the semantics. *)
+  if not (TopLevel.dvalue_is_canonical ty result) then
+    failwith
+      (Printf.sprintf "ASSERT EQ failed: the result is not a canonical value of type %s\ngot:\n\t%s"
+         (Camlcoq.camlstring_of_coqstring (ShowAST.show_dtyp ty))
+         (Interpreter.string_of_dvalue result)) ;
   begin match expected with
   | DVALUE_Base DV.DVALUE_Poison -> compare_dvalues_exn expected result msg
   | _ ->
@@ -217,7 +228,7 @@ let make_test_h run name ll_ast t : (string * Assert.assertion) option =
   let args_str args =
     pp_print_list
       ~pp_sep:(fun f () -> pp_print_string f ", ")
-      (fun f dv -> pp_print_string f (Interpreter.string_of_dvalue dv)) str_formatter args ;
+      (fun f (_, dv) -> pp_print_string f (Interpreter.string_of_dvalue dv)) str_formatter args ;
     flush_str_formatter ()
   in
   (* let _ = Printf.printf "I can get here\n" in *)

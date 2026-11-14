@@ -282,37 +282,37 @@ Proof.
   destruct HI as [Ht [Hf [Hargs Hva]]]; subst.
   cbn.
   destruct (RelDec.rel_dec f2 "llvm.fabs.f32");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_fabs_f32 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_fabs_f32 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.fabs.f64");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_fabs_f64 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_fabs_f64 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.maxnum.f32");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_maxnum_f32 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_maxnum_f32 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.maxnum.f64");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_maxnum_f64 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_maxnum_f64 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.minimum.f32");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_minimum_f32 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_minimum_f32 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.minimum.f64");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_minimum_f64 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_minimum_f64 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.ushl.sat.i1");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_1 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_1 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.ushl.sat.i8");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_8 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_8 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.ushl.sat.i16");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_16 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_16 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.ushl.sat.i32");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_32 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_32 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.ushl.sat.i64");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_64 | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_ushl_sat_64 | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.vellvm.internal.throw");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_vellvm_internal_throw | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_vellvm_internal_throw | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.assume");
-    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_assume | exact Hargs] | ].
+    [ simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic; [apply I2F_llvm_assume | exact (I2F_targs_snd Hargs)] | ].
   destruct (RelDec.rel_dec f2 "llvm.va_start");
-    [ simp I2FA_Intrinsic; apply I2F_llvm_va_start; auto | ].
+    [ simp I2FA_Intrinsic; apply I2F_llvm_va_start; auto using I2F_targs_snd | ].
   destruct (RelDec.rel_dec f2 "llvm.va_end");
     [ simp I2FA_Intrinsic; apply I2F_llvm_va_end | ].
   destruct (RelDec.rel_dec f2 "llvm.va_copy");
-    [ simp I2FA_Intrinsic; apply I2F_llvm_va_copy; auto | ].
+    [ simp I2FA_Intrinsic; apply I2F_llvm_va_copy; auto using I2F_targs_snd | ].
   cbn.
   apply ruttc_trigger; cbnn.
   - simp I2FE_Intrinsic; repeat (split; auto).

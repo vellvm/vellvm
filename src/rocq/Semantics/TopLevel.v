@@ -164,10 +164,12 @@ Section withParams.
             (DVALUE_Array false arg_addrs);;
       ret v.
 
-  Definition build_main_args (args : list string) : MCFGtop (list dvalue) :=
+  Definition build_main_args (args : list string) : MCFGtop (list (dtyp * dvalue)) :=
     v <- allocate_args args;;
     let main_args :=
-      [DVALUE_Base (DVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args))); v]
+      [(DTYPE_Base (DTYPE_I 32),
+         DVALUE_Base (DVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args))));
+       (DTYPE_Base DTYPE_Pointer, v)]
     in
     ret main_args.
 
@@ -209,7 +211,7 @@ Section withParams.
     let dt := (g_typ g) in
     a <- gread (g_ident g);;
     uv <- match (g_exp g) with
-         | None => ret (DVALUE_Base DVALUE_Poison)
+         | None => ret (poison_of_dtyp dt)
          | Some e => denote_exp (Some dt) e
          end ;;
     store dt a uv.
@@ -291,7 +293,7 @@ Section withParams.
   Definition denote_vellvm
              (ret_typ : dtyp)
              (entry : function_id)
-             (args : list dvalue)
+             (args : list (dtyp * dvalue))
              (mcfg : CFG.mcfg dtyp) : MCFGtop dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
@@ -313,7 +315,7 @@ Section withParams.
   Definition interpreter_gen
     (ret_typ : dtyp)
     (entry : function_id)
-    (arg_gen : MCFGtop (list dvalue))
+    (arg_gen : MCFGtop (list (dtyp * dvalue)))
     (prog: ll_toplevel_entities) : MCFGbot (Res dvalue) :=
     let t :=
       args <- arg_gen;;
@@ -336,3 +338,6 @@ End withParams.
 From Vellvm Require Import ParamsV IPtrInfinite.
 Definition interpreter := interpreter_param (Pa := @ParamsV IPZ IPZTheory).
 Definition dvalue_eqb := @DynamicValues.dvalue_eqb (@ParamsV IPZ IPZTheory).
+(* [dvalue_is_canonical t v]: [v] is a value of type [t] in canonical form;
+   the test harness checks it of every result it compares. *)
+Definition dvalue_is_canonical := @DynamicValues.dvalue_is_canonical (@ParamsV IPZ IPZTheory).

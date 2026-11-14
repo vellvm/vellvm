@@ -150,8 +150,10 @@ Section DValue.
   (* DESIGN CHOICE:
      - There is only one canonical representation of poison values.
      - It is a dvalue_base because it has no substructure
-     - DVALUE_Poison has any type it needs to; its size can be calculated
-       only given a type 
+     - DVALUE_Poison has any (non-empty) type it needs to; its size can be
+       calculated only given a type
+     - An aggregate whose fields are all poison is DVALUE_Poison, not an
+       aggregate of poisons: see "Canonical forms of dvalues" below.
    *)                   
   | DVALUE_Poison 
   | DVALUE_None
@@ -288,55 +290,10 @@ Section DValue.
     end.
   
 
-  (* We can't, in general, calculate a type from a dvalue.
-      - poison doesn't carry enough type information
-      - zero-size arrays and vectors don't carry enough type information
-     This function therefore fails in those cases:
-   *)
-
-  Definition dtyp_base_of_dvalue_base (v:dvalue_base) : option dtyp_base :=
-    match v with
-    | DVALUE_Pointer a => Some DTYPE_Pointer
-    | DVALUE_I sz x => Some (DTYPE_I sz)
-    | DVALUE_Iptr x => Some (DTYPE_Iptr)
-    | DVALUE_Double x => Some (DTYPE_FP FP_double)
-    | DVALUE_Float x => Some (DTYPE_FP FP_float)
-    | DVALUE_Poison => None
-    | DVALUE_None => Some DTYPE_Void
-    | DVALUE_B sz bits => Some (DTYPE_B sz)
-    end.
-
-  Definition dtyp_of_dvalue_base (v:dvalue_base) : EOU dtyp :=
-    match dtyp_base_of_dvalue_base v with
-    | Some dtb => raise_ret (DTYPE_Base dtb)
-    | None => raise_error "no type"
-    end.
-    
-  Fixpoint dtyp_of_dvalue (v:dvalue) : EOU dtyp :=
-    match v with
-    | DVALUE_Base vb => dtyp_of_dvalue_base vb
-    | DVALUE_Struct p fields =>
-        dts <- map_monad dtyp_of_dvalue fields ;;
-        ret (DTYPE_Struct p dts)
-    | DVALUE_Array p elts =>
-        match elts with
-        | [] =>
-            (* Corner case: what is the dynamic type of an empty array? We use DTYPE_Void as the canonical choice.
-               Note: this means that DVALUE_Array p (DVALUE_Array p []) is "bogus" and should never arise as a dynamic value?
-             *)
-            ret (DTYPE_Array p 0 DTYPE_Void)
-        | e::es =>
-            t <- dtyp_of_dvalue e ;;  (* get the type of elements *)
-            if @NO_VOID_dec t
-            then
-              if forallb (fun e => match dtyp_of_dvalue e with
-                                | raise_ret t' => dtyp_eqb t t'
-                                | _ => false end) es
-              then ret (DTYPE_Array p (N.of_nat (length elts)) t)
-              else raise_error "dtyp_of_dvalue: mismatched element type in array"
-            else raise_error "dtyp_of_dvalue: void in array type"
-        end
-    end.
+  (* A dvalue does not determine its type: poison has every (non-empty)
+     type, and an empty array says nothing about its element type.  Code that
+     needs the type of a value must be given it (see, e.g., the typed
+     arguments of [Call] in LLVMEvents.v). *)
 
   Definition double_to_hex_string (f : float) : string
     := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (unsigned (Float.to_bits f)))).
@@ -885,32 +842,166 @@ Section DValue.
     - apply (raise_error "ill_typed-iop: integer bitwidth mismatch.").
   Defined.
 
+  (** ** Canonical forms of dvalues
+
+      Poison has one constructor, [DVALUE_Poison], and it has no type of its
+      own.  So a value of aggregate type could be written in several ways:
+      [{i32, i32}] has the candidate values [DVALUE_Poison] and
+      [DVALUE_Struct [poison; poison]], which serialize to the same bytes.
+      Every well-typed value has exactly one representation, the *canonical*
+      one, and every operation of the semantics returns it.  Which
+      representation is canonical depends on the type, not on the value
+      alone, so the functions that build aggregates and poison take the type.
+
+      - An *empty* type has no scalar leaves: [{}], [[0 x T]], and
+        aggregates built only from empty types, such as [{ {} }] or
+        [[3 x {}]] ([dtyp_is_empty]).  It occupies no memory and has exactly
+        one value, [empty_dvalue_of_dtyp]: the aggregate of the empty values
+        of its fields.  That value is not poison, and [DVALUE_Poison] is not
+        a value of an empty type: there are no bits to be poison.
+
+      - At a non-empty aggregate type, a value all of whose fields *of
+        non-empty type* are poison is [DVALUE_Poison], never an aggregate of
+        poisons ([agg_is_poison]).  So [{i32, i32}] with both fields poison
+        is [DVALUE_Poison]; so is [{ {}, i32 }] with a poison [i32].  A
+        struct with one defined field stays a [DVALUE_Struct].
+
+      - The fields of an aggregate are themselves canonical at their types.
+
+      - A [DVALUE_B] holds a canonical [dvalue_bv] ([dvalue_bv_canonical]).
+
+      [dvalue_has_dtyp] states these invariants, [dvalue_is_canonical]
+      checks them, and the reader
+      [memory_bytes_to_dvalue] (MemoryBytes.v) produces canonical values, so
+      that writing a well-typed value to memory and reading it back is the
+      identity.
+
+      Maintaining the invariant:
+
+      - build an aggregate with [canonicalize_agg dt vs], where [dt] is the
+        type of the *result*, never with [DVALUE_Struct] / [DVALUE_Array]
+        directly (unless some field is known to be defined);
+      - make poison at a type with [poison_of_dtyp dt], never with
+        [DVALUE_Poison] directly (unless the type is known to be a scalar or
+        a vector);
+      - when taking a value of aggregate type apart, accept [DVALUE_Poison]
+        and expand it by the type ([vector_elts], [insert_value],
+        [extract_value], the writer [dvalue_to_memory_bytes]).
+
+      Vectors are the simple case: their elements are scalars, so a vector
+      type is never empty (a zero-length vector is not legal IR) and a vector
+      is poison exactly when every lane is. *)
+
+  (* A type with no scalar leaves.  It stops at the first leaf it finds. *)
+  Fixpoint dtyp_is_empty (dt : dtyp) : bool :=
+    match dt with
+    | DTYPE_Base _ => false
+    | DTYPE_Struct _ fields => forallb dtyp_is_empty fields
+    | DTYPE_Array _ sz t => N.eqb sz 0 || dtyp_is_empty t
+    end.
+
+  (* The one value of an empty type.  (At a non-empty type the result is
+     not meaningful: a scalar leaf is filled in with poison.) *)
+  Fixpoint empty_dvalue_of_dtyp (dt : dtyp) : dvalue :=
+    match dt with
+    | DTYPE_Base _ => DVALUE_Base DVALUE_Poison
+    | DTYPE_Struct p fields => DVALUE_Struct p (List.map empty_dvalue_of_dtyp fields)
+    | DTYPE_Array v sz t => DVALUE_Array v (repeat (empty_dvalue_of_dtyp t) (N.to_nat sz))
+    end.
+
+  (* Poison at type [dt].  An empty type has no poison value; its only
+     value stands in. *)
+  Definition poison_of_dtyp (dt : dtyp) : dvalue :=
+    if dtyp_is_empty dt then empty_dvalue_of_dtyp dt else DVALUE_Base DVALUE_Poison.
+
+  (* Every field of non-empty type is poison.  [dts] are the fields' types;
+     a length mismatch (an ill-typed value) answers [false]. *)
+  Fixpoint fields_all_poison (dts : list dtyp) (vs : list dvalue) : bool :=
+    match dts, vs with
+    | [], [] => true
+    | t :: dts', v :: vs' =>
+        (dtyp_is_empty t || dvalue_is_poison v) && fields_all_poison dts' vs'
+    | _, _ => false
+    end.
+
+  (* The aggregate of type [dt] with fields / elements [vs] is poison.  An
+     array's elements share one type, so when the array type is not empty
+     that type is not empty either and every element must be poison.  Like
+     [forallb], the tests stop at the first field that is not poison: a
+     vector with a defined lane 0 costs one test. *)
+  Definition agg_is_poison (dt : dtyp) (vs : list dvalue) : bool :=
+    negb (dtyp_is_empty dt)
+    && match dt with
+       | DTYPE_Struct _ dts => fields_all_poison dts vs
+       | DTYPE_Array _ _ _ => forallb dvalue_is_poison vs
+       | DTYPE_Base _ => true
+       end.
+
+  (* The canonicalising constructor for aggregates: the value of aggregate
+     type [dt] whose fields / elements are [vs], each canonical at its own
+     type.  The [packed] / [vector] flag comes from the type.  ([dt] must be
+     an aggregate type; at a base type the answer is poison.) *)
+  Definition canonicalize_agg (dt : dtyp) (vs : list dvalue) : dvalue :=
+    if agg_is_poison dt vs then DVALUE_Base DVALUE_Poison
+    else match dt with
+         | DTYPE_Struct p _ => DVALUE_Struct p vs
+         | DTYPE_Array v _ _ => DVALUE_Array v vs
+         | DTYPE_Base _ => DVALUE_Base DVALUE_Poison
+         end.
+
+  (** [dvalue_is_canonical dt dv]: the executable statement of the
+      invariants above -- [dv] is a value of type [dt] in canonical form.
+      It decides [dvalue_has_dtyp] ([dvalue_is_canonical_iff], below).
+
+      - Poison is canonical at every non-empty type, and at no empty one.
+      - Any other base value must have the base type, and a byte value must
+        hold a canonical [dvalue_bv].
+      - A struct must carry the type's [packed] flag, must not be a struct
+        that should have been written as poison ([agg_is_poison]), and must
+        have one canonical field per field type.
+      - An array or vector must carry the type's [vector] flag, have the
+        type's length and a non-void element type, must not be one that
+        should have been written as poison, and must have canonical
+        elements.  (At an empty array type -- length 0, or elements of empty
+        type -- nothing is poison.)
+
+      The one value of an empty type is canonical there
+      ([empty_dvalue_of_dtyp]): none of its fields is poison, and
+      [agg_is_poison] is false at an empty type. *)
+  Fixpoint dvalue_is_canonical (dt : dtyp) (dv : dvalue) {struct dv} : bool :=
+    match dv, dt with
+    | DVALUE_Base DVALUE_Poison, _ => negb (dtyp_is_empty dt)
+    | DVALUE_Base b, DTYPE_Base tb =>
+        dvalue_base_has_dtyp_base b tb && dvalue_base_canonical b
+    | DVALUE_Struct p fields, DTYPE_Struct q dts =>
+        let fix go (ts : list dtyp) (vs : list dvalue) {struct vs} : bool :=
+          match ts, vs with
+          | [], [] => true
+          | t :: ts', v :: vs' => dvalue_is_canonical t v && go ts' vs'
+          | _, _ => false
+          end in
+        Bool.eqb p q
+        && negb (agg_is_poison dt fields)
+        && go dts fields
+    | DVALUE_Array v elts, DTYPE_Array w sz t =>
+        Bool.eqb v w
+        && (if NO_VOID_dec t then true else false)
+        && N.eqb (N.of_nat (List.length elts)) sz
+        && negb (agg_is_poison dt elts)
+        && forallb (dvalue_is_canonical t) elts
+    | _, _ => false
+    end.
+
   (** ** Poison at vector type
 
-      A vector value has two representations: a [DVALUE_Array true] of its
-      lanes, or the scalar [DVALUE_Poison] when every lane is poison.  The
-      latter is the canonical form ([canonicalize_agg] in MemoryBytes.v
-      produces it, and the [forallb ... = false] premise of
-      [DVALUE_Array_typ] requires it), and the constant [<N x T> poison]
-      denotes it too.  The value alone does not say which type a
-      [DVALUE_Poison] has, so the element-wise operations below take the
-      instruction's type: at a vector type [vector_elts] expands either
-      representation to its list of lanes.  They return the canonical form,
-      building their results with [canonicalize_agg]. *)
-  (* Canonicalising constructor for aggregates: an aggregate all of whose
-     immediate children are poison *is* poison, per [dvalue_has_dtyp].
-     Children are canonical by induction, so the shallow [dvalue_is_poison]
-     test is enough.  [forallb] stops at the first non-poison child (its
-     extracted [&&] short-circuits), so a vector with a defined lane 0 costs
-     one test.
-
-     Note this also sends an empty aggregate to poison, which is what the
-     [forallb ... = false] premises of [DVALUE_Struct_typ] / [DVALUE_Array_typ]
-     require.  The memory reader (MemoryBytes.v) and the element-wise vector
-     operations below build their results with it. *)
-  Definition canonicalize_agg (mk : list dvalue -> dvalue) (vs : list dvalue) : dvalue :=
-    if forallb dvalue_is_poison vs then DVALUE_Base DVALUE_Poison else mk vs.
-
+      A vector value is a [DVALUE_Array true] of its lanes, or the scalar
+      [DVALUE_Poison] when every lane is poison (see "Canonical forms"
+      above); the constant [<N x T> poison] denotes the latter too.  The
+      value alone does not say which type a [DVALUE_Poison] has, so the
+      element-wise operations below take the instruction's type: at a vector
+      type [vector_elts] expands either representation to its list of lanes.
+      They build their results with [canonicalize_agg] at the result's
+      type. *)
   Definition vector_elts sz (v : dvalue) : option (list dvalue) :=
     match v with
     | DVALUE_Array true elts => Some elts
@@ -934,7 +1025,7 @@ Section DValue.
               elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
               elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
               ans <- vec_loop (eval_iop_integer_base iop) (List.combine elts1' elts2') ;;
-              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base ans))
+              ret (canonicalize_agg dt (List.map DVALUE_Base ans))
             else
               raise_ub ("iop: " ++ (show iop) ++  " of different-length vectors")
         | _, _ => raise_error "eval_iop called on illegal dvalue"
@@ -1026,7 +1117,7 @@ Section DValue.
               elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
               elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
               ans <- vec_loop (eval_fop_base fop) (List.combine elts1' elts2') ;;
-              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base ans))
+              ret (canonicalize_agg dt (List.map DVALUE_Base ans))
             else
               raise_ub ("fop: " ++ (show fop) ++  " different-length vectors of type "
                         ++ "v1 = " ++ (show v1) ++ "v2 = " ++ (show v2)
@@ -1049,7 +1140,8 @@ Section DValue.
     | _ => raise_error "ill_typed-fneg "
     end.
 
-  Definition eval_fneg (v:dvalue) : EOU dvalue :=
+  (* [dt] is the operand's (and the result's) type. *)
+  Definition eval_fneg (dt : dtyp) (v:dvalue) : EOU dvalue :=
     match v with
     | DVALUE_Base db =>
         DVALUE_Base <$> (eval_fneg_base db)
@@ -1057,7 +1149,7 @@ Section DValue.
     | DVALUE_Array true elts =>
         elts' <- map_monad dvalue_to_dvalue_base elts ;;        
         ans <- map_monad (eval_fneg_base) elts' ;;
-        ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base ans))
+        ret (canonicalize_agg dt (List.map DVALUE_Base ans))
     | _ => raise_error "eval_fneg got illegal value"
     end.
   
@@ -1141,7 +1233,8 @@ Section DValue.
               elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
               elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
               ans <- vec_loop (eval_fcmp_base fcmp) (List.combine elts1' elts2') ;;
-              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base ans))
+              (* the result is a vector of [i1] *)
+              ret (canonicalize_agg (DTYPE_Array true sz (DTYPE_I 1)) (List.map DVALUE_Base ans))
             else
               raise_ub "fcmp of different-length vectors"
         | _, _ => raise_error "eval_fcmp got illegal value"
@@ -1247,11 +1340,15 @@ Section DValue.
     if (idx <? 0)%Z then None else
       let szZ := Z.of_N sz in
       if (idx <? szZ)%Z then
-        Some (Z.to_N (idx - 1), (Z.to_N (szZ - (idx + 1))))
+        Some (Z.to_N idx, (Z.to_N (szZ - (idx + 1))))
       else
         None.
       
 
+  (* [str_t] is the type of [str].  A poison [str] is expanded by that type
+     ([poison_of_dtyp] field by field), and each level of the result is
+     rebuilt in canonical form: inserting poison over the only defined field
+     gives poison. *)
   Fixpoint insert_value (str_t:dtyp) (str : dvalue) (elt : dvalue) (idxs : list Z) : EOU dvalue :=
     match idxs with
     | [] => ret elt
@@ -1263,13 +1360,13 @@ Section DValue.
             | DVALUE_Struct q elts =>
                 '(pre,sub,post) <- option_ub "insertvalue: struct dynamic index out of bounds" (split [] i elts) ;;
                 modified_subfield <- insert_value sub_t sub elt tl ;;
-                ret (DVALUE_Struct q (pre ++ [modified_subfield] ++ post)%list)
+                ret (canonicalize_agg str_t (pre ++ [modified_subfield] ++ post)%list)
                     
             | DVALUE_Base DVALUE_Poison =>
-                let pre_dv := List.map (fun t => DVALUE_Base DVALUE_Poison) pre_t in
-                let post_dv := List.map (fun t => DVALUE_Base DVALUE_Poison) post_t in
-                modified_subfield <- insert_value sub_t (DVALUE_Base DVALUE_Poison) elt tl ;;
-                ret (DVALUE_Struct p (pre_dv ++ [modified_subfield] ++ post_dv))
+                let pre_dv := List.map poison_of_dtyp pre_t in
+                let post_dv := List.map poison_of_dtyp post_t in
+                modified_subfield <- insert_value sub_t (poison_of_dtyp sub_t) elt tl ;;
+                ret (canonicalize_agg str_t (pre_dv ++ [modified_subfield] ++ post_dv))
                     
             | _ => raise_error "insertvalue: type mismatch, found non-struct value"
             end
@@ -1279,12 +1376,12 @@ Section DValue.
             | DVALUE_Array false elts =>
                 '(pre,sub,post) <- option_ub "insertvalue array index out of bounds" (split [] i elts) ;;
                 modified_element <- insert_value t sub elt tl ;;
-                ret (DVALUE_Array false (pre ++ [modified_element] ++ post))
+                ret (canonicalize_agg str_t (pre ++ [modified_element] ++ post))
                     
             | DVALUE_Base DVALUE_Poison =>
                 '(pre, post) <- option_ub "insertvalue: array type size inconsistency" (split_indices i sz) ;;
-                modified_element <- insert_value t (DVALUE_Base DVALUE_Poison) elt tl ;;
-                ret (DVALUE_Array false ((repeatN pre (DVALUE_Base DVALUE_Poison)) ++ [modified_element] ++ (repeatN post (DVALUE_Base DVALUE_Poison))))
+                modified_element <- insert_value t (poison_of_dtyp t) elt tl ;;
+                ret (canonicalize_agg str_t ((repeatN pre (poison_of_dtyp t)) ++ [modified_element] ++ (repeatN post (poison_of_dtyp t))))
             | _ => raise_error "insertvalue: type mismatch, found non-array value"            
             end
         | DTYPE_Array true _ _ => raise_error "insertvalue: type mismatch, found vector type"
@@ -1305,7 +1402,7 @@ Section DValue.
                 extract_value sub_t sub tl
                 
             | DVALUE_Base DVALUE_Poison =>
-                extract_value sub_t (DVALUE_Base DVALUE_Poison) tl
+                extract_value sub_t (poison_of_dtyp sub_t) tl
                 
             | _ => raise_error "extractvalue: type mismatch, found non-struct value"
             end
@@ -1317,7 +1414,7 @@ Section DValue.
                 extract_value t sub tl
                 
             | DVALUE_Base DVALUE_Poison =>
-                extract_value t (DVALUE_Base DVALUE_Poison) tl
+                extract_value t (poison_of_dtyp t) tl
                 
             | _ => raise_error "extractvalue: type mismatch, found non-array value"            
             end
@@ -1375,7 +1472,7 @@ Section DValue.
             | Some i =>
                 match split_acc i elts with
                 | None => ret (DVALUE_Base DVALUE_Poison)
-                | Some (pre, _, post) =>  ret (canonicalize_agg (DVALUE_Array true) (pre ++ [elt] ++ post))
+                | Some (pre, _, post) =>  ret (canonicalize_agg vec_t (pre ++ [elt] ++ post))
                 end
             | None =>
                 match idx with
@@ -1389,7 +1486,7 @@ Section DValue.
             | Some i =>
                 match split_acc i elts with
                 | None => ret (DVALUE_Base DVALUE_Poison)
-                | Some (pre, _, post) =>  ret (canonicalize_agg (DVALUE_Array true) (pre ++ [elt] ++ post))
+                | Some (pre, _, post) =>  ret (canonicalize_agg vec_t (pre ++ [elt] ++ post))
                 end
             | None =>
                 match idx with
@@ -1423,7 +1520,9 @@ Section DValue.
               | None => DVALUE_Base DVALUE_Poison
               end
             in
-            ret (canonicalize_agg (DVALUE_Array true) (List.map lane idxs))
+            (* the result has one lane per mask element *)
+            ret (canonicalize_agg (DTYPE_Array true (N.of_nat (List.length idxs)) t)
+                   (List.map lane idxs))
         | _, _, DVALUE_Base DVALUE_Poison =>
         (* entirely poison mask *)
             ret (DVALUE_Base DVALUE_Poison)
@@ -1440,6 +1539,12 @@ Section DValue.
     | BYTE_Mixed_sz bits : forall sz', length bits = (Pos.to_nat sz') -> sz = sz' -> dvalue_bv_has_sz sz' (BYTE_Mixed sz bits).
 
   
+  (** [dvalue_has_dtyp v dt]: [v] is a value of type [dt], *in canonical
+      form* (see "Canonical forms of dvalues" above):
+      - poison is a value of every non-empty type, and of no empty type;
+      - an aggregate is well typed only if it is not poison
+        ([agg_is_poison] is false), with well-typed fields;
+      - a byte value holds a canonical [dvalue_bv]. *)
   Unset Elimination Schemes.
   Inductive dvalue_has_dtyp : dvalue -> dtyp -> Prop :=
   | DVALUE_Base_typ :
@@ -1450,11 +1555,12 @@ Section DValue.
 
   | DVALUE_Poison_typ_agg :
     forall t,
+      dtyp_is_empty t = false ->
       dvalue_has_dtyp (DVALUE_Base DVALUE_Poison) t
                                                        
   | DVALUE_Struct_typ :
     forall p fields dts,
-      List.forallb dvalue_is_poison fields = false ->
+      agg_is_poison (DTYPE_Struct p dts) fields = false ->
       List.Forall2 dvalue_has_dtyp fields dts ->
       dvalue_has_dtyp (DVALUE_Struct p fields) (DTYPE_Struct p dts)
 
@@ -1462,7 +1568,7 @@ Section DValue.
   | DVALUE_Array_typ :
     forall v xs sz dt,
       NO_VOID dt ->
-      List.forallb dvalue_is_poison xs = false ->      
+      agg_is_poison (DTYPE_Array v sz dt) xs = false ->
       Forall (fun x => dvalue_has_dtyp x dt) xs ->
       length xs = (N.to_nat sz) ->
       dvalue_has_dtyp (DVALUE_Array v xs) (DTYPE_Array v sz dt) 
@@ -1470,6 +1576,87 @@ Section DValue.
   Set Elimination Schemes.
 
   Hint Constructors dvalue_has_dtyp : dvalue.
+
+  (** [dvalue_is_canonical] decides [dvalue_has_dtyp]. *)
+
+  (* the struct case of [dvalue_is_canonical], field by field *)
+  Fixpoint fields_canonical (ts : list dtyp) (vs : list dvalue) {struct vs} : bool :=
+    match ts, vs with
+    | [], [] => true
+    | t :: ts', v :: vs' => dvalue_is_canonical t v && fields_canonical ts' vs'
+    | _, _ => false
+    end.
+
+  Lemma dvalue_is_canonical_struct : forall p fields q dts,
+      dvalue_is_canonical (DTYPE_Struct q dts) (DVALUE_Struct p fields)
+      = Bool.eqb p q
+        && negb (agg_is_poison (DTYPE_Struct q dts) fields)
+        && fields_canonical dts fields.
+  Proof.
+    (* the local loop of [dvalue_is_canonical] is [fields_canonical] itself *)
+    intros p fields q dts; cbn [dvalue_is_canonical]; f_equal.
+  Qed.
+
+  Lemma dvalue_is_canonical_sound : forall dv dt,
+      dvalue_is_canonical dt dv = true -> dvalue_has_dtyp dv dt.
+  Proof.
+    induction dv as [b | p fields IH | v elts IH] using dvalue_ind; intros dt H.
+    - destruct b;
+        try (destruct dt as [tb | |]; cbn in H; try discriminate;
+             apply andb_true_iff in H as [H1 H2]; constructor; assumption).
+      apply DVALUE_Poison_typ_agg.
+      cbn in H; apply negb_true_iff in H; exact H.
+    - destruct dt as [| q dts |]; try discriminate.
+      rewrite dvalue_is_canonical_struct in H.
+      apply andb_true_iff in H as [H H3]; apply andb_true_iff in H as [H1 H2].
+      apply Bool.eqb_prop in H1; subst q.
+      apply negb_true_iff in H2.
+      apply DVALUE_Struct_typ; [exact H2 |].
+      clear H2; revert dts H3; induction IH as [| f fs Hf _ IHl]; intros [| t ts] H3;
+        cbn in H3; try discriminate; constructor.
+      + apply andb_true_iff in H3 as [H3 _]; apply Hf, H3.
+      + apply andb_true_iff in H3 as [_ H3]; apply IHl, H3.
+    - destruct dt as [| | w sz t]; try discriminate.
+      cbn [dvalue_is_canonical] in H.
+      apply andb_true_iff in H as [H H5]; apply andb_true_iff in H as [H H4];
+        apply andb_true_iff in H as [H H3]; apply andb_true_iff in H as [H1 H2].
+      apply Bool.eqb_prop in H1; subst w.
+      destruct (NO_VOID_dec t) as [HNV |]; [| discriminate].
+      apply N.eqb_eq in H3; apply negb_true_iff in H4.
+      apply DVALUE_Array_typ; [exact HNV | exact H4 | | subst sz; symmetry; apply Nnat.Nat2N.id].
+      clear H4 H3; induction IH as [| e es He _ IHl]; constructor.
+      + cbn [forallb] in H5; apply andb_true_iff in H5 as [H5 _]; apply He, H5.
+      + cbn [forallb] in H5; apply andb_true_iff in H5 as [_ H5]; apply IHl, H5.
+  Qed.
+
+  Lemma dvalue_is_canonical_complete : forall dv dt,
+      dvalue_has_dtyp dv dt -> dvalue_is_canonical dt dv = true.
+  Proof.
+    induction dv as [b | p fields IH | v elts IH] using dvalue_ind; intros dt H.
+    - inversion H as [b' tb HB HC | t HNE | |]; subst.
+      + destruct b; cbn [dvalue_is_canonical];
+          first [rewrite HB, HC; reflexivity | reflexivity].
+      + cbn; rewrite HNE; reflexivity.
+    - inversion H as [| | p' fs dts HNP HF2 |]; subst.
+      rewrite dvalue_is_canonical_struct, Bool.eqb_reflx, HNP; cbn [negb andb].
+      clear H HNP; revert dts HF2; induction IH as [| f fs Hf _ IHl]; intros dts HF2;
+        inversion HF2; subst; cbn; [reflexivity |].
+      rewrite Hf by assumption; apply IHl; assumption.
+    - inversion H as [| | | v' xs sz t HNV HNP HF HL]; subst.
+      cbn [dvalue_is_canonical].
+      rewrite Bool.eqb_reflx, HNP, HL, Nnat.N2Nat.id, N.eqb_refl.
+      destruct (NO_VOID_dec t) as [| NNV]; [| contradiction]; cbn [negb andb].
+      clear H HNP HL; induction IH as [| e es He _ IHl]; [reflexivity |].
+      inversion HF; subst; cbn [forallb].
+      rewrite He by assumption; apply IHl; assumption.
+  Qed.
+
+  Theorem dvalue_is_canonical_iff : forall dv dt,
+      dvalue_is_canonical dt dv = true <-> dvalue_has_dtyp dv dt.
+  Proof.
+    intros dv dt; split;
+      [apply dvalue_is_canonical_sound | apply dvalue_is_canonical_complete].
+  Qed.
 
   Definition default_dvalue_of_dtyp_i (sz : positive) : dvalue_base :=
     @DVALUE_I sz (repr 0).

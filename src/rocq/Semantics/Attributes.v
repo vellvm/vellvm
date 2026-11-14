@@ -167,35 +167,58 @@ Section Attributes.
   (** LangRef (nofpclass): "If the value is a floating-point class indicated
       by the nofpclass test mask, a poison value is passed or returned
       instead."  It applies to floating-point values, vectors of them, and
-      aggregates of those, element by element. *)
-  Fixpoint value_nofpclass (mask : Z) (v : dvalue) : dvalue :=
+      aggregates of those, element by element.
+
+      [dt] is the type of [v]; each element is visited at its own type, and
+      the result is rebuilt in canonical form: an aggregate all of whose
+      elements became poison is poison.  (A
+      value whose shape does not match [dt] is ill typed; the part with no
+      type is left as it is.) *)
+  Fixpoint value_nofpclass (mask : Z) (dt : dtyp) (v : dvalue) : dvalue :=
     match v with
     | DVALUE_Base b =>
         match fp_class b with
         | Some c => if (Z.land mask c =? 0)%Z then v else DVALUE_Base DVALUE_Poison
         | None => v
         end
-    | DVALUE_Array vec elts => DVALUE_Array vec (List.map (value_nofpclass mask) elts)
-    | DVALUE_Struct p fields => DVALUE_Struct p (List.map (value_nofpclass mask) fields)
+    | DVALUE_Array vec elts =>
+        match dt with
+        | DTYPE_Array _ _ t => canonicalize_agg dt (List.map (value_nofpclass mask t) elts)
+        | _ => v
+        end
+    | DVALUE_Struct p fields =>
+        match dt with
+        | DTYPE_Struct _ dts =>
+            let fix go (ts : list dtyp) (vs : list dvalue) : list dvalue :=
+              match ts, vs with
+              | t :: ts', v :: vs' => value_nofpclass mask t v :: go ts' vs'
+              | _, _ => vs
+              end in
+            canonicalize_agg dt (go dts fields)
+        | _ => v
+        end
     end.
 
-  Definition value_attr_nofpclass (attrs : list param_attr) (v : dvalue) : dvalue :=
+  Definition value_attr_nofpclass (attrs : list param_attr) (dt : dtyp) (v : dvalue) : dvalue :=
     match find_option attr_nofpclass attrs with
-    | Some mask => value_nofpclass mask v
+    | Some mask => value_nofpclass mask dt v
     | None => v
     end.
 
-  (** The value passed on after the poison-producing attributes. *)
-  Definition value_attrs_poison (attrs : list param_attr) (v : dvalue) : dvalue :=
-    value_attr_nofpclass attrs
+  (** The value passed on after the poison-producing attributes; [dt] is its
+      type.  [nonnull], [align] and [range] rewrite scalars only, and poison
+      at a scalar type needs no type. *)
+  Definition value_attrs_poison (attrs : list param_attr) (dt : dtyp) (v : dvalue) : dvalue :=
+    value_attr_nofpclass attrs dt
       (value_attr_range attrs (value_attr_align attrs (value_attr_nonnull attrs v))).
 
-  (** Apply a parameter's or return value's attributes to [v], except for
-      the memory part of [dereferenceable] (see [apply_attrs]): the value to
-      pass on, or UB (reported with [msg]) if [noundef] is violated. *)
-  Definition apply_value_attrs (attrs : list param_attr) (msg : string) (v : dvalue)
+  (** Apply a parameter's or return value's attributes to [v] of type [dt],
+      except for the memory part of [dereferenceable] (see [apply_attrs]):
+      the value to pass on, or UB (reported with [msg]) if [noundef] is
+      violated. *)
+  Definition apply_value_attrs (attrs : list param_attr) (msg : string) (dt : dtyp) (v : dvalue)
     : EOU dvalue :=
-    let v := value_attrs_poison attrs v in
+    let v := value_attrs_poison attrs dt v in
     if existsb attr_is_noundef attrs && negb (dvalue_well_defined v)
     then raise_ub msg
     else ret v.
@@ -217,10 +240,10 @@ Section Attributes.
     | _ => v
     end.
 
-  Definition value_metadata_range (ranges : option (list (int_syntax * int_syntax))) (v : dvalue) : dvalue :=
+  Definition value_metadata_range (ranges : option (list (int_syntax * int_syntax))) (dt : dtyp) (v : dvalue) : dvalue :=
     match ranges, v with
     | None, _ => v
-    | Some rs, DVALUE_Array true elts => DVALUE_Array true (List.map (value_metadata_range_base rs) elts)
+    | Some rs, DVALUE_Array true elts => canonicalize_agg dt (List.map (value_metadata_range_base rs) elts)
     | Some rs, _ => value_metadata_range_base rs v
     end.
 
@@ -346,45 +369,46 @@ Section MemoryChecks.
 
       All of a parameter's or return value's attributes: [apply_value_attrs],
       then the memory part of [dereferenceable]. *)
-  Definition apply_attrs (attrs : list param_attr) (msg : string) (v : dvalue)
+  Definition apply_attrs (attrs : list param_attr) (msg : string) (dt : dtyp) (v : dvalue)
     : itree E dvalue :=
-    v <- lift (apply_value_attrs attrs msg v);;
+    v <- lift (apply_value_attrs attrs msg dt v);;
     assert_attrs_dereferenceable attrs v msg;;
     ret v.
 
   (** Apply per-argument attribute lists to a list of arguments.  Arguments
-      past the end of [attrss] (e.g. variadic ones) have no attributes. *)
+      past the end of [attrss] (e.g. variadic ones) have no attributes.
+      Each argument comes, and is returned, with its type. *)
   Fixpoint apply_args_attrs (attrss : list (list param_attr)) (msg : string)
-    (args : list dvalue) : itree E (list dvalue) :=
+    (args : list (dtyp * dvalue)) : itree E (list (dtyp * dvalue)) :=
     match args with
     | [] => ret []
-    | v :: vs =>
+    | (t, v) :: vs =>
         let '(attrs, rest) :=
           match attrss with
           | [] => ([], [])
           | a :: r => (a, r)
           end in
-        v' <- apply_attrs attrs msg v;;
+        v' <- apply_attrs attrs msg t v;;
         vs' <- apply_args_attrs rest msg vs;;
-        ret (v' :: vs')
+        ret ((t, v') :: vs')
     end.
 
   (** The result of a call with arguments [args], after the function
       attributes [fattrs], the [!range] metadata [ranges], and the
       return-value attributes [ret_attrs] (of the callee's definition or of
       the call site): UB if [check_call_result] fails, otherwise the unwind
-      unchanged or the returned value passed through [value_metadata_range]
-      and [apply_attrs].  [loc] (a location or a function name) prefixes the
+      unchanged or the returned value, of type [ret_t], passed through
+      [value_metadata_range] and [apply_attrs].  [loc] (a location or a function name) prefixes the
       UB messages. *)
   Definition check_call_return (fattrs : list fn_attr) (ret_attrs : list param_attr)
     (ranges : option (list (int_syntax * int_syntax))) (loc : string)
-    (args : list dvalue) (res : exc + dvalue) : itree E (exc + dvalue) :=
+    (ret_t : dtyp) (args : list dvalue) (res : exc + dvalue) : itree E (exc + dvalue) :=
     lift (check_call_result fattrs loc args res);;
     match res with
     | inl _ => ret res
     | inr v =>
         v' <- apply_attrs ret_attrs (loc ++ " return value violates noundef.")
-                (value_metadata_range ranges v);;
+                ret_t (value_metadata_range ranges ret_t v);;
         ret (inr v')
     end.
 

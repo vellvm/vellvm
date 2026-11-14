@@ -146,27 +146,32 @@ Section MemoryModel.
     end.
 
   
+  (* At a vector type [t_from], [vector_elts] expands the scalar
+     [DVALUE_Poison] to all-poison lanes, and the result is built in
+     canonical form at [t_to] (as in [convert_pure]). *)
   Definition convert_impure (conv : impure_conversion) (t_from : dtyp) (dv : dvalue) (t_to : dtyp) : memM dvalue :=
-    match dv with
-    | (DVALUE_Base dv) =>
-        match get_base_conversion_type t_from t_to with
-        | Some (t_from', t_to') =>
-            DVALUE_Base <$> (convert_impure_base conv t_from' dv t_to')
-        | None =>
-            merr "convert_impure: type mismatch"
-        end
-          
-    | (DVALUE_Array true elts1) =>
-        match get_vector_conversion_type t_from t_to with
-        | Some (t_from', t_to') =>
+    match t_from with
+    | DTYPE_Array true sz _ =>
+        match get_vector_conversion_type t_from t_to, vector_elts sz dv with
+        | Some (t_from', t_to'), Some elts1 =>
               elts1' <- lift (map_monad dvalue_to_dvalue_base elts1) ;;
               val <- map_monad (fun v => convert_impure_base conv t_from' v t_to') elts1' ;;
-              ret (DVALUE_Array true (List.map DVALUE_Base val))
-
-        | None =>
+              ret (canonicalize_agg t_to (List.map DVALUE_Base val))
+        | None, _ =>
             merr "convert_impure: type or vector size mismatch"
+        | _, None => merr "convert_impure: invalid input dvalue"
         end
-    | _ => merr "convert_impure: invalid input dvalue"
+    | _ =>
+        match dv with
+        | (DVALUE_Base dv) =>
+            match get_base_conversion_type t_from t_to with
+            | Some (t_from', t_to') =>
+                DVALUE_Base <$> (convert_impure_base conv t_from' dv t_to')
+            | None =>
+                merr "convert_impure: type mismatch"
+            end
+        | _ => merr "convert_impure: invalid input dvalue"
+        end
     end.
   
   Definition handle_memoryM : MemoryE ~> memM :=
@@ -345,7 +350,7 @@ Section MemoryModel.
     fun T e =>
       match e with
       | Intrinsic t name args _ =>
-          args' <- lift (map_monad dvalue_to_dvalue_base args) ;;
+          args' <- lift (map_monad dvalue_to_dvalue_base (List.map snd args)) ;;
           (* Pick all arguments, they should all be unique. *)
           if is_memcpy_name name
           then

@@ -197,6 +197,16 @@ Section Denotation.
     end.
 
   Definition NONE := DVALUE_Base (DVALUE_None).
+
+  (* The type of an array or vector literal, read off its (typed) elements.
+     A literal with no elements has an empty type whatever its element type
+     is, so that one is arbitrary. *)
+  Definition array_typ_of_texps (vector : bool) (es : list (texp dtyp)) : dtyp :=
+    DTYPE_Array vector (N.of_nat (List.length es))
+      (match es with
+       | (t, _) :: _ => t
+       | [] => DTYPE_Base DTYPE_Void
+       end).
   
   Fixpoint denote_exp (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=
     let denote_exp_base top o :=
@@ -245,32 +255,38 @@ Section Denotation.
       vs <- map_monad eval_texp es ;;
       ret (DVALUE_Array false vs)
 
-    (* [undef] is denoted as [poison] (see [EXP_Undef] in LLVMAst.v). *)
-    | EXP_Undef => ret (DVALUE_Base DVALUE_Poison)
+    (* [undef] is denoted as [poison] (see [EXP_Undef] in LLVMAst.v).
+       Poison is taken at the literal's type ([poison_of_dtyp]): at an empty
+       type such as [{}] it is the type's one value.  An untyped [poison]
+       does not arise as an operand; it is left as [DVALUE_Poison]. *)
+    | EXP_Undef | EXP_Poison =>
+        match top with
+        | Some t => ret (poison_of_dtyp t)
+        | None => ret (DVALUE_Base DVALUE_Poison)
+        end
 
-    | EXP_Poison => ret (DVALUE_Base DVALUE_Poison)
-
+    (* Aggregate literals are built in canonical form ([canonicalize_agg]):
+       a literal all of whose fields are poison is the value poison.  The
+       literal's type is read off its fields, each of which is typed. *)
     (* Question: should we do any typechecking for aggregate types here? *)
     (* Option 1: do no typechecking: *)
     | EXP_Struct es =>
         vs <- map_monad eval_texp es ;;
-        ret (DVALUE_Struct false vs)
+        ret (canonicalize_agg (DTYPE_Struct false (List.map fst es)) vs)
 
     (* Option 2: do a little bit of typechecking *)
     | EXP_Packed_struct es =>
         lift (assert_packed_struct_typ top) ;;
         vs <- map_monad eval_texp es ;;
-        ret (DVALUE_Struct true vs)
+        ret (canonicalize_agg (DTYPE_Struct true (List.map fst es)) vs)
 
     | EXP_Array es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array false vs)
+      ret (canonicalize_agg (array_typ_of_texps false es) vs)
 
-    (* A vector of poison lanes is the canonical [DVALUE_Poison]; see
-       [canonicalize_agg]. *)
     | EXP_Vector es =>
       vs <- map_monad eval_texp es ;;
-      ret (canonicalize_agg (DVALUE_Array true) vs)
+      ret (canonicalize_agg (array_typ_of_texps true es) vs)
 
     | OP_IBinop iop dt op1 op2 =>
       v1 <- denote_exp (Some dt) op1 ;;
@@ -291,7 +307,7 @@ Section Denotation.
     (* TODO: fast_math? **)
     | OP_Fneg _ (dt, op) =>
         v <- denote_exp (Some dt) op ;;
-        lift (eval_fneg v)
+        lift (eval_fneg dt v)
              
     | OP_FCmp fcmp _ dt op1 op2 =>
         v1 <- denote_exp (Some dt) op1 ;;
@@ -360,7 +376,7 @@ Section Denotation.
         (* use the type from the splat elt *)
         v <- eval_texp elt ;;
         (* this could be very expensive if the vector is big *)
-        ret (canonicalize_agg (DVALUE_Array true) (List.repeat v (N.to_nat sz)))
+        ret (canonicalize_agg (DTYPE_Array true sz t) (List.repeat v (N.to_nat sz)))
           
     | OP_Freeze (dt, e) =>
         dv <- denote_exp (Some dt) e ;;
@@ -503,12 +519,14 @@ Section Denotation.
     ret tt.
 
   (** Evaluate a call's arguments, passing each through its call-site
-      attributes ([apply_attrs]); [msg] reports a violated [noundef]. *)
+      attributes ([apply_attrs]); [msg] reports a violated [noundef].  Each
+      value is paired with the type the call site passes it at. *)
   Definition denote_call_args (args : list (texp dtyp * list param_attr)) (msg : string)
-    : CFGtop (list dvalue) :=
+    : CFGtop (list (dtyp * dvalue)) :=
     map_monad (fun '((t, op), attrs) =>
                  v <- denote_exp' (Some t) op ;;
-                 apply_attrs attrs msg v) args.
+                 v' <- apply_attrs attrs msg t v ;;
+                 ret (t, v')) args.
 
   (** ** Operand bundles
 
@@ -589,7 +607,7 @@ Section Denotation.
          a value out of range is UB with !noundef), then !dereferenceable *)
       v <- lift (apply_value_attrs (load_metadata_attrs md)
                    (err_loc tt ++ ": Loaded value violates !noundef.")
-                   (value_metadata_range (metadata_range md) v));;
+                   dt (value_metadata_range (metadata_range md) dt v));;
       assert_load_dereferenceable md v
         (err_loc tt ++ ": Loaded value violates !dereferenceable.");;
       lwrite id v
@@ -622,7 +640,7 @@ Section Denotation.
         (* the call site's function attributes, then its !range metadata and
            return-value attributes *)
         res <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
-                 (metadata_range md) (err_loc tt ++ ": Call") vs res ;;
+                 (metadata_range md) (err_loc tt ++ ": Call") dt (List.map snd vs) res ;;
         returned_value <-
           match res with
           | inl exc => raiseLLVM exc
@@ -758,7 +776,7 @@ Section Denotation.
       (* the invoke's function attributes, then its !range metadata and
          return-value attributes *)
       rv <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
-              (metadata_range md) (err_loc tt ++ ": Invoke") uvs rv ;;
+              (metadata_range md) (err_loc tt ++ ": Invoke") dt (List.map snd uvs) rv ;;
       (* branch to to_label *)
       match rv with
       | inl exn =>
@@ -920,10 +938,11 @@ Section Denotation.
   (* The denotation of an itree function is a rocq function that takes a list of
      dvalues and returns the appropriate semantics: a function either returns
      normally with a [dvalue] or unwinds with an exception [exc]. *)
-  (* A function's denotation takes the calling convention of the call site
-     and the arguments. *)
+  (* A function's denotation takes the calling convention of the call site,
+     the return type the call site expects, and the arguments, each with the
+     type the call site passes it at (see [Call]). *)
   Definition function_denotation : Type :=
-    cconv -> list dvalue -> CFGtop (exc + dvalue).
+    cconv -> dtyp -> list (dtyp * dvalue) -> CFGtop (exc + dvalue).
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOU (list (A * B) * list B) :=
     match l1, l2 with
@@ -941,24 +960,19 @@ Section Denotation.
     stack_pop;;
     mem_pop.
 
-  (* There is an issue with removing type annotations from poison:
-      - we use dtyp_of_dvalue to compute a "type" for the struct that
-        implements var-args
-      - if one of the varargs values is poison, we can't compute a
-        type for it (or even a size)
-      - Note that this will fail for poison and zero-sized arrays/vectors.
-  *)
-  (* Push call frame, return varargs address *)
-  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : CFGtop ptr :=
+  (* Push call frame, return varargs address.
+     The variadic arguments are stored as a packed struct, laid out by the
+     types the call site passed them at: a value alone does not determine
+     its type (poison, empty aggregates). *)
+  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list (dtyp * dvalue)) : CFGtop ptr :=
     (* We match the arguments variables to the inputs *)
     '(bs, vs) <- lift (combine_lists_varargs (df_args df) args) ;;
-    dts <- lift (map_monad dtyp_of_dvalue vs);;
-    let dt := DTYPE_Struct true dts in
+    let dt := DTYPE_Struct true (List.map fst vs) in
     (* generate the corresponding writes to the local stack frame *)
     mem_push ;;
-    stack_push bs ;;
+    stack_push (List.map (fun '(x, (_, v)) => (x, v)) bs) ;;
     varargs <- alloca dt 1 None;;
-    store dt varargs (DVALUE_Struct true vs);;
+    store dt varargs (canonicalize_agg dt (List.map snd vs));;
     match varargs with
     | DVALUE_Base (DVALUE_Pointer varg) =>
         ret varg
@@ -974,7 +988,7 @@ Section Denotation.
     let '(ret_attrs, args_attrs) := dc_param_attrs (df_prototype df) in
     let fname := show_raw_id (dc_name (df_prototype df)) in
     let fcc := anns_cconv (dc_annotations (df_prototype df)) in
-    fun (cc : cconv) (args : list dvalue) =>
+    fun (cc : cconv) (ret_t : dtyp) (args : list (dtyp * dvalue)) =>
       (* the calling convention, checked on entry so that a mismatch is
          reported at the call (see [check_cconv]) *)
       lift (check_cconv fcc cc fname);;
@@ -986,7 +1000,7 @@ Section Denotation.
          frame is always torn down before the (value-carried) unwind continues. *)
       rv <- run_exc (denote_cfg_map bmap (df_instrs df) (Some varg));;
       pop_call_frame;;
-      check_call_return (dc_attrs (df_prototype df)) ret_attrs None fname args rv.
+      check_call_return (dc_attrs (df_prototype df)) ret_attrs None fname ret_t (List.map snd args) rv.
 
   (* We now turn to the second knot to be tied: a top-level itree program is a set
          of mutually recursively defined functions, i.e. [cfg]s. We hence need to
@@ -1011,7 +1025,7 @@ Section Denotation.
 
   Definition denote_mcfg
     (fundefs : IntMap function_denotation) (dt : dtyp)
-    (f_value : dvalue) (args : list dvalue) : MCFGtop (dvalue + dvalue) :=
+    (f_value : dvalue) (args : list (dtyp * dvalue)) : MCFGtop (dvalue + dvalue) :=
     @mrec CallE (ExternalCallE +' _)
       (fun T call =>
          match call with
@@ -1022,7 +1036,7 @@ Section Denotation.
              | Some f_den => (* If the call is internal *)
                  (* [f_den] already produces [exc + dvalue] (see [denote_function]),
                     so the callee's unwind crosses the [mrec] knot as this value. *)
-                 f_den cc args
+                 f_den cc dt args
              | None => inr <$> external_call dt fv args
              end
          end) _ (Call dt CC_Ccc f_value args).

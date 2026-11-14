@@ -30,8 +30,12 @@ Section Select.
 
 
 
+  (* [v_t] is the type of [v1], [v2] and the result.  A poison condition
+     gives poison *at that type* ([poison_of_dtyp]), which matters when a
+     scalar condition selects between aggregates. *)
   Definition eval_select (cnd : dvalue) (v_t:dtyp) (v1 v2 : dvalue) : EOU dvalue :=
     match cnd with
+    | DVALUE_Base DVALUE_Poison => ret (poison_of_dtyp v_t)
     | DVALUE_Base cnd' => eval_select_base_dvalue cnd' v1 v2
     | DVALUE_Array true conds =>
         match v_t with
@@ -39,15 +43,15 @@ Section Select.
             conds' <- map_monad dvalue_to_dvalue_base conds ;;
             match v1, v2 with
             | DVALUE_Array true elts1, DVALUE_Array true elts2 =>
-                (canonicalize_agg (DVALUE_Array true)) <$>
+                (canonicalize_agg v_t) <$>
                   (vec_loop (fun c => fun '(v1, v2) => eval_select_base_dvalue c v1 v2)
                      (List.combine conds' (List.combine elts1 elts2)))
             | DVALUE_Base DVALUE_Poison, DVALUE_Array true ys =>
-                (canonicalize_agg (DVALUE_Array true)) <$>
+                (canonicalize_agg v_t) <$>
                   (vec_loop (fun c => fun '(v1, v2) => eval_select_base_dvalue c v1 v2)
                      (List.combine conds' (List.combine (repeat (DVALUE_Base DVALUE_Poison) (N.to_nat sz)) ys)))
             | DVALUE_Array true xs, DVALUE_Base DVALUE_Poison =>
-                (canonicalize_agg (DVALUE_Array true)) <$>
+                (canonicalize_agg v_t) <$>
                   (vec_loop (fun c => fun '(v1, v2) => eval_select_base_dvalue c v1 v2)
                      (List.combine conds' (List.combine xs (repeat (DVALUE_Base DVALUE_Poison) (N.to_nat sz)))))
             | DVALUE_Base DVALUE_Poison, DVALUE_Base DVALUE_Poison =>

@@ -216,20 +216,40 @@ Section Refinement.
       the [unit] messages of the abortive events) are shared between the
       two instantiations, hence required equal. *)
 
+  (* Typed arguments, as the call events carry them: the same types (a
+     [dtyp] is shared between the two instantiations), related values. *)
+  Definition I2F_targs : list (dtyp * @dvalue PInf) -> list (dtyp * @dvalue PFin) -> Prop :=
+    Forall2 (prod_rel eq I2F_dvalue).
+
+  Lemma I2F_targs_fst args1 args2 :
+    I2F_targs args1 args2 -> List.map fst args1 = List.map fst args2.
+  Proof.
+    induction 1 as [| [t1 v1] [t2 v2] vs1 vs2 Hv _ IH]; cbn; [reflexivity |].
+    destruct Hv as [Ht Hv]; cbn in *; subst; f_equal; exact IH.
+  Qed.
+
+  Lemma I2F_targs_snd args1 args2 :
+    I2F_targs args1 args2 ->
+    Forall2 I2F_dvalue (List.map snd args1) (List.map snd args2).
+  Proof.
+    induction 1 as [| [t1 v1] [t2 v2] vs1 vs2 Hv _ IH]; cbn; constructor; auto.
+    destruct Hv as [Ht Hv]; exact Hv.
+  Qed.
+
   Equations I2FE_Call : prerel (@CallE PInf) (@CallE PFin) :=
     I2FE_Call (@Call PInf τ1 cc1 f1 args1) (@Call PFin τ2 cc2 f2 args2) :=
-      τ1 = τ2 /\ cc1 = cc2 /\ I2F_dvalue f1 f2 /\ Forall2 I2F_dvalue args1 args2.
+      τ1 = τ2 /\ cc1 = cc2 /\ I2F_dvalue f1 f2 /\ I2F_targs args1 args2.
 
   Equations I2FE_ExternalCall : prerel (@ExternalCallE PInf) (@ExternalCallE PFin) :=
     I2FE_ExternalCall (@ExternalCall PInf τ1 f1 args1) (@ExternalCall PFin τ2 f2 args2) :=
-      τ1 = τ2 /\ I2F_dvalue f1 f2 /\ Forall2 I2F_dvalue args1 args2;
+      τ1 = τ2 /\ I2F_dvalue f1 f2 /\ I2F_targs args1 args2;
     I2FE_ExternalCall (@IO_stdout PInf str1) (@IO_stdout PFin str2) := str1 = str2;
     I2FE_ExternalCall (@IO_stderr PInf str1) (@IO_stderr PFin str2) := str1 = str2;
     I2FE_ExternalCall _ _ := False.
 
   Equations I2FE_Intrinsic : prerel (@IntrinsicE PInf) (@IntrinsicE PFin) :=
     I2FE_Intrinsic (@Intrinsic PInf τ1 f1 args1 va1) (@Intrinsic PFin τ2 f2 args2 va2) :=
-      τ1 = τ2 /\ f1 = f2 /\ Forall2 I2F_dvalue args1 args2 /\ option_rel I2F_Addr va1 va2.
+      τ1 = τ2 /\ f1 = f2 /\ I2F_targs args1 args2 /\ option_rel I2F_Addr va1 va2.
 
   Equations I2FE_Global : prerel (@GlobalE PInf) (@GlobalE PFin) :=
     I2FE_Global (@GlobalWrite PInf x1 dv1) (@GlobalWrite PFin x2 dv2) :=

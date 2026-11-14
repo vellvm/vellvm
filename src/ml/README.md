@@ -48,6 +48,12 @@ DVALUEs that can be interpreted without needing any program context
 a poison result fails the assertion (comparing against poison does not give a
 verdict).
 
+Whatever `lit` is, the result must also be a value of type `typ` in *canonical
+form* (`dvalue_is_canonical` in `DynamicValues.v`): for example, a struct whose
+fields are all poison must be returned as `poison`, not as a struct of poisons.
+A result that is not canonical fails the assertion even if it would otherwise
+compare equal.
+
 ## ASSERT SUCCEEDS
 
 ```

@@ -116,10 +116,10 @@ Qed.
 
 (** All of a value's attributes: the pure part ([I2F_apply_value_attrs]),
     then the memory part of [dereferenceable]. *)
-Lemma I2F_apply_attrs attrs msg v1 v2 :
+Lemma I2F_apply_attrs attrs msg dt v1 v2 :
   I2F_dvalue v1 v2 ->
   I2F_refine_CFG I2F_dvalue
-    (apply_attrs (Pa := PInf) attrs msg v1) (apply_attrs (Pa := PFin) attrs msg v2).
+    (apply_attrs (Pa := PInf) attrs msg dt v1) (apply_attrs (Pa := PFin) attrs msg dt v2).
 Proof.
   intros H; unfold I2F_refine_CFG, apply_attrs.
   rbind I2F_dvalue; [apply I2F_refine_lift', I2F_apply_value_attrs; auto | intros v1' v2' Hv].
@@ -127,31 +127,33 @@ Proof.
   apply ruttc_ret; auto.
 Qed.
 
-(** Per-argument attributes applied to related argument lists. *)
+(** Per-argument attributes applied to related (typed) argument lists. *)
 Lemma I2F_apply_args_attrs attrss msg args1 args2 :
-  Forall2 I2F_dvalue args1 args2 ->
-  I2F_refine_CFG (Forall2 I2F_dvalue)
+  I2F_targs args1 args2 ->
+  I2F_refine_CFG I2F_targs
     (apply_args_attrs (Pa := PInf) attrss msg args1)
     (apply_args_attrs (Pa := PFin) attrss msg args2).
 Proof.
-  intros H; revert attrss; induction H as [| v1 v2 vs1 vs2 Hv _ IH]; intros attrss;
+  intros H; revert attrss;
+    induction H as [| [t1 v1] [t2 v2] vs1 vs2 Hv _ IH]; intros attrss;
     cbn [apply_args_attrs].
-  - unfold I2F_refine_CFG; rstep; cbnn; auto.
-  - destruct attrss as [| attrs rest]; cbv beta iota;
+  - unfold I2F_refine_CFG; rstep; cbnn; constructor.
+  - inv Hv; cbn in *; subst.
+    destruct attrss as [| attrs rest]; cbv beta iota;
       (erbind; [apply I2F_apply_attrs; eauto | intros v1' v2' Hv'];
        erbind; [apply IH | intros vs1' vs2' Hvs'];
-       unfold I2F_refine_CFG; rstep; cbnn; auto).
+       unfold I2F_refine_CFG; rstep; cbnn; constructor; [constructor; auto | auto]).
 Qed.
 
 (** How a call ends: the function attributes see related results and
     arguments ([I2F_check_call_result]); a normal return then goes through
     [!range] and the return-value attributes. *)
-Lemma I2F_check_call_return fattrs ret_attrs ranges loc args1 args2 r1 r2 :
+Lemma I2F_check_call_return fattrs ret_attrs ranges loc ret_t args1 args2 r1 r2 :
   Forall2 I2F_dvalue args1 args2 ->
   sum_rel I2F_dvalue I2F_dvalue r1 r2 ->
   I2F_refine_CFG (sum_rel I2F_dvalue I2F_dvalue)
-    (check_call_return (Pa := PInf) fattrs ret_attrs ranges loc args1 r1)
-    (check_call_return (Pa := PFin) fattrs ret_attrs ranges loc args2 r2).
+    (check_call_return (Pa := PInf) fattrs ret_attrs ranges loc ret_t args1 r1)
+    (check_call_return (Pa := PFin) fattrs ret_attrs ranges loc ret_t args2 r2).
 Proof.
   intros HA H; unfold I2F_refine_CFG, check_call_return.
   rbind (fun (_ _ : unit) => True);
@@ -275,13 +277,15 @@ Qed.
 (** Call arguments: each is evaluated and passed through its attributes on
     both sides. *)
 Lemma I2F_denote_call_args args msg :
-  I2F_refine_CFG (Forall2 I2F_dvalue)
+  I2F_refine_CFG I2F_targs
     (@denote_call_args PInf args msg) (@denote_call_args PFin args msg).
 Proof.
-  unfold I2F_refine_CFG, denote_call_args.
+  unfold I2F_refine_CFG, I2F_targs, denote_call_args.
   apply ruttc_map_monad.
   intros [[t op] attrs] _.
-  erbind; [apply I2F_denote_exp' | intros; apply I2F_apply_attrs; auto].
+  erbind; [apply I2F_denote_exp' | intros].
+  erbind; [apply I2F_apply_attrs; eauto | intros].
+  rstep; cbnn; constructor; auto.
 Qed.
 
 Lemma I2F_denote_instr :
@@ -299,14 +303,14 @@ Lemma I2F_denote_instr :
       rbind TT...
       intros ???...
     - destruct x, fn; cbn;
-        (rbind (Forall2 I2F_dvalue); [apply I2F_denote_call_args | intros vs1 vs2 HVS];
+        (rbind I2F_targs; [apply I2F_denote_call_args | intros vs1 vs2 HVS];
          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _];
          rbind (sum_rel I2F_dvalue I2F_dvalue);
          [break_match_goal; [| bind_exp]; now (rstep; cbnn; try easy; eauto) | intros * HR'];
          (* the call site's function attributes, !range, and return-value
             attributes *)
          rbind (sum_rel I2F_dvalue I2F_dvalue);
-         [apply I2F_check_call_return; auto | intros * HR''];
+         [apply I2F_check_call_return; auto using I2F_targs_snd | intros * HR''];
          inv HR'').
       all: try now (rbind (fun _ _ => False); [rstep; cbnn; easy | intros ?? []]).
       all: rewrite 2 Eqit.bind_ret_l...
@@ -515,7 +519,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     intros * HR.
     (* the invoke's function and return-value attributes *)
     rbind (sum_rel I2F_dvalue I2F_dvalue);
-      [apply I2F_check_call_return; auto | intros * HR'].
+      [apply I2F_check_call_return; auto using I2F_targs_snd | intros * HR'].
     induction HR'.
     rbind TT...
     intros...
@@ -590,19 +594,19 @@ Qed.
 Definition I2F_function_denotation
   (ctx1 : @function_denotation PInf)
   (ctx2 : @function_denotation PFin) : Prop :=
-  forall cc args1 args2,
-    Forall2 I2F_dvalue args1 args2 ->
-    I2F_refine_CFG (sum_rel I2F_dvalue I2F_dvalue) (ctx1 cc args1) (ctx2 cc args2).
+  forall cc ret_t args1 args2,
+    I2F_targs args1 args2 ->
+    I2F_refine_CFG (sum_rel I2F_dvalue I2F_dvalue) (ctx1 cc ret_t args1) (ctx2 cc ret_t args2).
 
 Lemma I2F_combine_lists_varargs : 
   forall (d : definition dtyp (cfg dtyp)) y1 y2,
-    Forall2 I2F_dvalue y1 y2 -> 
+    I2F_targs y1 y2 -> 
     I2F_EOU 
-      (prod_rel (Forall2 (prod_rel Logic.eq I2F_dvalue)) (Forall2 I2F_dvalue))
+      (prod_rel (Forall2 (prod_rel Logic.eq (prod_rel Logic.eq I2F_dvalue))) I2F_targs)
       (combine_lists_varargs (df_args d) y1)
       (combine_lists_varargs (df_args d) y2).
 Proof with cbn; eauto using I2F_EOU_error, I2F_EOU_ret, I2F_EOU_oom, I2F_EOU_ub.
-  intros d.
+  intros d; unfold I2F_targs.
   generalize (df_args d) as l.
   induction l as [| x l IH]; intros * HR.
   - dependent induction HR...
@@ -615,33 +619,41 @@ Proof with cbn; eauto using I2F_EOU_error, I2F_EOU_ret, I2F_EOU_oom, I2F_EOU_ub.
     constructor; cbn...
 Qed.
 
-Lemma I2F_dtyp_of_dvalue :
-  forall a1 a2 : dvalue,
-    I2F_dvalue a1 a2 ->
-    I2F_EOU Logic.eq (dtyp_of_dvalue a1) (dtyp_of_dvalue a2).
+(* the bindings a frame pushes: each parameter with its argument's value *)
+Lemma I2F_frame_bindings
+  (bs1 : list (raw_id * (dtyp * @dvalue PInf)))
+  (bs2 : list (raw_id * (dtyp * @dvalue PFin))) :
+  Forall2 (prod_rel Logic.eq (prod_rel Logic.eq I2F_dvalue)) bs1 bs2 ->
+  Forall2 (prod_rel Logic.eq I2F_dvalue)
+    (List.map (fun '(x, (_, v)) => (x, v)) bs1)
+    (List.map (fun '(x, (_, v)) => (x, v)) bs2).
 Proof.
-  intros * H; erewrite I2F_dtyp_of_dvalue_eq; eauto.
-  apply I2F_EOU_refl.
+  induction 1 as [| [x1 [t1 v1]] [x2 [t2 v2]] ? ? Hb _ IH]; cbn; constructor; auto.
+  destruct Hb as [Hx Htv]; destruct Htv as [Ht Hv]; cbn in *; subst.
+  constructor; auto.
 Qed.
-  
+
+(* The variadic arguments are laid out by the types the call site supplies,
+   the same on both sides ([I2F_targs_fst]), and stored in canonical form. *)
 Lemma I2F_push_call_frame d args1 args2:
-    Forall2 I2F_dvalue args1 args2 ->
+    I2F_targs args1 args2 ->
     I2F_refine_CFG I2F_Addr (push_call_frame d args1) (push_call_frame d args2).
 Proof with try now (rstep; cbnn; try (easy); eauto).
   intros.
   erbind; [apply I2F_refine_lift', I2F_combine_lists_varargs; auto | intros].
   destruct r1, r2; inv H0; cbn in * |-.
-  erbind; [eapply I2F_refine_lift', I2F_EOU_map_monad2 with (RB := Logic.eq); eauto | intros ?? HEQ; apply ListUtil.Forall2_eq in HEQ; subst].
-  apply I2F_dtyp_of_dvalue.
+  cbv zeta; rewrite (I2F_targs_fst snd_rel).
   rbind TT...
   intros _ _ _.
-  rbind TT...
+  rbind TT.
+  { rstep; cbnn; try easy; simp I2FE_Stack; apply I2F_frame_bindings; auto. }
   intros _ _ _.
   rbind I2F_dvalue...
   intros ?? HR.
   rbind TT.
   rstep; cbnn; try easy.
-  constructor; intuition.
+  constructor; [reflexivity | split; [exact HR |]].
+  apply I2F_canonicalize_agg, I2F_targs_snd; auto.
   intros _ _ _.
   induction HR; [induction H0 | |]...
 Qed.
@@ -734,14 +746,14 @@ Lemma I2F_denote_function d :
 Proof with try now (rstep; cbnn; try (easy); eauto).
   unfold denote_function.
   destruct (dc_param_attrs (df_prototype d)) as [ret_attrs args_attrs].
-  intros cc ???.
+  intros cc ret_t ???.
   (* the calling-convention check, the same on both sides *)
   rbind (fun (_ _ : unit) => True).
   { apply I2F_refine_lift'.
     eapply I2F_EOU_mono with (RR := @Logic.eq unit); [auto | apply I2F_EOU_refl]. }
   intros _ _ _.
   (* the callee's declared argument attributes, on entry *)
-  rbind (Forall2 I2F_dvalue);
+  rbind I2F_targs;
     [apply I2F_apply_args_attrs; auto | intros args1' args2' Hargs'].
   rbind I2F_Addr; [apply I2F_push_call_frame; auto | intros].
   erbind...
@@ -753,7 +765,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   rbind TT...
   intros ???.
   (* the callee's function and declared return-value attributes *)
-  apply I2F_check_call_return; auto.
+  apply I2F_check_call_return; auto using I2F_targs_snd.
 Qed.
 
 (** Pointwise lifting of [I2F_function_denotation] to function contexts,
@@ -779,7 +791,7 @@ Qed.
 Lemma I2F_denote_mcfg :
   forall t ctx1 ctx2 f1 f2 args1 args2,
     I2F_dvalue f1 f2 ->
-    Forall2 I2F_dvalue args1 args2 ->
+    I2F_targs args1 args2 ->
     I2F_ctx ctx1 ctx2 ->
     I2F_refine_MCFG
       (sum_rel I2F_dvalue I2F_dvalue)
