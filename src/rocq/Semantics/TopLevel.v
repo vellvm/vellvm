@@ -338,3 +338,6 @@ End withParams.
 From Vellvm Require Import ParamsV IPtrInfinite.
 Definition interpreter := interpreter_param (Pa := @ParamsV IPZ IPZTheory).
 Definition dvalue_eqb := @DynamicValues.dvalue_eqb (@ParamsV IPZ IPZTheory).
+(* [dvalue_is_canonical t v]: [v] is a value of type [t] in canonical form;
+   the test harness checks it of every result it compares. *)
+Definition dvalue_is_canonical := @DynamicValues.dvalue_is_canonical (@ParamsV IPZ IPZTheory).

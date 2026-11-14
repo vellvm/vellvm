@@ -181,6 +181,16 @@ let dvalue_eq_assertion name (ty:DynamicTypes.dtyp) (expected : DV.dvalue) (got 
     Printf.sprintf "ASSERT EQ failed: \ngot:\n\t%s\nasserted:\n\t%s"
       (Interpreter.string_of_dvalue result) (Interpreter.string_of_dvalue expected) 
   in
+  (* Whatever the expected value, the result must be a value of the
+     asserted type in canonical form (DynamicValues.v, "Canonical forms of
+     dvalues"): e.g. an aggregate whose fields are all poison must be
+     poison itself.  A result that compares equal but is not canonical is a
+     bug in the semantics. *)
+  if not (TopLevel.dvalue_is_canonical ty result) then
+    failwith
+      (Printf.sprintf "ASSERT EQ failed: the result is not a canonical value of type %s\ngot:\n\t%s"
+         (Camlcoq.camlstring_of_coqstring (ShowAST.show_dtyp ty))
+         (Interpreter.string_of_dvalue result)) ;
   begin match expected with
   | DVALUE_Base DV.DVALUE_Poison -> compare_dvalues_exn expected result msg
   | _ ->
