@@ -834,15 +834,13 @@ Lemma I2F_convert_impure : forall conv t_from t_to v1 v2,
       (@convert_impure PInf _ conv t_from v1 t_to) (@convert_impure PFin _ conv t_from v2 t_to).
 Proof.
   intros conv t_from t_to v1 v2 Hv; unfold convert_impure.
-  destruct Hv as [b1 b2 Hb | p s1 s2 Hs | v s1 s2 Hs].
-  - destruct (get_base_conversion_type t_from t_to) as [[tf' tt']|]; cbn; [| apply I2F_Merr].
-    eapply I2F_memS_bind; [apply I2F_convert_impure_base; auto |].
-    intros b1' b2' Hb'; apply I2F_Mret; constructor; auto.
-  - cbn; apply I2F_Merr.
-  - (* The vector element type is no longer carried by the value; the
-       array flag alone decides, exactly as in [I2F_convert_pure]. *)
-    destruct v; cbn; [| apply I2F_Merr ..].
-    destruct (get_vector_conversion_type t_from t_to) as [[tf' tt']|]; cbn; [| apply I2F_Merr].
+  destruct t_from as [ ? | ? ? | [|] sz t ].
+  3: { (* vector: [vector_elts] expands both sides to related lanes, as in
+         [I2F_convert_pure]; the result is canonicalised at [t_to] *)
+    pose proof (I2F_vector_elts sz Hv) as V.
+    destruct (get_vector_conversion_type _ t_to) as [[tf' tt']|]; [| apply I2F_Merr].
+    destruct (vector_elts sz v1) as [elts1|], (vector_elts sz v2) as [elts2|];
+      try contradiction; [| apply I2F_Merr].
     eapply I2F_memS_bind.
     { apply I2F_memS_lift, I2F_EOU_map_monad2 with (RA := I2F_dvalue); auto.
       intros a1 a2 Ha; apply I2F_dvalue_to_dvalue_base; auto. }
@@ -851,8 +849,13 @@ Proof.
     { eapply I2F_memS_map_monad2; eauto.
       intros x1 x2 Hx; apply I2F_convert_impure_base; auto. }
     intros val1 val2 Hval.
-    apply I2F_Mret, I2F_dvalue_Array.
-    induction Hval; cbn; constructor; auto.
+    apply I2F_Mret, I2F_canonicalize_agg.
+    induction Hval; cbn; constructor; auto. }
+  (* a scalar type: only a base value converts *)
+  all: destruct Hv as [b1 b2 Hb | p s1 s2 Hs | v s1 s2 Hs]; try apply I2F_Merr.
+  all: destruct (get_base_conversion_type _ t_to) as [[tf' tt']|]; cbn; [| apply I2F_Merr].
+  all: eapply I2F_memS_bind; [apply I2F_convert_impure_base; auto |].
+  all: intros b1' b2' Hb'; apply I2F_Mret; constructor; auto.
 Qed.
 
 (** ** [handle_memoryM] *)
