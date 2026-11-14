@@ -64,14 +64,207 @@ Import EqvNotation.
           and a case for its family added to [handle_intrinsicM].
  *)
 
+(** * Integer intrinsics
+
+    The intrinsics on integers ([llvm.smax], [llvm.uadd.with.overflow],
+    [llvm.ctlz], [llvm.vector.reduce.add], ...) are overloaded at every
+    width and involve no pointers, so they are defined once, on mathematical
+    integers, independently of [Params]: an [int_intrinsic] sees its
+    arguments as [ival]s and answers with an [ires].  A poison argument makes
+    the result poison before the intrinsic is consulted
+    ([llvm_int_intrinsic]). *)
+
+Variant ival : Set :=
+| IV_Int (sz : positive) (u : Z)             (* [u] is the unsigned value *)
+| IV_Vector (elts : list (positive * Z))
+| IV_Poison.                                 (* or a vector with a poison element *)
+
+Variant ires : Set :=
+| IR_Int (sz : positive) (z : Z)             (* [z] modulo [2^sz] *)
+| IR_Overflow (sz : positive) (z : Z) (overflow : bool)   (* [{ iN, i1 }] *)
+| IR_Poison.
+
+(** From the return type and the arguments; [None] if they are ill-typed. *)
+Definition int_intrinsic : Set := dtyp -> list ival -> option ires.
+
+Section IntegerIntrinsics.
+  #[local] Open Scope Z_scope.
+
+  Definition imodulus (sz : positive) : Z := 2 ^ Zpos sz.
+
+  Definition isigned (sz : positive) (u : Z) : Z :=
+    if 2 * u <? imodulus sz then u else u - imodulus sz.
+
+  Definition imin_signed (sz : positive) : Z := - 2 ^ (Zpos sz - 1).
+  Definition imax_signed (sz : positive) : Z := 2 ^ (Zpos sz - 1) - 1.
+  Definition imax_unsigned (sz : positive) : Z := imodulus sz - 1.
+
+  Definition sclamp (sz : positive) (z : Z) : Z :=
+    Z.max (imin_signed sz) (Z.min z (imax_signed sz)).
+
+  Definition uclamp (sz : positive) (z : Z) : Z :=
+    Z.max 0 (Z.min z (imax_unsigned sz)).
+
+  (** Lift an operation on the signed values. *)
+  Definition on_signed {A} (f : Z -> Z -> A) (sz : positive) (a b : Z) : A :=
+    f (isigned sz a) (isigned sz b).
+
+  Definition int_binary (f : positive -> Z -> Z -> ires) : int_intrinsic :=
+    fun _ args =>
+      match args with
+      | [IV_Int sz a; IV_Int sz' b] => if Pos.eqb sz sz' then Some (f sz a b) else None
+      | _ => None
+      end.
+
+  (** [f] returns the exact result; the intrinsic returns it at the operand
+      width. *)
+  Definition int_arith (f : positive -> Z -> Z -> Z) : int_intrinsic :=
+    int_binary (fun sz a b => IR_Int sz (f sz a b)).
+
+  (* https://llvm.org/docs/LangRef.html#standard-c-c-library-intrinsics *)
+  Definition llvm_smax := int_arith (on_signed Z.max).
+  Definition llvm_smin := int_arith (on_signed Z.min).
+  Definition llvm_umax := int_arith (fun _ => Z.max).
+  Definition llvm_umin := int_arith (fun _ => Z.min).
+
+  (* https://llvm.org/docs/LangRef.html#arithmetic-with-overflow-intrinsics *)
+  Definition signed_overflow (f : Z -> Z -> Z) : int_intrinsic :=
+    int_binary (fun sz a b =>
+      let z := on_signed f sz a b in
+      IR_Overflow sz z (negb (Z.eqb z (sclamp sz z)))).
+
+  Definition unsigned_overflow (f : Z -> Z -> Z) : int_intrinsic :=
+    int_binary (fun sz a b =>
+      let z := f a b in
+      IR_Overflow sz z (negb (Z.eqb z (uclamp sz z)))).
+
+  Definition llvm_sadd_with_overflow := signed_overflow Z.add.
+  Definition llvm_ssub_with_overflow := signed_overflow Z.sub.
+  Definition llvm_smul_with_overflow := signed_overflow Z.mul.
+  Definition llvm_uadd_with_overflow := unsigned_overflow Z.add.
+  Definition llvm_usub_with_overflow := unsigned_overflow Z.sub.
+  Definition llvm_umul_with_overflow := unsigned_overflow Z.mul.
+
+  (* https://llvm.org/docs/LangRef.html#saturation-arithmetic-intrinsics *)
+  Definition llvm_sadd_sat := int_arith (fun sz a b => sclamp sz (on_signed Z.add sz a b)).
+  Definition llvm_ssub_sat := int_arith (fun sz a b => sclamp sz (on_signed Z.sub sz a b)).
+  Definition llvm_uadd_sat := int_arith (fun sz a b => uclamp sz (a + b)).
+  Definition llvm_usub_sat := int_arith (fun sz a b => uclamp sz (a - b)).
+
+  (* A shift by the bit width or more is poison. *)
+  Definition shl_sat (f : positive -> Z -> Z -> Z) : int_intrinsic :=
+    int_binary (fun sz a b => if Zpos sz <=? b then IR_Poison else IR_Int sz (f sz a b)).
+
+  Definition llvm_sshl_sat := shl_sat (fun sz a b => sclamp sz (Z.shiftl (isigned sz a) b)).
+  Definition llvm_ushl_sat := shl_sat (fun sz a b => uclamp sz (Z.shiftl a b)).
+
+  (** The intrinsics taking a value and an [i1] immediate. *)
+  Definition int_flagged (f : positive -> Z -> bool -> ires) : int_intrinsic :=
+    fun _ args =>
+      match args with
+      | [IV_Int sz a; IV_Int 1 flag] => Some (f sz a (negb (Z.eqb flag 0)))
+      | _ => None
+      end.
+
+  (* [abs] of the minimum signed value is that value, or poison if
+     [is_int_min_poison]. *)
+  Definition llvm_abs :=
+    int_flagged (fun sz a is_int_min_poison =>
+      let s := isigned sz a in
+      if andb is_int_min_poison (Z.eqb s (imin_signed sz)) then IR_Poison
+      else IR_Int sz (Z.abs s)).
+
+  (* [ctlz] and [cttz] of zero are the bit width, or poison if
+     [is_zero_poison]. *)
+  Definition count_zeros (f : positive -> Z -> Z) : int_intrinsic :=
+    int_flagged (fun sz a is_zero_poison =>
+      if Z.eqb a 0
+      then if is_zero_poison then IR_Poison else IR_Int sz (Zpos sz)
+      else IR_Int sz (f sz a)).
+
+  Definition llvm_ctlz := count_zeros (fun sz a => Zpos sz - 1 - Z.log2 a).
+  Definition llvm_cttz := count_zeros (fun _ a => Z.log2 (Z.land a (- a))).
+
+  Definition int_unary (f : positive -> Z -> Z) : int_intrinsic :=
+    fun _ args =>
+      match args with
+      | [IV_Int sz a] => Some (IR_Int sz (f sz a))
+      | _ => None
+      end.
+
+  Fixpoint pos_popcount (p : positive) : Z :=
+    match p with
+    | xH => 1
+    | xO p => pos_popcount p
+    | xI p => 1 + pos_popcount p
+    end.
+
+  Definition llvm_ctpop :=
+    int_unary (fun _ a => match a with Zpos p => pos_popcount p | _ => 0 end).
+
+  Definition llvm_bitreverse :=
+    int_unary (fun sz a =>
+      snd (Pos.iter (fun '(a, r) => (Z.div2 a, 2 * r + Z.b2z (Z.odd a))) (a, 0) sz)).
+
+  (* Funnel shifts of the concatenation [a:b] by [c] modulo the bit width:
+     [fshl] returns the high word of the left shift, [fshr] the low word of
+     the right shift. *)
+  Definition funnel_shift (f : positive -> Z -> Z -> Z) : int_intrinsic :=
+    fun _ args =>
+      match args with
+      | [IV_Int sz a; IV_Int sz' b; IV_Int sz'' c] =>
+          if andb (Pos.eqb sz sz') (Pos.eqb sz sz'')
+          then Some (IR_Int sz (f sz (a * imodulus sz + b) (c mod Zpos sz)))
+          else None
+      | _ => None
+      end.
+
+  Definition llvm_fshl := funnel_shift (fun sz ab c => Z.shiftr (Z.shiftl ab c) (Zpos sz)).
+  Definition llvm_fshr := funnel_shift (fun _ ab c => Z.shiftr ab c).
+
+  (* Three-way comparison: -1, 0 or 1 at the return type. *)
+  Definition three_way (f : positive -> Z -> Z -> Datatypes.comparison) : int_intrinsic :=
+    fun t args =>
+      match t, args with
+      | DTYPE_Base (DTYPE_I r), [IV_Int sz a; IV_Int sz' b] =>
+          if Pos.eqb sz sz'
+          then Some (IR_Int r (match f sz a b with Datatypes.Lt => -1 | Datatypes.Eq => 0 | Datatypes.Gt => 1 end))
+          else None
+      | _, _ => None
+      end.
+
+  Definition llvm_scmp := three_way (on_signed Z.compare).
+  Definition llvm_ucmp := three_way (fun _ => Z.compare).
+
+  (* https://llvm.org/docs/LangRef.html#vector-reduction-intrinsics *)
+  Definition vector_reduce (f : positive -> Z -> Z -> Z) : int_intrinsic :=
+    fun _ args =>
+      match args with
+      | [IV_Vector ((sz, a) :: elts)] =>
+          Some (IR_Int sz (fold_left (fun acc '(_, b) => f sz acc b mod imodulus sz) elts a))
+      | _ => None
+      end.
+
+  Definition llvm_vector_reduce_add := vector_reduce (fun _ => Z.add).
+  Definition llvm_vector_reduce_mul := vector_reduce (fun _ => Z.mul).
+  Definition llvm_vector_reduce_and := vector_reduce (fun _ => Z.land).
+  Definition llvm_vector_reduce_or := vector_reduce (fun _ => Z.lor).
+  Definition llvm_vector_reduce_xor := vector_reduce (fun _ => Z.lxor).
+  Definition llvm_vector_reduce_smax := vector_reduce (on_signed Z.max).
+  Definition llvm_vector_reduce_smin := vector_reduce (on_signed Z.min).
+  Definition llvm_vector_reduce_umax := vector_reduce (fun _ => Z.max).
+  Definition llvm_vector_reduce_umin := vector_reduce (fun _ => Z.min).
+
+End IntegerIntrinsics.
+
 (** The intrinsics with a built-in semantics.  An overloaded intrinsic is one
-    family, whatever its type mangling: [llvm.ushl.sat.i8] and
-    [llvm.ushl.sat.i64] are both [Intr_ushl_sat]. *)
+    family, whatever its type mangling: [llvm.fabs.f32] and [llvm.fabs.f64]
+    are both [Intr_fabs]. *)
 Variant intrinsic_family : Set :=
+| Intr_int (f : int_intrinsic)
 | Intr_fabs
 | Intr_maxnum
 | Intr_minimum
-| Intr_ushl_sat
 | Intr_throw
 | Intr_assume
 | Intr_va_start
@@ -83,25 +276,57 @@ Variant intrinsic_family : Set :=
 | Intr_malloc
 | Intr_free.
 
-(** Each family's name, and whether it is overloaded: an overloaded name is
-    followed by the mangling of its type parameters ([.f32], [.p0.p0.i64]),
-    any other name must match exactly.  The semantic functions take the types
-    from their arguments, so the mangling itself is not interpreted. *)
+(** The families named [llvm.<name>], and whether each is overloaded: an
+    overloaded name is followed by the mangling of its type parameters
+    ([.f32], [.p0.p0.i64]), any other name must match exactly.  The semantic
+    functions take the types from their arguments, so the mangling itself is
+    not interpreted. *)
 Definition intrinsic_table : list (string * bool * intrinsic_family) :=
-  [ ("llvm.fabs", true, Intr_fabs);
-    ("llvm.maxnum", true, Intr_maxnum);
-    ("llvm.minimum", true, Intr_minimum);
-    ("llvm.ushl.sat", true, Intr_ushl_sat);
-    ("llvm.memcpy", true, Intr_memcpy);
-    ("llvm.memmove", true, Intr_memmove);
-    ("llvm.memset", true, Intr_memset);
-    ("malloc", false, Intr_malloc);
-    ("free", false, Intr_free);
-    ("llvm.vellvm.internal.throw", false, Intr_throw);
-    ("llvm.assume", false, Intr_assume);
-    ("llvm.va_start", false, Intr_va_start);
-    ("llvm.va_end", false, Intr_va_end);
-    ("llvm.va_copy", false, Intr_va_copy)
+  [ ("fabs", true, Intr_fabs);
+    ("maxnum", true, Intr_maxnum);
+    ("minimum", true, Intr_minimum);
+    ("memcpy", true, Intr_memcpy);
+    ("memmove", true, Intr_memmove);
+    ("memset", true, Intr_memset);
+    ("vellvm.internal.throw", false, Intr_throw);
+    ("assume", false, Intr_assume);
+    ("va_start", false, Intr_va_start);
+    ("va_end", false, Intr_va_end);
+    ("va_copy", false, Intr_va_copy);
+    ("smax", true, Intr_int llvm_smax);
+    ("smin", true, Intr_int llvm_smin);
+    ("umax", true, Intr_int llvm_umax);
+    ("umin", true, Intr_int llvm_umin);
+    ("sadd.with.overflow", true, Intr_int llvm_sadd_with_overflow);
+    ("ssub.with.overflow", true, Intr_int llvm_ssub_with_overflow);
+    ("smul.with.overflow", true, Intr_int llvm_smul_with_overflow);
+    ("uadd.with.overflow", true, Intr_int llvm_uadd_with_overflow);
+    ("usub.with.overflow", true, Intr_int llvm_usub_with_overflow);
+    ("umul.with.overflow", true, Intr_int llvm_umul_with_overflow);
+    ("sadd.sat", true, Intr_int llvm_sadd_sat);
+    ("ssub.sat", true, Intr_int llvm_ssub_sat);
+    ("uadd.sat", true, Intr_int llvm_uadd_sat);
+    ("usub.sat", true, Intr_int llvm_usub_sat);
+    ("sshl.sat", true, Intr_int llvm_sshl_sat);
+    ("ushl.sat", true, Intr_int llvm_ushl_sat);
+    ("abs", true, Intr_int llvm_abs);
+    ("ctlz", true, Intr_int llvm_ctlz);
+    ("cttz", true, Intr_int llvm_cttz);
+    ("ctpop", true, Intr_int llvm_ctpop);
+    ("bitreverse", true, Intr_int llvm_bitreverse);
+    ("fshl", true, Intr_int llvm_fshl);
+    ("fshr", true, Intr_int llvm_fshr);
+    ("scmp", true, Intr_int llvm_scmp);
+    ("ucmp", true, Intr_int llvm_ucmp);
+    ("vector.reduce.add", true, Intr_int llvm_vector_reduce_add);
+    ("vector.reduce.mul", true, Intr_int llvm_vector_reduce_mul);
+    ("vector.reduce.and", true, Intr_int llvm_vector_reduce_and);
+    ("vector.reduce.or", true, Intr_int llvm_vector_reduce_or);
+    ("vector.reduce.xor", true, Intr_int llvm_vector_reduce_xor);
+    ("vector.reduce.smax", true, Intr_int llvm_vector_reduce_smax);
+    ("vector.reduce.smin", true, Intr_int llvm_vector_reduce_smin);
+    ("vector.reduce.umax", true, Intr_int llvm_vector_reduce_umax);
+    ("vector.reduce.umin", true, Intr_int llvm_vector_reduce_umin)
   ]%string.
 
 Definition is_digit (c : ascii) : bool :=
@@ -132,9 +357,24 @@ Fixpoint names_intrinsic (overloaded : bool) (fam name : string) : bool :=
   | String _ _, EmptyString => false
   end.
 
+(** [s] without the prefix [pre], if it has it. *)
+Fixpoint strip_prefix (pre s : string) : option string :=
+  match pre, s with
+  | EmptyString, _ => Some s
+  | String a pre', String b s' => if Ascii.eqb a b then strip_prefix pre' s' else None
+  | String _ _, EmptyString => None
+  end.
+
 Definition lookup_intrinsic (name : string) : option intrinsic_family :=
-  option_map snd
-    (List.find (fun '(fam, overloaded, _) => names_intrinsic overloaded fam name) intrinsic_table).
+  match strip_prefix "llvm." name with
+  | Some name' =>
+      option_map snd
+        (List.find (fun '(fam, overloaded, _) => names_intrinsic overloaded fam name') intrinsic_table)
+  | None =>
+      if String.eqb name "malloc" then Some Intr_malloc
+      else if String.eqb name "free" then Some Intr_free
+      else None
+  end.
 
 Definition is_intrinsic (id : function_id) : bool :=
   match id with
@@ -307,40 +547,6 @@ Section Intrinsics.
       | _ => raise_error "llvm.minimum got incorrect / ill-typed inputs"
       end.
 
-  (* Saturated arithmetic: https://llvm.org/docs/LangRef.html#saturation-arithmetic-intrinsics *)
-  Definition ushl_sat {I : Type} `{TDI : ToDvalueBase I} `{VMI : VMemInt I} (x y : I) : EOU dvalue_base :=
-    res <- mshl x y;;
-    let res_u := munsigned res in
-    let res_u' := Z.shiftl (munsigned x) (munsigned y) in
-    if option_pred (fun bw => munsigned y >=? Zpos bw) (@mbitwidth I VMI)
-    then ret DVALUE_Poison
-    else
-      if (res_u' >? res_u)
-      then 
-        match (@mmax_unsigned I VMI) with
-        | None =>
-            raise_error "ushl_sat issue with unbounded integer type."
-        | Some m =>
-            match mrepr m with
-            | raise_oom _ =>
-                raise_error "ushl_sat: cannot represent maximum value in type... Should not happen."
-            (* Note: we have enlarged the monad, so that statically we don't rule out new absurd cases such as failure or ub *)
-            | m => tdb <$> m
-            end
-        end
-      else ret (tdb res).
-
-  Definition llvm_ushl_sat : pure_base_function :=
-    fun args =>
-      match args with
-      | [DVALUE_I sz a; DVALUE_I sz' b] =>
-          match Pos.eq_dec sz' sz with
-          | left e => inr <$> ushl_sat a (eq_rect sz' (@bit_int) b sz e)
-          | right _ => raise_error "llvm.ushl.sat got operands of different widths"
-          end
-      | _ => raise_error "llvm.ushl.sat got incorrect / ill-typed inputs"
-      end.
-
   Definition llvm_vellvm_internal_throw : pure_base_function :=
     fun args =>
       match args with
@@ -390,6 +596,58 @@ Section Intrinsics.
     fun args varargs =>
       retr (DVALUE_Base DVALUE_None).
 
+  Definition dvalue_to_ival (v : dvalue) : option ival :=
+    match v with
+    | DVALUE_Base (DVALUE_I sz x) => Some (IV_Int sz (unsigned x))
+    | DVALUE_Base DVALUE_Poison => Some IV_Poison
+    | DVALUE_Array true elts =>
+        fold_right (fun elt acc =>
+                      match elt, acc with
+                      | DVALUE_Base (DVALUE_I sz x), Some (IV_Vector l) =>
+                          Some (IV_Vector ((sz, unsigned x) :: l))
+                      | DVALUE_Base (DVALUE_I _ _), Some IV_Poison
+                      | DVALUE_Base DVALUE_Poison, Some _ => Some IV_Poison
+                      | _, _ => None
+                      end)
+          (Some (IV_Vector [])) elts
+    | _ => None
+    end.
+
+  Fixpoint dvalues_to_ivals (vs : list dvalue) : option (list ival) :=
+    match vs with
+    | [] => Some []
+    | v :: vs =>
+        match dvalue_to_ival v, dvalues_to_ivals vs with
+        | Some i, Some is => Some (i :: is)
+        | _, _ => None
+        end
+    end.
+
+  Definition ires_to_dvalue (r : ires) : dvalue :=
+    match r with
+    | IR_Int sz z => DVALUE_Base (DVALUE_I sz (repr z))
+    | IR_Overflow sz z overflow =>
+        DVALUE_Struct false [DVALUE_Base (DVALUE_I sz (repr z));
+                             DVALUE_Base (DVALUE_I 1 (if overflow then one else zero))]
+    | IR_Poison => DVALUE_Base DVALUE_Poison
+    end.
+
+  Definition is_iv_poison (i : ival) : bool :=
+    match i with IV_Poison => true | _ => false end.
+
+  Definition llvm_int_intrinsic (f : int_intrinsic) (t : dtyp) : pure_function :=
+    fun args =>
+      match dvalues_to_ivals args with
+      | Some args' =>
+          if existsb is_iv_poison args' then retr (DVALUE_Base DVALUE_Poison)
+          else
+            match f t args' with
+            | Some r => retr (ires_to_dvalue r)
+            | None => raise_error "integer intrinsic got incorrect / ill-typed inputs"
+            end
+      | None => raise_error "integer intrinsic got incorrect / ill-typed inputs"
+      end.
+
   Definition pure_base_to_pure : pure_base_function -> pure_function :=
     fun f args =>
       args' <- map_monad dvalue_to_dvalue_base args ;;
@@ -407,12 +665,12 @@ Section Intrinsics.
   
   (* The semantics of each family, except for the memory intrinsics, which
      [handle_intrinsicM] interprets. *)
-  Definition intrinsic_semantics (fam : intrinsic_family) : option semantic_function :=
+  Definition intrinsic_semantics (t : dtyp) (fam : intrinsic_family) : option semantic_function :=
     match fam with
+    | Intr_int f => Some (pure_to_semantic (llvm_int_intrinsic f t))
     | Intr_fabs => Some (pure_base_to_semantic llvm_fabs)
     | Intr_maxnum => Some (pure_base_to_semantic llvm_maxnum)
     | Intr_minimum => Some (pure_base_to_semantic llvm_minimum)
-    | Intr_ushl_sat => Some (pure_base_to_semantic llvm_ushl_sat)
     | Intr_throw => Some (pure_base_to_semantic llvm_vellvm_internal_throw)
     | Intr_assume => Some (pure_base_to_semantic llvm_assume)
     | Intr_va_start => Some llvm_va_start
@@ -421,9 +679,10 @@ Section Intrinsics.
     | Intr_memcpy | Intr_memmove | Intr_memset | Intr_malloc | Intr_free => None
     end.
 
-  Definition named_intrinsic_semantics (name : string) : option semantic_function :=
+  (* [t] is the call's return type. *)
+  Definition named_intrinsic_semantics (t : dtyp) (name : string) : option semantic_function :=
     match lookup_intrinsic name with
-    | Some fam => intrinsic_semantics fam
+    | Some fam => intrinsic_semantics t fam
     | None => None
     end.
 

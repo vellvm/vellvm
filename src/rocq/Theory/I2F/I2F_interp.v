@@ -119,34 +119,40 @@ Proof.
   destruct Hargs; [apply I2F_EOU_ret; repeat constructor | constructor].
 Qed.
 
-(** ** [ushl_sat] (saturated shift-left) *)
-Lemma I2F_ushl_sat {I : Type} (VMI : VMemInt I)
-      (TDI1 : @ToDvalueBase PInf I) (TDI2 : @ToDvalueBase PFin I)
-      (Htdb : forall x : I, I2F_dvalue_base (@tdb PInf I TDI1 x) (@tdb PFin I TDI2 x))
-      (a b : I) :
-  I2F_EOU I2F_dvalue_base (@ushl_sat I PInf TDI1 VMI a b) (@ushl_sat I PFin TDI2 VMI a b).
+(** ** The integer intrinsics: [Params]-independent functions of the
+    [ival] view of their arguments *)
+
+Lemma I2F_dvalue_to_ival : forall v1 v2,
+    I2F_dvalue v1 v2 -> @dvalue_to_ival PInf v1 = @dvalue_to_ival PFin v2.
 Proof.
-  unfold ushl_sat.
-  destruct (mshl a b) as [s|s|s|res]; [constructor | constructor | constructor | cbn].
-  destruct (option_pred (fun bw => munsigned b >=? Z.pos bw) mbitwidth).
-  { constructor; constructor. }
-  destruct (Z.shiftl (munsigned a) (munsigned b) >? munsigned res).
-  - destruct mmax_unsigned as [m | ]; [ | constructor].
-    destruct (mrepr m) as [s|s|s|v]; cbn; [constructor | constructor | constructor | constructor; apply Htdb].
-  - cbn; constructor; apply Htdb.
+  intros v1 v2 Hv.
+  destruct Hv as [b b' Hb | p s1 s2 Hs | v s1 s2 Hs]; [destruct Hb; reflexivity | reflexivity |].
+  destruct v; [ | reflexivity]; cbn.
+  induction Hs as [ | x y l l' Hxy Hl IH]; [reflexivity | cbn; rewrite IH].
+  destruct Hxy as [b b' Hb | | ]; [destruct Hb | | ]; reflexivity.
 Qed.
 
-Lemma I2F_llvm_ushl_sat : forall args1 args2,
-    Forall2 I2F_dvalue_base args1 args2 ->
-    I2F_EOU (sum_rel I2F_dvalue_base I2F_dvalue_base) (llvm_ushl_sat args1) (llvm_ushl_sat args2).
+Lemma I2F_dvalues_to_ivals : forall vs1 vs2,
+    Forall2 I2F_dvalue vs1 vs2 -> @dvalues_to_ivals PInf vs1 = @dvalues_to_ivals PFin vs2.
 Proof.
-  intros args1 args2 Hargs; unfold llvm_ushl_sat.
-  i2f_arg Hargs; try (destruct Hargs; constructor).
-  i2f_arg Hargs; try (destruct Hargs; constructor).
-  destruct Hargs; [ | constructor].
-  destruct (Pos.eq_dec sz0 sz) as [e | ]; [destruct e; cbn -[ushl_sat] | constructor].
-  eapply I2F_EOU_bind; [apply I2F_ushl_sat; intros; repeat constructor |].
-  intros; constructor; constructor; auto.
+  intros vs1 vs2 Hvs.
+  induction Hvs as [ | x y l l' Hxy Hl IH]; [reflexivity | cbn].
+  now rewrite (I2F_dvalue_to_ival Hxy), IH.
+Qed.
+
+Lemma I2F_llvm_int_intrinsic : forall f t args1 args2 va1 va2,
+    Forall2 I2F_dvalue args1 args2 ->
+    I2F_refine_MCFG (sum_rel I2F_dvalue I2F_dvalue)
+      (pure_to_semantic (@llvm_int_intrinsic PInf f t) args1 va1)
+      (pure_to_semantic (@llvm_int_intrinsic PFin f t) args2 va2).
+Proof.
+  intros f t args1 args2 va1 va2 Hargs.
+  unfold pure_to_semantic, llvm_int_intrinsic.
+  apply I2F_refine_lift.
+  rewrite (I2F_dvalues_to_ivals Hargs).
+  destruct (dvalues_to_ivals args2) as [args | ]; [ | constructor].
+  destruct (existsb is_iv_poison args); [repeat constructor |].
+  destruct (f t args) as [[] | ]; cbn; repeat constructor.
 Qed.
 
 (** ** [va_start] / [va_copy] (the only two intrinsics touching memory) *)
@@ -213,13 +219,13 @@ Proof.
   cbn -[named_intrinsic_semantics].
   unfold named_intrinsic_semantics.
   destruct (lookup_intrinsic f2) as [[] | ];
-    cbn -[pure_base_to_semantic llvm_va_start llvm_va_end llvm_va_copy];
+    cbn -[pure_base_to_semantic pure_to_semantic llvm_va_start llvm_va_end llvm_va_copy];
     try (simp I2FA_Intrinsic; apply I2F_pure_base_to_semantic;
          [ | exact (I2F_targs_snd Hargs)]).
+  - simp I2FA_Intrinsic; apply I2F_llvm_int_intrinsic; exact (I2F_targs_snd Hargs).
   - apply I2F_llvm_fabs.
   - apply I2F_llvm_maxnum.
   - apply I2F_llvm_minimum.
-  - apply I2F_llvm_ushl_sat.
   - apply I2F_llvm_vellvm_internal_throw.
   - apply I2F_llvm_assume.
   - simp I2FA_Intrinsic; apply I2F_llvm_va_start; auto using I2F_targs_snd.

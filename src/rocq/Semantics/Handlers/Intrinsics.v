@@ -60,8 +60,8 @@ Section Intrinsics.
     IntrinsicE ~> itree E :=
     fun X (e : IntrinsicE X) =>
       match e in IntrinsicE Y return X = Y -> itree E Y with
-      | Intrinsic _ fname args varargs =>
-          match named_intrinsic_semantics fname with
+      | Intrinsic t fname args varargs =>
+          match named_intrinsic_semantics t fname with
           | Some f => fun pf => f (List.map snd args) varargs
           | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) _ pf
           end
