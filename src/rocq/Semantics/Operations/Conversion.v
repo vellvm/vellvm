@@ -149,11 +149,16 @@ Section Convert.
         | _, _, _ => raise_error "ill-typed Trunc"
         end
 
-    | Zext nneg => (* TODO: handle the nneg flag *)
+    | Zext nneg =>
+        (* LANGREF: If the nneg flag is set, and the zext argument is
+           negative, the result is a poison value. *)
         match t1, x, t2 with
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_I sz_to =>
             if Pos.eqb sz_t sz_from && (sz_from <? sz_to)%positive
-            then ret (DVALUE_I sz_to (repr (unsigned i1)))
+            then
+              if nneg && (signed i1 <? 0)%Z
+              then ret (dvp t2)
+              else ret (DVALUE_I sz_to (repr (unsigned i1)))
             else raise_error "i-to-i ill-typed Zext"
 
         | DTYPE_I sz_t, DVALUE_Poison, DTYPE_I sz_to =>
@@ -175,16 +180,24 @@ Section Convert.
         | _, _, _ => raise_error "ill-typed Sext"
         end
 
-    | Uitofp nneg => (* TODO: handle the nneg flag *)
+    | Uitofp nneg =>
+        (* LANGREF: If the nneg flag is set, and the uitofp argument is
+           negative, the result is a poison value. *)
         match t1, x, t2 with
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_float =>
             if Pos.eqb sz_t sz_from
-            then ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
+            then
+              if nneg && (signed i1 <? 0)%Z
+              then ret (dvp t2)
+              else ret (DVALUE_Float (Float32.of_intu (repr (unsigned i1))))
             else raise_error "i-to-float ill-typed Uitofp"
 
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_FP FP_double =>
             if Pos.eqb sz_t sz_from
-            then ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
+            then
+              if nneg && (signed i1 <? 0)%Z
+              then ret (dvp t2)
+              else ret (DVALUE_Double (Float.of_longu (repr (unsigned i1))))
             else raise_error "i-to-double ill-typed Uitofp"
 
         | DTYPE_I sz_t, DVALUE_Poison, DTYPE_FP _ =>
