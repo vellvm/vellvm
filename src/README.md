@@ -13,6 +13,7 @@ Run from `src/`.
 | `make frontend_exe` | Just the `dune build` step of `frontend`, assuming its Rocq files are already compiled. |
 | `make test` / `make check` | Run the differential test suite over `../tests` against `clang`/`llc` (builds `vellvm` first). |
 | `make test-full` | Same, but the full corpus (`-test` instead of `-test-dir ../tests`). |
+| `make i1-tests` / `make i1-tests-regen` | Generate the `i1` arithmetic tests under `../tests/llvm-arith/i1` if any is missing (`make test` does this first) / rewrite them unconditionally. Needs `python3`. |
 | `make perf` | Run the interpreter performance stress tests (`../tests/perf/run.sh`); see `../tests/perf/README.md`. |
 | `make timing` | Print per-file Rocq compile times and a summary table sorted by duration (`make clean-rocqmakefile` first to time the whole library from scratch). |
 | `make clean` | Remove all build artifacts: compiled Rocq (`.vo`/`.glob`/`.aux`), extracted OCaml, the `vellvm`/`frontend` executables, and dune's build directory. |

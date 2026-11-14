@@ -80,12 +80,36 @@ timing: RocqMakefile
 
 ######## testing the Vellvm interpreter
 
+# The i1 arithmetic tests are generated (see ../tests/llvm-arith/i1/README.md).
+# `make i1-tests` writes them if any is missing; `make i1-tests-regen` rewrites
+# them unconditionally, e.g. after editing the generator.
+I1_DIR := ../tests/llvm-arith/i1
+I1_GEN := $(I1_DIR)/gen-i1.py
+I1_TESTS := $(addprefix $(I1_DIR)/, \
+  binop.ll icmp.ll cast.ll control.ll switch-literals.ll memory.ll \
+  vector-ops.ll intrinsics.ll binop-poison.ll div-rem-ub.ll cast-poison.ll \
+  control-poison.ll vector-poison.ll intrinsics-poison.ll)
+
+.PHONY: i1-tests
+i1-tests:
+	@for f in $(I1_TESTS); do \
+	  if [ ! -f $$f ]; then \
+	    echo "python3 $(I1_GEN)  # $$f is missing"; \
+	    python3 $(I1_GEN) || exit 1; \
+	    break; \
+	  fi; \
+	done
+
+.PHONY: i1-tests-regen
+i1-tests-regen:
+	python3 $(I1_GEN)
+
 .PHONY: test-full
-test-full: vellvm
+test-full: vellvm i1-tests
 	./vellvm -L libll -test
 
 .PHONY: test
-test: vellvm
+test: vellvm i1-tests
 	./vellvm -L libll -test-dir ../tests
 
 .PHONY: check
