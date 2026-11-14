@@ -89,17 +89,13 @@ assertion, and where the result is defined it also compares the native output.
 
 ## Status
 
-As of 2026-11-14 (`main` at 0e535ce1), with LLVM 23.1.2: all 1,488 generated
-cases agree with clang and llubi. Vellvm passes 1,175 of them, fails 309, and
+As of 2026-11-14 (after the `mul nsw` and `trunc nuw`/`nsw` fixes), with LLVM 23.1.2: all 1,488 generated
+cases agree with clang and llubi. Vellvm passes 1,277 of them, fails 207, and
 does not parse the 4 in `switch-literals.ll` (`-test-dir` skips that file
 silently). What fails:
 
-- **`mul nsw i1 1, 1`** returns 1, not poison (scalar and vector). The
-  other `nuw`/`nsw` checks on `add`, `sub`, `mul`, and `shl` are right.
-- **`trunc nuw` / `trunc nsw`** are not enforced at any source width: the
-  flags are ignored.
 - **`zext nneg`** and **`uitofp nneg`** are not enforced.
-- Branching on any of the above therefore isn't UB (`control-poison.ll`).
+- Branching on `zext nneg i1 1` therefore isn't UB (`control-poison.ll`).
 - **`udiv`/`sdiv`/`urem`/`srem` of a poison dividend by 0** give poison, not UB.
 - **`getelementptr` with an `i1` index** fails (`gep_steps: unsupported index
   type`).

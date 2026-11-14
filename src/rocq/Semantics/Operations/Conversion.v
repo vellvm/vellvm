@@ -124,11 +124,23 @@ Section Convert.
    *)
   Definition convert_pure_base (conv : pure_conversion) (t1:dtyp_base) (x:dvalue_base) (t2:dtyp_base) : EOU dvalue_base :=
     match conv with
-    | Trunc nuw nsb => (* TODO: handle the nuw and nsb flags *)
+    | Trunc nuw nsw =>
+        (* LANGREF: If the nuw keyword is present, and any of the truncated
+           bits are non-zero, the result is a poison value. If the nsw keyword
+           is present, and any of the truncated bits are not the same as the
+           top bit of the truncation result, the result is a poison value.
+
+           Equivalently: nuw requires that zero-extending the result gives
+           back the operand, and nsw that sign-extending it does. *)
         match t1, x, t2 with
         | DTYPE_I sz_t, DVALUE_I sz_from i1, DTYPE_I sz_to =>
             if Pos.eqb sz_t sz_from && (sz_to <? sz_from)%positive
-            then ret (DVALUE_I sz_to (repr (unsigned i1)))
+            then
+              let res : @bit_int sz_to := repr (unsigned i1) in
+              if (nuw && negb (Z.eqb (unsigned res) (unsigned i1)))
+                 || (nsw && negb (Z.eqb (signed res) (signed i1)))
+              then ret (dvp t2)
+              else ret (DVALUE_I sz_to res)
             else raise_error "i-to-i ill-typed Trunc"
 
         | DTYPE_I sz_t, DVALUE_Poison, DTYPE_I sz_to =>

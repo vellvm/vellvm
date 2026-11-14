@@ -631,36 +631,32 @@ Section DValue.
           then ret (dvp mdtyp_of_int)
           else tdb <$> (msub x y)
                          
-      | Mul nuw nsw => 
-          (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
-          if (option_pred (fun bw => Pos.eqb bw 1) mbitwidth)
-          then tdb <$> (mmul x y)
+      | Mul nuw nsw =>
+          res <- mmul x y;;
+
+          let res_u' := ((munsigned x) * (munsigned y))%Z in
+          let res_s' := ((msigned x) * (msigned y))%Z in
+
+          let min_s_bound := match fmap (fun m => m >? res_s') mmin_signed with
+                             | None => false
+                             | Some x => x
+                             end in
+          let max_s_bound := match fmap (fun m => res_s' >? m) mmax_signed with
+                             | None => false
+                             | Some x => x
+                             end in
+
+          if dtyp_base_eq_dec mdtyp_of_int DTYPE_Iptr
+          then
+            if (res_u' >? munsigned res)
+            then raise_oom "Multiplication overflow on iptr."
+            else ret (tdb res)
           else
-            res <- mmul x y;;
-            
-            let res_u' := ((munsigned x) * (munsigned y))%Z in
-            let res_s' := ((msigned x) * (msigned y))%Z in
+            if orb (andb nuw (res_u' >? munsigned res))
+                 (andb nsw (orb min_s_bound max_s_bound))
+            then ret (dvp mdtyp_of_int)
+            else ret (tdb res)
 
-            let min_s_bound := match fmap (fun m => m >? res_s') mmin_signed with
-                               | None => false
-                               | Some x => x
-                               end in
-            let max_s_bound := match fmap (fun m => res_s' >? m) mmax_signed with
-                               | None => false
-                               | Some x => x
-                               end in
-
-            if dtyp_base_eq_dec mdtyp_of_int DTYPE_Iptr
-            then
-              if (res_u' >? munsigned res)
-              then raise_oom "Multiplication overflow on iptr."
-              else ret (tdb res)
-            else
-              if orb (andb nuw (res_u' >? munsigned res))
-                   (andb nsw (orb min_s_bound max_s_bound))
-              then ret (dvp mdtyp_of_int)
-              else ret (tdb res)                               
-                       
       | Shl nuw nsw =>
           if dtyp_base_eq_dec (@mdtyp_of_int Int _) DTYPE_Iptr
           then
