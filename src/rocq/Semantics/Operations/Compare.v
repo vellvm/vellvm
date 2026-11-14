@@ -50,7 +50,8 @@ Section Compare.
               elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
               elts2' <- map_monad dvalue_to_dvalue_base elts2 ;;
               val <- vec_loop (eval_icmp_base samesign icmp) (List.combine elts1' elts2') ;;
-              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base val))
+              (* the result is a vector of [i1] *)
+              ret (canonicalize_agg (DTYPE_Array true sz (DTYPE_I 1)) (List.map DVALUE_Base val))
             else
               raise_ub "icmp of different-length vectors"
         | _, _ => raise_error "eval_icmp_base: ill-typed icmp"

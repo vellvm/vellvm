@@ -211,7 +211,7 @@ Section withParams.
     let dt := (g_typ g) in
     a <- gread (g_ident g);;
     uv <- match (g_exp g) with
-         | None => ret (DVALUE_Base DVALUE_Poison)
+         | None => ret (poison_of_dtyp dt)
          | Some e => denote_exp (Some dt) e
          end ;;
     store dt a uv.

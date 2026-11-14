@@ -169,7 +169,9 @@ Section Attributes.
       instead."  It applies to floating-point values, vectors of them, and
       aggregates of those, element by element.
 
-      [dt] is the type of [v]; each element is visited at its own type.  (A
+      [dt] is the type of [v]; each element is visited at its own type, and
+      the result is rebuilt in canonical form: an aggregate all of whose
+      elements became poison is poison.  (A
       value whose shape does not match [dt] is ill typed; the part with no
       type is left as it is.) *)
   Fixpoint value_nofpclass (mask : Z) (dt : dtyp) (v : dvalue) : dvalue :=
@@ -181,7 +183,7 @@ Section Attributes.
         end
     | DVALUE_Array vec elts =>
         match dt with
-        | DTYPE_Array _ _ t => DVALUE_Array vec (List.map (value_nofpclass mask t) elts)
+        | DTYPE_Array _ _ t => canonicalize_agg dt (List.map (value_nofpclass mask t) elts)
         | _ => v
         end
     | DVALUE_Struct p fields =>
@@ -192,7 +194,7 @@ Section Attributes.
               | t :: ts', v :: vs' => value_nofpclass mask t v :: go ts' vs'
               | _, _ => vs
               end in
-            DVALUE_Struct p (go dts fields)
+            canonicalize_agg dt (go dts fields)
         | _ => v
         end
     end.
@@ -241,7 +243,7 @@ Section Attributes.
   Definition value_metadata_range (ranges : option (list (int_syntax * int_syntax))) (dt : dtyp) (v : dvalue) : dvalue :=
     match ranges, v with
     | None, _ => v
-    | Some rs, DVALUE_Array true elts => DVALUE_Array true (List.map (value_metadata_range_base rs) elts)
+    | Some rs, DVALUE_Array true elts => canonicalize_agg dt (List.map (value_metadata_range_base rs) elts)
     | Some rs, _ => value_metadata_range_base rs v
     end.
 

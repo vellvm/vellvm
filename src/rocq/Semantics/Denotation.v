@@ -197,6 +197,16 @@ Section Denotation.
     end.
 
   Definition NONE := DVALUE_Base (DVALUE_None).
+
+  (* The type of an array or vector literal, read off its (typed) elements.
+     A literal with no elements has an empty type whatever its element type
+     is, so that one is arbitrary. *)
+  Definition array_typ_of_texps (vector : bool) (es : list (texp dtyp)) : dtyp :=
+    DTYPE_Array vector (N.of_nat (List.length es))
+      (match es with
+       | (t, _) :: _ => t
+       | [] => DTYPE_Base DTYPE_Void
+       end).
   
   Fixpoint denote_exp (top:option dtyp) (o:exp dtyp) {struct o} : MCFGtop dvalue :=
     let denote_exp_base top o :=
@@ -245,32 +255,38 @@ Section Denotation.
       vs <- map_monad eval_texp es ;;
       ret (DVALUE_Array false vs)
 
-    (* [undef] is denoted as [poison] (see [EXP_Undef] in LLVMAst.v). *)
-    | EXP_Undef => ret (DVALUE_Base DVALUE_Poison)
+    (* [undef] is denoted as [poison] (see [EXP_Undef] in LLVMAst.v).
+       Poison is taken at the literal's type ([poison_of_dtyp]): at an empty
+       type such as [{}] it is the type's one value.  An untyped [poison]
+       does not arise as an operand; it is left as [DVALUE_Poison]. *)
+    | EXP_Undef | EXP_Poison =>
+        match top with
+        | Some t => ret (poison_of_dtyp t)
+        | None => ret (DVALUE_Base DVALUE_Poison)
+        end
 
-    | EXP_Poison => ret (DVALUE_Base DVALUE_Poison)
-
+    (* Aggregate literals are built in canonical form ([canonicalize_agg]):
+       a literal all of whose fields are poison is the value poison.  The
+       literal's type is read off its fields, each of which is typed. *)
     (* Question: should we do any typechecking for aggregate types here? *)
     (* Option 1: do no typechecking: *)
     | EXP_Struct es =>
         vs <- map_monad eval_texp es ;;
-        ret (DVALUE_Struct false vs)
+        ret (canonicalize_agg (DTYPE_Struct false (List.map fst es)) vs)
 
     (* Option 2: do a little bit of typechecking *)
     | EXP_Packed_struct es =>
         lift (assert_packed_struct_typ top) ;;
         vs <- map_monad eval_texp es ;;
-        ret (DVALUE_Struct true vs)
+        ret (canonicalize_agg (DTYPE_Struct true (List.map fst es)) vs)
 
     | EXP_Array es =>
       vs <- map_monad eval_texp es ;;
-      ret (DVALUE_Array false vs)
+      ret (canonicalize_agg (array_typ_of_texps false es) vs)
 
-    (* A vector of poison lanes is the canonical [DVALUE_Poison]; see
-       [canonicalize_agg]. *)
     | EXP_Vector es =>
       vs <- map_monad eval_texp es ;;
-      ret (canonicalize_agg (DVALUE_Array true) vs)
+      ret (canonicalize_agg (array_typ_of_texps true es) vs)
 
     | OP_IBinop iop dt op1 op2 =>
       v1 <- denote_exp (Some dt) op1 ;;
@@ -291,7 +307,7 @@ Section Denotation.
     (* TODO: fast_math? **)
     | OP_Fneg _ (dt, op) =>
         v <- denote_exp (Some dt) op ;;
-        lift (eval_fneg v)
+        lift (eval_fneg dt v)
              
     | OP_FCmp fcmp _ dt op1 op2 =>
         v1 <- denote_exp (Some dt) op1 ;;
@@ -360,7 +376,7 @@ Section Denotation.
         (* use the type from the splat elt *)
         v <- eval_texp elt ;;
         (* this could be very expensive if the vector is big *)
-        ret (canonicalize_agg (DVALUE_Array true) (List.repeat v (N.to_nat sz)))
+        ret (canonicalize_agg (DTYPE_Array true sz t) (List.repeat v (N.to_nat sz)))
           
     | OP_Freeze (dt, e) =>
         dv <- denote_exp (Some dt) e ;;
@@ -956,7 +972,7 @@ Section Denotation.
     mem_push ;;
     stack_push (List.map (fun '(x, (_, v)) => (x, v)) bs) ;;
     varargs <- alloca dt 1 None;;
-    store dt varargs (DVALUE_Struct true (List.map snd vs));;
+    store dt varargs (canonicalize_agg dt (List.map snd vs));;
     match varargs with
     | DVALUE_Base (DVALUE_Pointer varg) =>
         ret varg

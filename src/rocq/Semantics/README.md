@@ -12,7 +12,10 @@ concrete instances live in `Implementations/`.
 - `EOU.v`                    sum type for pure computations that may raise an error, run out of memory, or trigger UB
 - `VellvmIntegers.v`         `VMemInt`/`VInt` typeclass interfaces for the integer operations used by the semantics
 - `VellvmFloats.v`           `VFloat` typeclass interface for the floating-point operations
-- `DynamicValues.v`          dynamic values (`dvalue`) computed by programs, and the operations over them
+- `DynamicValues.v`          dynamic values (`dvalue`) computed by programs, and the operations over them.
+                             Values are kept in a *canonical form* that depends on their type (see "Canonical forms of dvalues" there):
+                             an aggregate whose fields are all poison is `DVALUE_Poison`, and an empty type (`{}`, `[0 x T]`) has one value, which is not poison.
+                             Build aggregates with `canonicalize_agg dt` and poison with `poison_of_dtyp dt`
 - `LLVMEvents.v`             inventory of the LLVM events (`GlobalE`, `LocalE`, `StackE`, `MemoryE`, `DrawE`, calls, intrinsics, exceptions, UB, OOM, failure, debug) and the event signatures (`CFGEtop`, `MCFGEtop`, ...) used at each interpretation level
 - `MemoryBytes.v`            the byte-level serializer (`dvalue_to_memory_bytes`) and deserializer (`memory_bytes_to_dvalue`) that loads, stores and `bitcast` go through; their theory is in `../Theory/MemoryBytesFacts.v`
 

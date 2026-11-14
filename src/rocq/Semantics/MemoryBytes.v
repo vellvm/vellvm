@@ -807,8 +807,13 @@ Section MemoryByte.
       come back under a different [dvalue_bv] constructor than it went in.
       Pinning down "<dv' agrees with dv>" is the open part of this model.
    *)
-  (* [canonicalize_agg] (DynamicValues.v) is the canonicalising constructor
-     for aggregates.  The [poison_split] fast path in [memory_bytes_to_dvalue]
+  (* The reader returns values in canonical form (DynamicValues.v, "Canonical
+     forms of dvalues"), which is type directed: all-poison bytes read as
+     [poison_of_dtyp dt] -- [DVALUE_Poison], or the one value of [dt] if [dt]
+     is an empty type, which occupies no bytes at all -- and an aggregate is
+     built with [canonicalize_agg dt].
+
+     The [poison_split] fast path in [memory_bytes_to_dvalue]
      catches the common case -- every byte poison -- without rebuilding the
      value, but it is not sufficient on its own.  A single non-poison byte
      lying in padding, or in the tail of an array slot, leaves [rest]
@@ -871,7 +876,7 @@ Section MemoryByte.
             let asz := alloc_size_dtyp dt in
             let rest_bytes := drop asz dbs' in
             f <- (if N.leb (start + ssz) np
-                  then ret (DVALUE_Base DVALUE_Poison)
+                  then ret (poison_of_dtyp dt)
                   else memory_bytes_to_dvalue (take ssz dbs') dt) ;;
             rest <- go (start + asz) dts rest_bytes ;;
             ret (f :: rest)
@@ -887,7 +892,7 @@ Section MemoryByte.
         | O => ret []
         | S n' =>
             e <- (if N.leb (offset + ssz) np
-                  then ret (DVALUE_Base DVALUE_Poison)
+                  then ret (poison_of_dtyp t)
                   else memory_bytes_to_dvalue (take ssz dbs) t) ;;
             rest <- go n' (offset + stride)%N (drop stride dbs) ;;
             ret (e :: rest)
@@ -908,10 +913,11 @@ Section MemoryByte.
     | DTYPE_Array vector sz t =>
         (* An all-poison aggregate canonicalises to [DVALUE_Poison] rather than
            to an aggregate of poisons -- the same treatment [DTYPE_B] already
-           gets in [memory_bytes_to_dvalue_base]. *)
+           gets in [memory_bytes_to_dvalue_base].  (No bytes at all is the
+           all-poison case too: an empty type reads as its one value.) *)
         let '(np, rest) := poison_split dbs in
         match rest with
-        | [] => ret (DVALUE_Base DVALUE_Poison)
+        | [] => ret (poison_of_dtyp (DTYPE_Array vector sz t))
         | _ :: _ =>
             match packed_vector_type (DTYPE_Array vector sz t) with
             | Some (tb, m) =>
@@ -919,22 +925,22 @@ Section MemoryByte.
                    padding bits above the last element are ignored, as for a
                    non-byte-sized integer *)
                 let bits := rev_append (get_bits_of_memory_byte_list (sz * Npos m) dbs []) [] in
-                ret (canonicalize_agg (DVALUE_Array true)
+                ret (canonicalize_agg (DTYPE_Array vector sz t)
                        (packed_bits_to_elts tb m (N.to_nat sz) bits))
             | None =>
                 let stride := if vector then store_size_dtyp t else alloc_size_dtyp t in
                 elts <- array_elts_to_dvalue np stride t (N.to_nat sz) 0%N dbs ;;
-                ret (canonicalize_agg (DVALUE_Array vector) elts)
+                ret (canonicalize_agg (DTYPE_Array vector sz t) elts)
             end
         end
 
     | DTYPE_Struct packed fields =>
         let '(np, rest) := poison_split dbs in
         match rest with
-        | [] => ret (DVALUE_Base DVALUE_Poison)
+        | [] => ret (poison_of_dtyp (DTYPE_Struct packed fields))
         | _ :: _ =>
             let pad := if packed then None else Some (max_preferred_dtyp_alignment fields) in
-            (canonicalize_agg (DVALUE_Struct packed))
+            (canonicalize_agg (DTYPE_Struct packed fields))
               <$> (list_memory_bytes_to_dvalue np pad 0%N fields dbs)
         end
     end.

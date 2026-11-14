@@ -305,7 +305,7 @@ Section Convert.
         | Some (t_from', t_to'), Some elts1 =>
               elts1' <- map_monad dvalue_to_dvalue_base elts1 ;;
               val <- map_monad (fun v => convert_pure_base conv t_from' v t_to') elts1' ;;
-              ret (canonicalize_agg (DVALUE_Array true) (List.map DVALUE_Base val))
+              ret (canonicalize_agg t_to (List.map DVALUE_Base val))
         | None, _ =>
             raise_error "convert_pure: type or vector size mismatch"
         | _, None => raise_error "convert_pure: invalid input dvalue"
