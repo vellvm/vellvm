@@ -86,7 +86,7 @@ timing: RocqMakefile
 I1_DIR := ../tests/llvm-arith/i1
 I1_GEN := $(I1_DIR)/gen-i1.py
 I1_TESTS := $(addprefix $(I1_DIR)/, \
-  binop.ll icmp.ll cast.ll control.ll switch-literals.ll memory.ll \
+  binop.ll icmp.ll cast.ll control.ll memory.ll \
   vector-ops.ll intrinsics.ll binop-poison.ll div-rem-ub.ll cast-poison.ll \
   control-poison.ll vector-poison.ll intrinsics-poison.ll)
 

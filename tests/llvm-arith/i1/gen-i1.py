@@ -495,6 +495,26 @@ d:
   ret i64 102
 }
 
+; the cases spelled `true` and `false`
+define i64 @switch_bool(i1 %c) {
+  switch i1 %c, label %d [ i1 false, label %zero
+                           i1 true, label %one ]
+zero:
+  ret i64 100
+one:
+  ret i64 101
+d:
+  ret i64 102
+}
+
+define i64 @switch_bool_default(i1 %c) {
+  switch i1 %c, label %d [ i1 true, label %one ]
+one:
+  ret i64 101
+d:
+  ret i64 102
+}
+
 ; the case value -1 is the value 1
 define i64 @switch_m1(i1 %c) {
   switch i1 %c, label %d [ i1 -1, label %one ]
@@ -525,6 +545,8 @@ exit:
         t.call(f"switch_{c}", 100 + c, "i64", "switch", f"i1 {c}")
         t.call(f"switch_default_{c}", 101 if c else 102, "i64", "switch_default", f"i1 {c}")
         t.call(f"switch_m1_{c}", 101 if c else 102, "i64", "switch_m1", f"i1 {c}")
+        t.call(f"switch_bool_{c}", 100 + c, "i64", "switch_bool", f"i1 {c}")
+        t.call(f"switch_bool_default_{c}", 101 if c else 102, "i64", "switch_bool_default", f"i1 {c}")
 
     t.section("calls")
     t.add("""
@@ -569,43 +591,6 @@ define i1 @chain(i1 %a, i1 %b, i1 %c) {
             for c in (0, 1):
                 x = (((((a + b) & 1) * c) - a) & 1) ^ b
                 t.call(f"chain_{a}_{b}_{c}", int(sgn(x) <= sgn(c)), "i1", "chain", f"i1 {a}, i1 {b}, i1 {c}")
-    t.write()
-
-# ======================================================== switch-literals.ll
-
-
-def gen_switch_literals():
-    t = PrintAll("switch-literals.ll", """
-; `true` and `false` as the case values of a switch on i1.
-;
-; This is control.ll's @switch with the cases spelled `i1 true` / `i1 false`
-; instead of `i1 1` / `i1 0`.  It is a file of its own because Vellvm's parser
-; rejected that spelling when the suite was written, and a parse error loses
-; every case in the file.
-;
-;   clang -w tests/llvm-arith/i1/switch-literals.ll -o a.out && ./a.out""")
-    t.add("""
-define i64 @switch(i1 %c) {
-  switch i1 %c, label %d [ i1 false, label %zero
-                           i1 true, label %one ]
-zero:
-  ret i64 100
-one:
-  ret i64 101
-d:
-  ret i64 102
-}
-
-define i64 @switch_default(i1 %c) {
-  switch i1 %c, label %d [ i1 true, label %one ]
-one:
-  ret i64 101
-d:
-  ret i64 102
-}""")
-    for c in (0, 1):
-        t.call(f"switch_{c}", 100 + c, "i64", "switch", f"i1 {c}")
-        t.call(f"switch_default_{c}", 101 if c else 102, "i64", "switch_default", f"i1 {c}")
     t.write()
 
 # ================================================================= memory.ll
@@ -1518,7 +1503,7 @@ define i1 @smul_overflow_flag(i1 %a, i1 %b) {
 # ===================================================================== check
 
 
-PRINT_ALL = ["binop.ll", "icmp.ll", "cast.ll", "control.ll", "switch-literals.ll", "memory.ll", "vector-ops.ll", "intrinsics.ll"]
+PRINT_ALL = ["binop.ll", "icmp.ll", "cast.ll", "control.ll", "memory.ll", "vector-ops.ll", "intrinsics.ll"]
 DISPATCH = ["binop-poison.ll", "div-rem-ub.ll", "cast-poison.ll", "control-poison.ll",
             "vector-poison.ll", "intrinsics-poison.ll"]
 
@@ -1614,7 +1599,7 @@ def check(clang="clang", llubi="llubi"):
 if __name__ == "__main__":
     if sys.argv[1:2] == ["--check"]:
         sys.exit(1 if check() else 0)
-    for g in (gen_binop, gen_icmp, gen_cast, gen_control, gen_switch_literals, gen_memory, gen_vector, gen_intrinsics,
+    for g in (gen_binop, gen_icmp, gen_cast, gen_control, gen_memory, gen_vector, gen_intrinsics,
               gen_binop_poison, gen_div_rem, gen_cast_poison, gen_control_poison, gen_vector_poison,
               gen_intrinsics_poison):
         g()

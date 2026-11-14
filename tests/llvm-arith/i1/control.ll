@@ -181,6 +181,26 @@ d:
   ret i64 102
 }
 
+; the cases spelled `true` and `false`
+define i64 @switch_bool(i1 %c) {
+  switch i1 %c, label %d [ i1 false, label %zero
+                           i1 true, label %one ]
+zero:
+  ret i64 100
+one:
+  ret i64 101
+d:
+  ret i64 102
+}
+
+define i64 @switch_bool_default(i1 %c) {
+  switch i1 %c, label %d [ i1 true, label %one ]
+one:
+  ret i64 101
+d:
+  ret i64 102
+}
+
 ; the case value -1 is the value 1
 define i64 @switch_m1(i1 %c) {
   switch i1 %c, label %d [ i1 -1, label %one ]
@@ -231,6 +251,16 @@ define i64 @switch_m1_0() {
   ret i64 %r
 }
 
+define i64 @switch_bool_0() {
+  %r = call i64 @switch_bool(i1 0)
+  ret i64 %r
+}
+
+define i64 @switch_bool_default_0() {
+  %r = call i64 @switch_bool_default(i1 0)
+  ret i64 %r
+}
+
 define i64 @br_1() {
   %r = call i64 @br(i1 1)
   ret i64 %r
@@ -254,6 +284,16 @@ define i64 @switch_default_1() {
 
 define i64 @switch_m1_1() {
   %r = call i64 @switch_m1(i1 1)
+  ret i64 %r
+}
+
+define i64 @switch_bool_1() {
+  %r = call i64 @switch_bool(i1 1)
+  ret i64 %r
+}
+
+define i64 @switch_bool_default_1() {
+  %r = call i64 @switch_bool_default(i1 1)
   ret i64 %r
 }
 
@@ -637,11 +677,15 @@ define i64 @chain_1_1_1() {
 @fmt_switch_0 = private unnamed_addr constant [19 x i8] c"switch_0() = %lld\0A\00"
 @fmt_switch_default_0 = private unnamed_addr constant [27 x i8] c"switch_default_0() = %lld\0A\00"
 @fmt_switch_m1_0 = private unnamed_addr constant [22 x i8] c"switch_m1_0() = %lld\0A\00"
+@fmt_switch_bool_0 = private unnamed_addr constant [24 x i8] c"switch_bool_0() = %lld\0A\00"
+@fmt_switch_bool_default_0 = private unnamed_addr constant [32 x i8] c"switch_bool_default_0() = %lld\0A\00"
 @fmt_br_1 = private unnamed_addr constant [15 x i8] c"br_1() = %lld\0A\00"
 @fmt_phi_not_1 = private unnamed_addr constant [20 x i8] c"phi_not_1() = %lld\0A\00"
 @fmt_switch_1 = private unnamed_addr constant [19 x i8] c"switch_1() = %lld\0A\00"
 @fmt_switch_default_1 = private unnamed_addr constant [27 x i8] c"switch_default_1() = %lld\0A\00"
 @fmt_switch_m1_1 = private unnamed_addr constant [22 x i8] c"switch_m1_1() = %lld\0A\00"
+@fmt_switch_bool_1 = private unnamed_addr constant [24 x i8] c"switch_bool_1() = %lld\0A\00"
+@fmt_switch_bool_default_1 = private unnamed_addr constant [32 x i8] c"switch_bool_default_1() = %lld\0A\00"
 @fmt_id_0 = private unnamed_addr constant [15 x i8] c"id_0() = %lld\0A\00"
 @fmt_id_0_sext = private unnamed_addr constant [20 x i8] c"id_0_sext() = %lld\0A\00"
 @fmt_id_1 = private unnamed_addr constant [15 x i8] c"id_1() = %lld\0A\00"
@@ -744,104 +788,112 @@ define i32 @main() {
   %p25 = call i32 (ptr, ...) @printf(ptr @fmt_switch_default_0, i64 %v25)
   %v26 = call i64 @switch_m1_0()
   %p26 = call i32 (ptr, ...) @printf(ptr @fmt_switch_m1_0, i64 %v26)
-  %v27 = call i64 @br_1()
-  %p27 = call i32 (ptr, ...) @printf(ptr @fmt_br_1, i64 %v27)
-  %v28 = call i64 @phi_not_1()
-  %p28 = call i32 (ptr, ...) @printf(ptr @fmt_phi_not_1, i64 %v28)
-  %v29 = call i64 @switch_1()
-  %p29 = call i32 (ptr, ...) @printf(ptr @fmt_switch_1, i64 %v29)
-  %v30 = call i64 @switch_default_1()
-  %p30 = call i32 (ptr, ...) @printf(ptr @fmt_switch_default_1, i64 %v30)
-  %v31 = call i64 @switch_m1_1()
-  %p31 = call i32 (ptr, ...) @printf(ptr @fmt_switch_m1_1, i64 %v31)
-  %v32 = call i64 @id_0()
-  %p32 = call i32 (ptr, ...) @printf(ptr @fmt_id_0, i64 %v32)
-  %v33 = call i64 @id_0_sext()
-  %p33 = call i32 (ptr, ...) @printf(ptr @fmt_id_0_sext, i64 %v33)
-  %v34 = call i64 @id_1()
-  %p34 = call i32 (ptr, ...) @printf(ptr @fmt_id_1, i64 %v34)
-  %v35 = call i64 @id_1_sext()
-  %p35 = call i32 (ptr, ...) @printf(ptr @fmt_id_1_sext, i64 %v35)
-  %v36 = call i64 @id_zeroext_0()
-  %p36 = call i32 (ptr, ...) @printf(ptr @fmt_id_zeroext_0, i64 %v36)
-  %v37 = call i64 @id_zeroext_0_sext()
-  %p37 = call i32 (ptr, ...) @printf(ptr @fmt_id_zeroext_0_sext, i64 %v37)
-  %v38 = call i64 @id_zeroext_1()
-  %p38 = call i32 (ptr, ...) @printf(ptr @fmt_id_zeroext_1, i64 %v38)
-  %v39 = call i64 @id_zeroext_1_sext()
-  %p39 = call i32 (ptr, ...) @printf(ptr @fmt_id_zeroext_1_sext, i64 %v39)
-  %v40 = call i64 @id_signext_0()
-  %p40 = call i32 (ptr, ...) @printf(ptr @fmt_id_signext_0, i64 %v40)
-  %v41 = call i64 @id_signext_0_sext()
-  %p41 = call i32 (ptr, ...) @printf(ptr @fmt_id_signext_0_sext, i64 %v41)
-  %v42 = call i64 @id_signext_1()
-  %p42 = call i32 (ptr, ...) @printf(ptr @fmt_id_signext_1, i64 %v42)
-  %v43 = call i64 @id_signext_1_sext()
-  %p43 = call i32 (ptr, ...) @printf(ptr @fmt_id_signext_1_sext, i64 %v43)
-  %v44 = call i64 @neg_0()
-  %p44 = call i32 (ptr, ...) @printf(ptr @fmt_neg_0, i64 %v44)
-  %v45 = call i64 @neg_1()
-  %p45 = call i32 (ptr, ...) @printf(ptr @fmt_neg_1, i64 %v45)
-  %v46 = call i64 @not_0()
-  %p46 = call i32 (ptr, ...) @printf(ptr @fmt_not_0, i64 %v46)
-  %v47 = call i64 @not_1()
-  %p47 = call i32 (ptr, ...) @printf(ptr @fmt_not_1, i64 %v47)
-  %v48 = call i64 @twice_0()
-  %p48 = call i32 (ptr, ...) @printf(ptr @fmt_twice_0, i64 %v48)
-  %v49 = call i64 @twice_1()
-  %p49 = call i32 (ptr, ...) @printf(ptr @fmt_twice_1, i64 %v49)
-  %v50 = call i64 @square_0()
-  %p50 = call i32 (ptr, ...) @printf(ptr @fmt_square_0, i64 %v50)
-  %v51 = call i64 @square_1()
-  %p51 = call i32 (ptr, ...) @printf(ptr @fmt_square_1, i64 %v51)
-  %v52 = call i64 @inc_0()
-  %p52 = call i32 (ptr, ...) @printf(ptr @fmt_inc_0, i64 %v52)
-  %v53 = call i64 @inc_1()
-  %p53 = call i32 (ptr, ...) @printf(ptr @fmt_inc_1, i64 %v53)
-  %v54 = call i64 @dec_0()
-  %p54 = call i32 (ptr, ...) @printf(ptr @fmt_dec_0, i64 %v54)
-  %v55 = call i64 @dec_1()
-  %p55 = call i32 (ptr, ...) @printf(ptr @fmt_dec_1, i64 %v55)
-  %v56 = call i64 @self_sub_0()
-  %p56 = call i32 (ptr, ...) @printf(ptr @fmt_self_sub_0, i64 %v56)
-  %v57 = call i64 @self_sub_1()
-  %p57 = call i32 (ptr, ...) @printf(ptr @fmt_self_sub_1, i64 %v57)
-  %v58 = call i64 @self_xor_0()
-  %p58 = call i32 (ptr, ...) @printf(ptr @fmt_self_xor_0, i64 %v58)
-  %v59 = call i64 @self_xor_1()
-  %p59 = call i32 (ptr, ...) @printf(ptr @fmt_self_xor_1, i64 %v59)
-  %v60 = call i64 @self_eq_0()
-  %p60 = call i32 (ptr, ...) @printf(ptr @fmt_self_eq_0, i64 %v60)
-  %v61 = call i64 @self_eq_1()
-  %p61 = call i32 (ptr, ...) @printf(ptr @fmt_self_eq_1, i64 %v61)
-  %v62 = call i64 @self_slt_0()
-  %p62 = call i32 (ptr, ...) @printf(ptr @fmt_self_slt_0, i64 %v62)
-  %v63 = call i64 @self_slt_1()
-  %p63 = call i32 (ptr, ...) @printf(ptr @fmt_self_slt_1, i64 %v63)
-  %v64 = call i64 @mul_m1_0()
-  %p64 = call i32 (ptr, ...) @printf(ptr @fmt_mul_m1_0, i64 %v64)
-  %v65 = call i64 @mul_m1_1()
-  %p65 = call i32 (ptr, ...) @printf(ptr @fmt_mul_m1_1, i64 %v65)
-  %v66 = call i64 @add_m1_0()
-  %p66 = call i32 (ptr, ...) @printf(ptr @fmt_add_m1_0, i64 %v66)
-  %v67 = call i64 @add_m1_1()
-  %p67 = call i32 (ptr, ...) @printf(ptr @fmt_add_m1_1, i64 %v67)
-  %v68 = call i64 @chain_0_0_0()
-  %p68 = call i32 (ptr, ...) @printf(ptr @fmt_chain_0_0_0, i64 %v68)
-  %v69 = call i64 @chain_0_0_1()
-  %p69 = call i32 (ptr, ...) @printf(ptr @fmt_chain_0_0_1, i64 %v69)
-  %v70 = call i64 @chain_0_1_0()
-  %p70 = call i32 (ptr, ...) @printf(ptr @fmt_chain_0_1_0, i64 %v70)
-  %v71 = call i64 @chain_0_1_1()
-  %p71 = call i32 (ptr, ...) @printf(ptr @fmt_chain_0_1_1, i64 %v71)
-  %v72 = call i64 @chain_1_0_0()
-  %p72 = call i32 (ptr, ...) @printf(ptr @fmt_chain_1_0_0, i64 %v72)
-  %v73 = call i64 @chain_1_0_1()
-  %p73 = call i32 (ptr, ...) @printf(ptr @fmt_chain_1_0_1, i64 %v73)
-  %v74 = call i64 @chain_1_1_0()
-  %p74 = call i32 (ptr, ...) @printf(ptr @fmt_chain_1_1_0, i64 %v74)
-  %v75 = call i64 @chain_1_1_1()
-  %p75 = call i32 (ptr, ...) @printf(ptr @fmt_chain_1_1_1, i64 %v75)
+  %v27 = call i64 @switch_bool_0()
+  %p27 = call i32 (ptr, ...) @printf(ptr @fmt_switch_bool_0, i64 %v27)
+  %v28 = call i64 @switch_bool_default_0()
+  %p28 = call i32 (ptr, ...) @printf(ptr @fmt_switch_bool_default_0, i64 %v28)
+  %v29 = call i64 @br_1()
+  %p29 = call i32 (ptr, ...) @printf(ptr @fmt_br_1, i64 %v29)
+  %v30 = call i64 @phi_not_1()
+  %p30 = call i32 (ptr, ...) @printf(ptr @fmt_phi_not_1, i64 %v30)
+  %v31 = call i64 @switch_1()
+  %p31 = call i32 (ptr, ...) @printf(ptr @fmt_switch_1, i64 %v31)
+  %v32 = call i64 @switch_default_1()
+  %p32 = call i32 (ptr, ...) @printf(ptr @fmt_switch_default_1, i64 %v32)
+  %v33 = call i64 @switch_m1_1()
+  %p33 = call i32 (ptr, ...) @printf(ptr @fmt_switch_m1_1, i64 %v33)
+  %v34 = call i64 @switch_bool_1()
+  %p34 = call i32 (ptr, ...) @printf(ptr @fmt_switch_bool_1, i64 %v34)
+  %v35 = call i64 @switch_bool_default_1()
+  %p35 = call i32 (ptr, ...) @printf(ptr @fmt_switch_bool_default_1, i64 %v35)
+  %v36 = call i64 @id_0()
+  %p36 = call i32 (ptr, ...) @printf(ptr @fmt_id_0, i64 %v36)
+  %v37 = call i64 @id_0_sext()
+  %p37 = call i32 (ptr, ...) @printf(ptr @fmt_id_0_sext, i64 %v37)
+  %v38 = call i64 @id_1()
+  %p38 = call i32 (ptr, ...) @printf(ptr @fmt_id_1, i64 %v38)
+  %v39 = call i64 @id_1_sext()
+  %p39 = call i32 (ptr, ...) @printf(ptr @fmt_id_1_sext, i64 %v39)
+  %v40 = call i64 @id_zeroext_0()
+  %p40 = call i32 (ptr, ...) @printf(ptr @fmt_id_zeroext_0, i64 %v40)
+  %v41 = call i64 @id_zeroext_0_sext()
+  %p41 = call i32 (ptr, ...) @printf(ptr @fmt_id_zeroext_0_sext, i64 %v41)
+  %v42 = call i64 @id_zeroext_1()
+  %p42 = call i32 (ptr, ...) @printf(ptr @fmt_id_zeroext_1, i64 %v42)
+  %v43 = call i64 @id_zeroext_1_sext()
+  %p43 = call i32 (ptr, ...) @printf(ptr @fmt_id_zeroext_1_sext, i64 %v43)
+  %v44 = call i64 @id_signext_0()
+  %p44 = call i32 (ptr, ...) @printf(ptr @fmt_id_signext_0, i64 %v44)
+  %v45 = call i64 @id_signext_0_sext()
+  %p45 = call i32 (ptr, ...) @printf(ptr @fmt_id_signext_0_sext, i64 %v45)
+  %v46 = call i64 @id_signext_1()
+  %p46 = call i32 (ptr, ...) @printf(ptr @fmt_id_signext_1, i64 %v46)
+  %v47 = call i64 @id_signext_1_sext()
+  %p47 = call i32 (ptr, ...) @printf(ptr @fmt_id_signext_1_sext, i64 %v47)
+  %v48 = call i64 @neg_0()
+  %p48 = call i32 (ptr, ...) @printf(ptr @fmt_neg_0, i64 %v48)
+  %v49 = call i64 @neg_1()
+  %p49 = call i32 (ptr, ...) @printf(ptr @fmt_neg_1, i64 %v49)
+  %v50 = call i64 @not_0()
+  %p50 = call i32 (ptr, ...) @printf(ptr @fmt_not_0, i64 %v50)
+  %v51 = call i64 @not_1()
+  %p51 = call i32 (ptr, ...) @printf(ptr @fmt_not_1, i64 %v51)
+  %v52 = call i64 @twice_0()
+  %p52 = call i32 (ptr, ...) @printf(ptr @fmt_twice_0, i64 %v52)
+  %v53 = call i64 @twice_1()
+  %p53 = call i32 (ptr, ...) @printf(ptr @fmt_twice_1, i64 %v53)
+  %v54 = call i64 @square_0()
+  %p54 = call i32 (ptr, ...) @printf(ptr @fmt_square_0, i64 %v54)
+  %v55 = call i64 @square_1()
+  %p55 = call i32 (ptr, ...) @printf(ptr @fmt_square_1, i64 %v55)
+  %v56 = call i64 @inc_0()
+  %p56 = call i32 (ptr, ...) @printf(ptr @fmt_inc_0, i64 %v56)
+  %v57 = call i64 @inc_1()
+  %p57 = call i32 (ptr, ...) @printf(ptr @fmt_inc_1, i64 %v57)
+  %v58 = call i64 @dec_0()
+  %p58 = call i32 (ptr, ...) @printf(ptr @fmt_dec_0, i64 %v58)
+  %v59 = call i64 @dec_1()
+  %p59 = call i32 (ptr, ...) @printf(ptr @fmt_dec_1, i64 %v59)
+  %v60 = call i64 @self_sub_0()
+  %p60 = call i32 (ptr, ...) @printf(ptr @fmt_self_sub_0, i64 %v60)
+  %v61 = call i64 @self_sub_1()
+  %p61 = call i32 (ptr, ...) @printf(ptr @fmt_self_sub_1, i64 %v61)
+  %v62 = call i64 @self_xor_0()
+  %p62 = call i32 (ptr, ...) @printf(ptr @fmt_self_xor_0, i64 %v62)
+  %v63 = call i64 @self_xor_1()
+  %p63 = call i32 (ptr, ...) @printf(ptr @fmt_self_xor_1, i64 %v63)
+  %v64 = call i64 @self_eq_0()
+  %p64 = call i32 (ptr, ...) @printf(ptr @fmt_self_eq_0, i64 %v64)
+  %v65 = call i64 @self_eq_1()
+  %p65 = call i32 (ptr, ...) @printf(ptr @fmt_self_eq_1, i64 %v65)
+  %v66 = call i64 @self_slt_0()
+  %p66 = call i32 (ptr, ...) @printf(ptr @fmt_self_slt_0, i64 %v66)
+  %v67 = call i64 @self_slt_1()
+  %p67 = call i32 (ptr, ...) @printf(ptr @fmt_self_slt_1, i64 %v67)
+  %v68 = call i64 @mul_m1_0()
+  %p68 = call i32 (ptr, ...) @printf(ptr @fmt_mul_m1_0, i64 %v68)
+  %v69 = call i64 @mul_m1_1()
+  %p69 = call i32 (ptr, ...) @printf(ptr @fmt_mul_m1_1, i64 %v69)
+  %v70 = call i64 @add_m1_0()
+  %p70 = call i32 (ptr, ...) @printf(ptr @fmt_add_m1_0, i64 %v70)
+  %v71 = call i64 @add_m1_1()
+  %p71 = call i32 (ptr, ...) @printf(ptr @fmt_add_m1_1, i64 %v71)
+  %v72 = call i64 @chain_0_0_0()
+  %p72 = call i32 (ptr, ...) @printf(ptr @fmt_chain_0_0_0, i64 %v72)
+  %v73 = call i64 @chain_0_0_1()
+  %p73 = call i32 (ptr, ...) @printf(ptr @fmt_chain_0_0_1, i64 %v73)
+  %v74 = call i64 @chain_0_1_0()
+  %p74 = call i32 (ptr, ...) @printf(ptr @fmt_chain_0_1_0, i64 %v74)
+  %v75 = call i64 @chain_0_1_1()
+  %p75 = call i32 (ptr, ...) @printf(ptr @fmt_chain_0_1_1, i64 %v75)
+  %v76 = call i64 @chain_1_0_0()
+  %p76 = call i32 (ptr, ...) @printf(ptr @fmt_chain_1_0_0, i64 %v76)
+  %v77 = call i64 @chain_1_0_1()
+  %p77 = call i32 (ptr, ...) @printf(ptr @fmt_chain_1_0_1, i64 %v77)
+  %v78 = call i64 @chain_1_1_0()
+  %p78 = call i32 (ptr, ...) @printf(ptr @fmt_chain_1_1_0, i64 %v78)
+  %v79 = call i64 @chain_1_1_1()
+  %p79 = call i32 (ptr, ...) @printf(ptr @fmt_chain_1_1_1, i64 %v79)
   ret i32 0
 }
 
@@ -872,11 +924,15 @@ define i32 @main() {
 ; ASSERT EQ: i64 100 = call i64 @switch_0()
 ; ASSERT EQ: i64 102 = call i64 @switch_default_0()
 ; ASSERT EQ: i64 102 = call i64 @switch_m1_0()
+; ASSERT EQ: i64 100 = call i64 @switch_bool_0()
+; ASSERT EQ: i64 102 = call i64 @switch_bool_default_0()
 ; ASSERT EQ: i64 10  = call i64 @br_1()
 ; ASSERT EQ: i64 0   = call i64 @phi_not_1()
 ; ASSERT EQ: i64 101 = call i64 @switch_1()
 ; ASSERT EQ: i64 101 = call i64 @switch_default_1()
 ; ASSERT EQ: i64 101 = call i64 @switch_m1_1()
+; ASSERT EQ: i64 101 = call i64 @switch_bool_1()
+; ASSERT EQ: i64 101 = call i64 @switch_bool_default_1()
 ; ASSERT EQ: i64 0   = call i64 @id_0()
 ; ASSERT EQ: i64 0   = call i64 @id_0_sext()
 ; ASSERT EQ: i64 1   = call i64 @id_1()
