@@ -49,71 +49,85 @@ Section GEP.
   Definition sequential_stride (vector : bool) (ta : dtyp) : N :=
     if vector then store_size_dtyp ta else alloc_size_dtyp ta.
 
+  (** ** Indices
+
+      LangRef (getelementptr): "When indexing into a (optionally packed)
+      structure, only i32 integer constants are allowed ... When indexing
+      into an array, pointer or vector, integers of any width are allowed,
+      and they are not required to be constant.  These integers are treated
+      as signed values where relevant."  And: "If the offsets have a
+      different width from the pointer's index type, they are sign-extended
+      or truncated to the width of the pointer's index type." *)
+
+  (* The width of the pointer index type, in bits.  Vellvm's index type is
+     the pointer size, also under the infinite-pointer parameters. *)
+  Definition gep_index_bits : Z := 8 * Z.of_N pointer_size.
+
+  (* The signed value of the low [gep_index_bits] bits of [k]. *)
+  Definition trunc_to_index (k : Z) : Z :=
+    let half := 2 ^ (gep_index_bits - 1) in
+    (k + half) mod (2 * half) - half.
+
+  (* The value of an index of an array, vector, or pointer step, as it
+     enters the address computation.  An [iN] index of any width N is read
+     as signed, which sign-extends a narrow one, and one wider than the
+     index type is truncated to it.  An [iptr] is the index type itself
+     (unbounded under the infinite-pointer parameters). *)
+  Definition gep_index (v : dvalue) : option Z :=
+    match v with
+    | DVALUE_Base (DVALUE_I sz i) =>
+        Some (if Zpos sz <=? gep_index_bits then signed i else trunc_to_index (signed i))
+    | DVALUE_Base (DVALUE_Iptr i) => Some (to_Z i)
+    | _ => None
+    end.
+
+  (* The byte offset of field [n] of a struct with fields [ts], and the
+     field's type. *)
+  Definition gep_struct_field (packed : bool) (ts : list dtyp) (n : nat) : option (N * dtyp) :=
+    match nth_error ts n with
+    | None => None
+    | Some t' =>
+        let before := firstn n ts in
+        Some (if packed
+              then fold_left (fun acc t => acc + alloc_size_dtyp t)%N before 0%N
+              else pad_to_align (dtyp_alignment t')
+                     (fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + alloc_size_dtyp t)%N before 0%N),
+              t')
+    end.
+
   Fixpoint gep_steps_h (t:dtyp) (vs:list dvalue): EOUP (list (Z * Z)) :=
     match vs with
     | v :: vs' =>
         if negb (gep_indexable t)
         then raise_ub "getelementptr into a vector with non-byte-addressable element type"
         else
-        match v with
-        | DVALUE_Base (DVALUE_I 8 i) =>
-            match t with
-            | DTYPE_Array vec _ ta =>
-                cons (signed i, Z.of_N (sequential_stride vec ta)) <$> gep_steps_h ta vs'
-            | _ => raise_error ("non-i8-indexable type")
+        match v, t with
+        | DVALUE_Base DVALUE_Poison, _ => ret Pois
+        | _, DTYPE_Array vec _ ta =>
+            match gep_index v with
+            | Some k => cons (k, Z.of_N (sequential_stride vec ta)) <$> gep_steps_h ta vs'
+            | None => raise_error "gep_steps_h: index is not an integer"
             end
-        | DVALUE_Base (DVALUE_I 32 i) =>
-            let n := BinIntDef.Z.to_nat (unsigned i) in
-            match t with
-            | DTYPE_Array vec _ ta =>
-                cons (signed i, Z.of_N (sequential_stride vec ta)) <$> gep_steps_h ta vs'
-            | DTYPE_Struct false ts =>
-                match nth_error ts n with
-                | None => raise_error "overflow"
-                | Some t' =>
-                    let end_of_prev_field := fold_left (fun acc t => pad_to_align (dtyp_alignment t) acc + alloc_size_dtyp t)%N (firstn n ts) 0%N in
-                    let offset := pad_to_align (dtyp_alignment t') end_of_prev_field in
-                    cons (Z.of_N offset, 1) <$> gep_steps_h t' vs'
-                end
-            | DTYPE_Struct true ts =>
-                let offset := fold_left (fun acc t => acc + alloc_size_dtyp t)%N
-                                (firstn n ts) 0%N in
-                match nth_error ts n with
-                | None => raise_error "overflow"
-                | Some t' =>
-                    cons (Z.of_N offset, 1) <$> gep_steps_h t' vs'
-                end
-            | _ => raise_error ("non-i32-indexable type")
+        | DVALUE_Base (DVALUE_I 32 i), DTYPE_Struct packed ts =>
+            match gep_struct_field packed ts (BinIntDef.Z.to_nat (unsigned i)) with
+            | Some (offset, t') => cons (Z.of_N offset, 1) <$> gep_steps_h t' vs'
+            | None => raise_error "gep_steps_h: no such struct field"
             end
-        | DVALUE_Base (DVALUE_I 64 i) =>
-            match t with
-            | DTYPE_Array vec _ ta =>
-                cons (signed i, Z.of_N (sequential_stride vec ta)) <$> gep_steps_h ta vs'
-            | _ => raise_error ("non-i64-indexable type")
-            end
-        | DVALUE_Base (DVALUE_Iptr i) =>
-            match t with
-            | DTYPE_Array vec _ ta =>
-                cons (to_Z i, Z.of_N (sequential_stride vec ta)) <$> gep_steps_h ta vs'
-            | _ => raise_error ("non-iptr-indexable type")
-            end
-        | DVALUE_Base (DVALUE_Poison) =>
-            ret Pois
-        | _ => raise_error "gep_steps_h: unsupported index type"
+        | _, DTYPE_Struct _ _ => raise_error "gep_steps_h: a struct index must be an i32"
+        | _, _ => raise_error "gep_steps_h: indexing into a non-aggregate type"
         end
     | [] => ret (NoPois [])
     end.
 
   Definition gep_steps (t:dtyp) (vs:list dvalue) : EOUP (list (Z * Z)) :=
-    let first k vs' := cons (k, Z.of_N (alloc_size_dtyp t)) <$> gep_steps_h t vs' in
     match vs with
-    | DVALUE_Base (DVALUE_I 8 i) :: vs' => first (signed i) vs'
-    | DVALUE_Base (DVALUE_I 32 i) :: vs' => first (signed i) vs'
-    | DVALUE_Base (DVALUE_I 64 i) :: vs' => first (signed i) vs'
-    | DVALUE_Base (DVALUE_Iptr i) :: vs' => first (to_Z i) vs'
-    | DVALUE_Base (DVALUE_Poison)::_ => ret Pois
     | [] => raise_error "gep_steps: no indices"
-    | _ => raise_error "gep_steps: unsupported index type"
+    | DVALUE_Base DVALUE_Poison :: _ => ret Pois
+    | v :: vs' =>
+        match gep_index v with
+        | Some k => cons (k, Z.of_N (alloc_size_dtyp t)) <$> gep_steps_h t vs'
+        | None => raise_error "gep_steps: index is not an integer"
+        end
     end.
 
   Definition gep_offset (steps : list (Z * Z)) : Z :=
@@ -123,10 +137,6 @@ Section GEP.
 
       LangRef (getelementptr): with [nusw], [nuw], or [inbounds], "If any of
       the rules are violated, the result value is a poison value". *)
-
-  (* The width of the pointer index type, in bits.  Vellvm's index type is
-     the pointer size, also under the infinite-pointer parameters. *)
-  Definition gep_index_bits : Z := 8 * Z.of_N pointer_size.
 
   Definition in_signed_index_range (x : Z) : bool :=
     (- 2 ^ (gep_index_bits - 1) <=? x) && (x <? 2 ^ (gep_index_bits - 1)).
@@ -176,6 +186,25 @@ Section GEP.
         (off' =? 0) && gep_inbounds_null_ok off' steps'
     end.
 
+  (* The rules about truncating an index wider than the index type, which
+     [gep_steps] has already done.  LangRef [nusw]: "the truncation to the
+     pointer index type preserves the signed value (trunc nsw)"; [nuw]: "the
+     truncation to the pointer index type preserves the unsigned value
+     (trunc nuw)".  An index no wider than the index type is not truncated. *)
+  Definition gep_index_trunc_ok (unsigned_rule : bool) (v : dvalue) : bool :=
+    match v with
+    | DVALUE_Base (DVALUE_I sz i) =>
+        (Zpos sz <=? gep_index_bits)
+        || (if unsigned_rule
+            then in_unsigned_index_range (unsigned i)
+            else in_signed_index_range (signed i))
+    | _ => true
+    end.
+
+  Definition gep_trunc_violated (flags : gep_flags) (vs : list dvalue) : bool :=
+    ((gep_inbounds flags || gep_nusw flags) && negb (forallb (gep_index_trunc_ok false) vs))
+    || (gep_nuw flags && negb (forallb (gep_index_trunc_ok true) vs)).
+
   (* Whether the flags make the result poison.  [inbounds] implies [nusw]. *)
   Definition gep_flags_violated (flags : gep_flags) (addr : Z) (steps : list (Z * Z)) : bool :=
     let a := addr mod 2 ^ gep_index_bits in
@@ -190,7 +219,7 @@ Section GEP.
   Definition handle_gep_ptr (flags : gep_flags) (t:dtyp) (a:ptr) (vs:list dvalue) : EOUP ptr :=
     let ptr := ptr_to_int a in
     steps <- gep_steps t vs ;;
-    if gep_flags_violated flags ptr steps
+    if gep_flags_violated flags ptr steps || gep_trunc_violated flags vs
     then raise_ret Pois
     else NoPois <$> (int_to_ptr (ptr + gep_offset steps) (ptr_provenance a)).
 

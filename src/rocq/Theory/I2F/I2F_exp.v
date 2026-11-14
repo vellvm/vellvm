@@ -2734,45 +2734,76 @@ Lemma I2F_sequential_stride : forall v t,
     @sequential_stride PInf v t = @sequential_stride PFin v t.
 Proof. reflexivity. Qed.
 
-(* [break_match_goal_safe], also refusing [EOUP]-typed scrutinees (which
-     do not syntactically match [EOU _]), so that the two sides' recursive
-     calls are left for the induction hypothesis. *)
-Ltac break_match_goal_safeP :=
+Lemma I2F_gep_struct_field : forall packed ts n,
+    @gep_struct_field PInf packed ts n = @gep_struct_field PFin packed ts n.
+Proof. reflexivity. Qed.
+
+(* Related indices have the same value: integers are equal, and [to_Z]
+   agrees on related intptrs. *)
+Lemma I2F_gep_index : forall v v',
+    I2F_dvalue v v' ->
+    @gep_index PInf v = @gep_index PFin v'.
+Proof.
+  intros v v' HV; inversion HV; subst; try reflexivity.
   match goal with
-  | |- context [match ?X with _ => _ end] =>
-      lazymatch type of X with
-      | EOU _ => fail
-      | EOUP _ => fail
-      | _ => destruct X eqn:?
-      end
+  | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; try reflexivity
   end.
+  match goal with
+  | HI : I2F_Iptr _ _ |- _ => red in HI; subst
+  end; reflexivity.
+Qed.
+
+Lemma I2F_gep_index_trunc_ok : forall u v v',
+    I2F_dvalue v v' ->
+    @gep_index_trunc_ok PInf u v = @gep_index_trunc_ok PFin u v'.
+Proof.
+  intros u v v' HV; inversion HV; subst; try reflexivity.
+  match goal with
+  | HB : I2F_dvalue_base _ _ |- _ => inversion HB; subst; reflexivity
+  end.
+Qed.
+
+Lemma I2F_gep_trunc_violated : forall flags vs vs',
+    Forall2 I2F_dvalue vs vs' ->
+    @gep_trunc_violated PInf flags vs = @gep_trunc_violated PFin flags vs'.
+Proof.
+  intros flags vs vs' F.
+  assert (ALL : forall u, forallb (@gep_index_trunc_ok PInf u) vs
+                          = forallb (@gep_index_trunc_ok PFin u) vs').
+  { intros u; induction F; cbn [forallb]; [reflexivity |].
+    erewrite I2F_gep_index_trunc_ok, IHF by eauto; reflexivity. }
+  unfold gep_trunc_violated; rewrite !ALL; reflexivity.
+Qed.
 
 Lemma I2F_gep_steps_h : forall vs vs',
     Forall2 I2F_dvalue vs vs' ->
     forall t,
       @gep_steps_h PInf t vs = @gep_steps_h PFin t vs'.
 Proof.
-  intros vs vs' F; induction F; intros t;
-    cbn -[gep_indexable sequential_stride]; auto.
+  intros vs vs' F; induction F as [| v v' vs vs' HV F IH]; intros t;
+    cbn -[gep_indexable sequential_stride gep_index gep_struct_field]; auto.
   (* a GEP into a non-byte-addressable vector is UB on both sides *)
   rewrite I2F_gep_indexable; destruct (@gep_indexable PFin t); cbn [negb]; [| reflexivity].
-  rewrite ?I2F_sequential_stride.
-  match goal with
-  | HC : I2F_dvalue ?c ?c' |- _ =>
-      induction HC; cbn; auto
-  end;
-  try (match goal with
-       | HB : I2F_dvalue_base _ _ |- _ =>
-           induction HB; cbn; auto
-       end);
-  try (match goal with
-       | HI : I2F_Iptr _ _ |- _ => red in HI; subst
-       end);
-  repeat (break_match_goal_safeP; cbn); auto;
-  repeat match goal with
-         | IH : forall t, @gep_steps_h PInf t _ = @gep_steps_h PFin t _ |- _ =>
-             rewrite IH
-         end; auto.
+  rewrite ?I2F_sequential_stride, ?I2F_gep_struct_field;
+    erewrite I2F_gep_index by exact HV.
+  (* the remaining case analysis is on the shape of the index and of [t],
+     which related values share *)
+  inversion HV as [b b' HB | |]; subst;
+    [inversion HB; subst |..];
+    destruct t; try reflexivity;
+    repeat match goal with
+      | |- context [match ?p with xH => _ | _ => _ end] => destruct p; try reflexivity
+      end;
+    repeat match goal with
+      | |- context [@gep_struct_field ?P ?a ?b ?c] =>
+          lazymatch P with PFin => fail | _ => idtac end;
+          change (@gep_struct_field P a b c) with (@gep_struct_field PFin a b c)
+      end;
+    repeat match goal with
+      | |- context [match ?o with Some _ => _ | None => _ end] => destruct o as [[? ?] |]; try reflexivity
+      | |- context [match ?o with Some _ => _ | None => _ end] => destruct o; try reflexivity
+      end;
+    rewrite ?IH; reflexivity.
 Qed.
 
 Lemma I2F_gep_steps : forall t vs vs',
@@ -2780,17 +2811,9 @@ Lemma I2F_gep_steps : forall t vs vs',
     @gep_steps PInf t vs = @gep_steps PFin t vs'.
 Proof.
   intros t vs vs' F.
-  destruct F as [|v v' vs vs' HV F]; cbn; auto.
-  inversion HV; subst; cbn; auto.
-  match goal with
-  | HB : I2F_dvalue_base _ _ |- _ =>
-      inversion HB; subst; cbn; auto
-  end;
-  try (match goal with
-       | HI : I2F_Iptr _ _ |- _ => red in HI; subst
-       end);
-  repeat (break_match_goal_safeP; cbn); auto;
-  erewrite I2F_gep_steps_h by eauto; reflexivity.
+  destruct F as [|v v' vs vs' HV F]; cbn -[gep_index]; auto.
+  erewrite I2F_gep_index by exact HV; erewrite I2F_gep_steps_h by exact F.
+  inversion HV as [b b' HB | |]; subst; [inversion HB; subst |..]; reflexivity.
 Qed.
 
 (** Related pointers have the same address, so the flags are violated on
@@ -2810,7 +2833,9 @@ Proof.
   - intros steps ? <-.
     match goal with
     | |- I2F_EOUP _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
-        replace b1 with b2 by reflexivity; destruct b2; [constructor|]
+        replace b1 with b2
+          by (erewrite I2F_gep_trunc_violated by exact F; reflexivity);
+        destruct b2; [constructor|]
     end.
     apply I2F_EOUP_fmap_NoPois, I2F_int_to_ptr.
 Qed.
