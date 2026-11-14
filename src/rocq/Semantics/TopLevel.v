@@ -164,10 +164,12 @@ Section withParams.
             (DVALUE_Array false arg_addrs);;
       ret v.
 
-  Definition build_main_args (args : list string) : MCFGtop (list dvalue) :=
+  Definition build_main_args (args : list string) : MCFGtop (list (dtyp * dvalue)) :=
     v <- allocate_args args;;
     let main_args :=
-      [DVALUE_Base (DVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args))); v]
+      [(DTYPE_Base (DTYPE_I 32),
+         DVALUE_Base (DVALUE_I 32 ((@Integers.repr 32%positive ∘ Z.of_nat) (List.length args))));
+       (DTYPE_Base DTYPE_Pointer, v)]
     in
     ret main_args.
 
@@ -291,7 +293,7 @@ Section withParams.
   Definition denote_vellvm
              (ret_typ : dtyp)
              (entry : function_id)
-             (args : list dvalue)
+             (args : list (dtyp * dvalue))
              (mcfg : CFG.mcfg dtyp) : MCFGtop dvalue :=
     build_global_environment mcfg ;;
     'defns <- map_monad address_one_function (m_definitions mcfg) ;;
@@ -313,7 +315,7 @@ Section withParams.
   Definition interpreter_gen
     (ret_typ : dtyp)
     (entry : function_id)
-    (arg_gen : MCFGtop (list dvalue))
+    (arg_gen : MCFGtop (list (dtyp * dvalue)))
     (prog: ll_toplevel_entities) : MCFGbot (Res dvalue) :=
     let t :=
       args <- arg_gen;;

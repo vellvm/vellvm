@@ -503,12 +503,14 @@ Section Denotation.
     ret tt.
 
   (** Evaluate a call's arguments, passing each through its call-site
-      attributes ([apply_attrs]); [msg] reports a violated [noundef]. *)
+      attributes ([apply_attrs]); [msg] reports a violated [noundef].  Each
+      value is paired with the type the call site passes it at. *)
   Definition denote_call_args (args : list (texp dtyp * list param_attr)) (msg : string)
-    : CFGtop (list dvalue) :=
+    : CFGtop (list (dtyp * dvalue)) :=
     map_monad (fun '((t, op), attrs) =>
                  v <- denote_exp' (Some t) op ;;
-                 apply_attrs attrs msg v) args.
+                 v' <- apply_attrs attrs msg v ;;
+                 ret (t, v')) args.
 
   (** ** Operand bundles
 
@@ -622,7 +624,7 @@ Section Denotation.
         (* the call site's function attributes, then its !range metadata and
            return-value attributes *)
         res <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
-                 (metadata_range md) (err_loc tt ++ ": Call") vs res ;;
+                 (metadata_range md) (err_loc tt ++ ": Call") (List.map snd vs) res ;;
         returned_value <-
           match res with
           | inl exc => raiseLLVM exc
@@ -758,7 +760,7 @@ Section Denotation.
       (* the invoke's function attributes, then its !range metadata and
          return-value attributes *)
       rv <- check_call_return (ann_fun_attributes anns) (ann_ret_attributes anns)
-              (metadata_range md) (err_loc tt ++ ": Invoke") uvs rv ;;
+              (metadata_range md) (err_loc tt ++ ": Invoke") (List.map snd uvs) rv ;;
       (* branch to to_label *)
       match rv with
       | inl exn =>
@@ -920,10 +922,11 @@ Section Denotation.
   (* The denotation of an itree function is a rocq function that takes a list of
      dvalues and returns the appropriate semantics: a function either returns
      normally with a [dvalue] or unwinds with an exception [exc]. *)
-  (* A function's denotation takes the calling convention of the call site
-     and the arguments. *)
+  (* A function's denotation takes the calling convention of the call site,
+     the return type the call site expects, and the arguments, each with the
+     type the call site passes it at (see [Call]). *)
   Definition function_denotation : Type :=
-    cconv -> list dvalue -> CFGtop (exc + dvalue).
+    cconv -> dtyp -> list (dtyp * dvalue) -> CFGtop (exc + dvalue).
 
   Fixpoint combine_lists_varargs {A B:Type} (l1:list A) (l2:list B) : EOU (list (A * B) * list B) :=
     match l1, l2 with
@@ -941,24 +944,19 @@ Section Denotation.
     stack_pop;;
     mem_pop.
 
-  (* There is an issue with removing type annotations from poison:
-      - we use dtyp_of_dvalue to compute a "type" for the struct that
-        implements var-args
-      - if one of the varargs values is poison, we can't compute a
-        type for it (or even a size)
-      - Note that this will fail for poison and zero-sized arrays/vectors.
-  *)
-  (* Push call frame, return varargs address *)
-  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list dvalue) : CFGtop ptr :=
+  (* Push call frame, return varargs address.
+     The variadic arguments are stored as a packed struct, laid out by the
+     types the call site passed them at: a value alone does not determine
+     its type (poison, empty aggregates). *)
+  Definition push_call_frame (df:definition dtyp (cfg dtyp)) (args : list (dtyp * dvalue)) : CFGtop ptr :=
     (* We match the arguments variables to the inputs *)
     '(bs, vs) <- lift (combine_lists_varargs (df_args df) args) ;;
-    dts <- lift (map_monad dtyp_of_dvalue vs);;
-    let dt := DTYPE_Struct true dts in
+    let dt := DTYPE_Struct true (List.map fst vs) in
     (* generate the corresponding writes to the local stack frame *)
     mem_push ;;
-    stack_push bs ;;
+    stack_push (List.map (fun '(x, (_, v)) => (x, v)) bs) ;;
     varargs <- alloca dt 1 None;;
-    store dt varargs (DVALUE_Struct true vs);;
+    store dt varargs (DVALUE_Struct true (List.map snd vs));;
     match varargs with
     | DVALUE_Base (DVALUE_Pointer varg) =>
         ret varg
@@ -974,13 +972,13 @@ Section Denotation.
     let '(ret_attrs, args_attrs) := dc_param_attrs (df_prototype df) in
     let fname := show_raw_id (dc_name (df_prototype df)) in
     let fcc := anns_cconv (dc_annotations (df_prototype df)) in
-    fun (cc : cconv) (args : list dvalue) =>
+    fun (cc : cconv) (ret_t : dtyp) (targs : list (dtyp * dvalue)) =>
       (* the calling convention, checked on entry so that a mismatch is
          reported at the call (see [check_cconv]) *)
       lift (check_cconv fcc cc fname);;
       args <- apply_args_attrs args_attrs
-               ("Argument of " ++ fname ++ " violates noundef.") args;;
-      varg <- push_call_frame df args;;
+               ("Argument of " ++ fname ++ " violates noundef.") (List.map snd targs);;
+      varg <- push_call_frame df (List.combine (List.map fst targs) args);;
       (* Catch a frame-local unwind so the result surfaces as [exc + dvalue].
          [pop_call_frame] runs on both the normal and the unwinding path, so the
          frame is always torn down before the (value-carried) unwind continues. *)
@@ -1011,7 +1009,7 @@ Section Denotation.
 
   Definition denote_mcfg
     (fundefs : IntMap function_denotation) (dt : dtyp)
-    (f_value : dvalue) (args : list dvalue) : MCFGtop (dvalue + dvalue) :=
+    (f_value : dvalue) (args : list (dtyp * dvalue)) : MCFGtop (dvalue + dvalue) :=
     @mrec CallE (ExternalCallE +' _)
       (fun T call =>
          match call with
@@ -1022,7 +1020,7 @@ Section Denotation.
              | Some f_den => (* If the call is internal *)
                  (* [f_den] already produces [exc + dvalue] (see [denote_function]),
                     so the callee's unwind crosses the [mrec] knot as this value. *)
-                 f_den cc args
+                 f_den cc dt args
              | None => inr <$> external_call dt fv args
              end
          end) _ (Call dt CC_Ccc f_value args).

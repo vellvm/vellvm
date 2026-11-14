@@ -109,8 +109,12 @@ Section withParams.
     (* [cc]: the calling convention of the call site, which must match the
        callee's (LangRef: "The calling convention of any pair of dynamic
        caller/callee must match, or the behavior of the program is
-       undefined.") *)
-    | Call        : forall (t:dtyp) (cc:cconv) (f:dvalue) (args:list dvalue), CallE (exc + dvalue).
+       undefined.")
+       [t] is the return type of the call, and each argument comes with the
+       type the call site passes it at.  A [dvalue] does not determine its
+       type (poison, empty aggregates), so the callee needs these, e.g. to lay
+       out the variadic arguments. *)
+    | Call        : forall (t:dtyp) (cc:cconv) (f:dvalue) (args:list (dtyp * dvalue)), CallE (exc + dvalue).
   Definition call {E} `{CallE -< E} t cc f args : itree E _ := trigger (Call t cc f args).
 
   (* ExternalCallE values are the "observable" events by which one should compare the 
@@ -126,7 +130,8 @@ Section withParams.
        The latter two are actually printed to the console by [interpreter.ml]
    *)
   Variant ExternalCallE : Type -> Type :=
-    | ExternalCall (t : dtyp) (f : dvalue) (args : list dvalue) :
+    (* [t] and the argument types are as for [Call] *)
+    | ExternalCall (t : dtyp) (f : dvalue) (args : list (dtyp * dvalue)) :
       ExternalCallE dvalue
     (* This event corresponds to writing to the [stdout] channel. ] *)                              
     | IO_stdout (str : list int8) :
@@ -141,7 +146,8 @@ Section withParams.
   (* Call to an intrinsic whose implementation do not rely on the implementation of the memory model *)
   (* Intrinsics may raise an exception by returning inl *)
   Variant IntrinsicE : Type -> Type :=
-    | Intrinsic (t : dtyp) (f : string) (args : list dvalue) (vararg : option ptr) :
+    (* [t] and the argument types are as for [Call] *)
+    | Intrinsic (t : dtyp) (f : string) (args : list (dtyp * dvalue)) (vararg : option ptr) :
       IntrinsicE (exc + dvalue).
   Definition intrinsic {E} `{IntrinsicE -< E} t f args vararg : itree E _ := trigger (Intrinsic t f args vararg).
   

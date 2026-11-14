@@ -14,10 +14,10 @@ open List
 
 type test =
   (* expected dvalue, dynamic type, entry, arguments *)
-  | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.dvalue list
-  | SuccessTest of function_id * DV.dvalue list
-  | FailsTest of function_id * DV.dvalue list
-  | UBTest of int * function_id * DV.dvalue list
+  | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * (DynamicTypes.dtyp * DV.dvalue) list
+  | SuccessTest of function_id * (DynamicTypes.dtyp * DV.dvalue) list
+  | FailsTest of function_id * (DynamicTypes.dtyp * DV.dvalue) list
+  | UBTest of int * function_id * (DynamicTypes.dtyp * DV.dvalue) list
 
 let ocaml_of_EOU (c : 'x EOU.coq_EOU) : 'x =
   match c with
@@ -48,7 +48,8 @@ let instr_to_call_data instr =
   match instr with
   | INSTR_Call (fn, args, _, _) ->
       ( texp_to_function_id fn
-      , List.map (fun x -> texp_to_dvalue (fst x)) args )
+      , (* each argument with the type the call passes it at *)
+        List.map (fun x -> (typ_to_dtyp (fst (fst x)), texp_to_dvalue (fst x))) args )
   | _ ->
       failwith "Assertion includes unsupported instruction (must be a call)"
 
@@ -217,7 +218,7 @@ let make_test_h run name ll_ast t : (string * Assert.assertion) option =
   let args_str args =
     pp_print_list
       ~pp_sep:(fun f () -> pp_print_string f ", ")
-      (fun f dv -> pp_print_string f (Interpreter.string_of_dvalue dv)) str_formatter args ;
+      (fun f (_, dv) -> pp_print_string f (Interpreter.string_of_dvalue dv)) str_formatter args ;
     flush_str_formatter ()
   in
   (* let _ = Printf.printf "I can get here\n" in *)

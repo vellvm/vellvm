@@ -345,7 +345,7 @@ Section MemoryModel.
     fun T e =>
       match e with
       | Intrinsic t name args _ =>
-          args' <- lift (map_monad dvalue_to_dvalue_base args) ;;
+          args' <- lift (map_monad dvalue_to_dvalue_base (List.map snd args)) ;;
           (* Pick all arguments, they should all be unique. *)
           if is_memcpy_name name
           then
