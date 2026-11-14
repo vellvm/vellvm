@@ -366,6 +366,10 @@ Qed.
 Definition convert_types (CFG:(CFG.mcfg typ)) : (CFG.mcfg dtyp) :=
   convert_typ (m_type_defs CFG) CFG.
 
+(* Useful for the testing infrastructure. *)
+Definition convert_types_closed_exp (e:exp typ) : (exp dtyp) := 
+  convert_typ [] e.
+  
 Lemma convert_typ_ocfg_app : forall (a b : ocfg typ) env, (convert_typ env (a ++ b) = convert_typ env a ++ convert_typ env b)%list.
 Proof using.
   intros; rewrite convert_typ_list_app; reflexivity.

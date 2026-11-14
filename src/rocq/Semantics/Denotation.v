@@ -368,6 +368,12 @@ Section Denotation.
     end.
   Arguments denote_exp _ _ : simpl nomatch.
 
+  Definition denote_closed_exp (t:dtyp) (e:exp dtyp) : option dvalue :=
+    match denote_exp (Some t) e with
+    | Ret v => Some v
+    | _ => None
+    end.
+  
   Definition denote_exp' t e := withCall (denote_exp t e).
   Arguments denote_exp' _ _ : simpl nomatch.
 
