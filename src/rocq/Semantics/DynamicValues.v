@@ -631,36 +631,32 @@ Section DValue.
           then ret (dvp mdtyp_of_int)
           else tdb <$> (msub x y)
                          
-      | Mul nuw nsw => 
-          (* I1 mul can't overflow, just based on the 4 possible multiplications. *)
-          if (option_pred (fun bw => Pos.eqb bw 1) mbitwidth)
-          then tdb <$> (mmul x y)
+      | Mul nuw nsw =>
+          res <- mmul x y;;
+
+          let res_u' := ((munsigned x) * (munsigned y))%Z in
+          let res_s' := ((msigned x) * (msigned y))%Z in
+
+          let min_s_bound := match fmap (fun m => m >? res_s') mmin_signed with
+                             | None => false
+                             | Some x => x
+                             end in
+          let max_s_bound := match fmap (fun m => res_s' >? m) mmax_signed with
+                             | None => false
+                             | Some x => x
+                             end in
+
+          if dtyp_base_eq_dec mdtyp_of_int DTYPE_Iptr
+          then
+            if (res_u' >? munsigned res)
+            then raise_oom "Multiplication overflow on iptr."
+            else ret (tdb res)
           else
-            res <- mmul x y;;
-            
-            let res_u' := ((munsigned x) * (munsigned y))%Z in
-            let res_s' := ((msigned x) * (msigned y))%Z in
+            if orb (andb nuw (res_u' >? munsigned res))
+                 (andb nsw (orb min_s_bound max_s_bound))
+            then ret (dvp mdtyp_of_int)
+            else ret (tdb res)
 
-            let min_s_bound := match fmap (fun m => m >? res_s') mmin_signed with
-                               | None => false
-                               | Some x => x
-                               end in
-            let max_s_bound := match fmap (fun m => res_s' >? m) mmax_signed with
-                               | None => false
-                               | Some x => x
-                               end in
-
-            if dtyp_base_eq_dec mdtyp_of_int DTYPE_Iptr
-            then
-              if (res_u' >? munsigned res)
-              then raise_oom "Multiplication overflow on iptr."
-              else ret (tdb res)
-            else
-              if orb (andb nuw (res_u' >? munsigned res))
-                   (andb nsw (orb min_s_bound max_s_bound))
-              then ret (dvp mdtyp_of_int)
-              else ret (tdb res)                               
-                       
       | Shl nuw nsw =>
           if dtyp_base_eq_dec (@mdtyp_of_int Int _) DTYPE_Iptr
           then
@@ -818,23 +814,24 @@ Section DValue.
            then raise_ub "Division by poison."
            else ret DVALUE_Poison
        | DVALUE_Poison, _             =>
-           match iop with
-           (* A poison dividend could be INT_MIN, and INT_MIN / -1 is UB for
-              both sdiv and srem. *)
-           | SDiv _ | SRem =>
-               x <- match v2 with
-                   | DVALUE_I sz2 i2 =>
-                       ret (@Integers.signed sz2 i2)
-                   | DVALUE_Iptr i2 =>
-                       ret (to_Z i2)
-                   | _ => raise_error "ill_typed-iop: sdiv/srem"
-                   end;;
-               if Z.eq_dec x (-1)
+           (* A poison dividend does not hide a bad divisor: dividing by 0
+              is UB whatever the dividend.  And the dividend could be
+              INT_MIN, so for sdiv and srem a divisor of -1 is UB too.
+              Otherwise the result is poison. *)
+           if iop_is_div iop
+           then
+             y <- match v2 with
+                 | DVALUE_I sz2 i2 => ret (@Integers.signed sz2 i2)
+                 | DVALUE_Iptr i2 => ret (to_Z i2)
+                 | _ => raise_error "ill_typed-iop: division"
+                 end;;
+             if (y =? 0)%Z
+             then raise_ub "Division of poison by 0."
+             else
+               if (match iop with SDiv _ | SRem => true | _ => false end && (y =? -1))%Z
                then raise_ub "Signed division/remainder poison overflow"
                else ret DVALUE_Poison
-           | _ =>
-               ret DVALUE_Poison 
-           end
+           else ret DVALUE_Poison
        | _, _                           => raise_error "ill_typed-iop"
        end).
     destruct (Pos.eq_dec sz1 sz2); subst.
@@ -1423,10 +1420,14 @@ Section DValue.
         end
     end.
 
-  Definition dvalue_to_Z (dv : dvalue) : option Z :=
+  (* An index into a vector, for extractelement, insertelement, and the
+     shufflevector mask.  LangRef (extractelement, insertelement): "The index
+     may be a variable of any integer type, and will be treated as an
+     unsigned integer."  So [i1 true] is element 1 and [i8 -1] element 255.
+     (Contrast getelementptr, whose indices are signed: [Gep.gep_index].) *)
+  Definition vector_index (dv : dvalue) : option Z :=
     match dv with
-    (* TODO: should this be restricted to 32 / 64-bit integers? *)      
-    | DVALUE_Base (@DVALUE_I sz i2) => Some (signed i2)
+    | DVALUE_Base (DVALUE_I _ i) => Some (unsigned i)
     | _ => None
     end.
   
@@ -1443,7 +1444,7 @@ Section DValue.
         ret (DVALUE_Base DVALUE_Poison)
     (* 0-size vector, always return poison *)
     | DVALUE_Array true elts =>
-        match dvalue_to_Z idx with
+        match vector_index idx with
         | Some i =>
             match split_acc i elts with
             | None => ret (DVALUE_Base DVALUE_Poison)
@@ -1468,7 +1469,7 @@ Section DValue.
     | DTYPE_Array true sz t =>
         match vec with
         | DVALUE_Array true elts =>
-            match dvalue_to_Z idx with
+            match vector_index idx with
             | Some i =>
                 match split_acc i elts with
                 | None => ret (DVALUE_Base DVALUE_Poison)
@@ -1482,7 +1483,7 @@ Section DValue.
             end
         | DVALUE_Base DVALUE_Poison =>
             let elts : list dvalue := repeat (DVALUE_Base DVALUE_Poison) (N.to_nat sz) in
-            match dvalue_to_Z idx with
+            match vector_index idx with
             | Some i =>
                 match split_acc i elts with
                 | None => ret (DVALUE_Base DVALUE_Poison)
@@ -1510,13 +1511,12 @@ Section DValue.
         | Some elts1, Some elts2, DVALUE_Array true idxs =>
             let combined := elts1 ++ elts2 in
             let lane (idxv : dvalue) : dvalue :=
-              match dvalue_to_Z idxv with
+              match vector_index idxv with
               | Some i =>
-                  if (i <? 0)%Z then DVALUE_Base DVALUE_Poison
-                  else match nth_error combined (Z.to_nat i) with
-                       | Some v => v
-                       | None => DVALUE_Base DVALUE_Poison
-                       end
+                  match nth_error combined (Z.to_nat i) with
+                  | Some v => v
+                  | None => DVALUE_Base DVALUE_Poison
+                  end
               | None => DVALUE_Base DVALUE_Poison
               end
             in

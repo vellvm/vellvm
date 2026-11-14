@@ -1956,8 +1956,15 @@ comma_align:
 align:
   | KW_ALIGN n=INTEGER { ANN_align n }
 
+(* A case value is an integer constant, which at i1 may be spelled
+   [true] or [false]: these are the literals 1 and 0. *)
 switch_table_entry:
-  | sz=I x=INTEGER COMMA i=branch_label { (TInt_Literal(sz, x), i) }
+  | sz=I x=switch_case_value COMMA i=branch_label { (TInt_Literal(sz, x), i) }
+
+switch_case_value:
+  | x=INTEGER { x }
+  | KW_TRUE   { Number.IntDecimal (Decimal.Pos (Decimal.D1 Decimal.Nil)) }
+  | KW_FALSE  { Number.IntDecimal (Decimal.Pos (Decimal.D0 Decimal.Nil)) }
 
 %inline csep:
   COMMA { }
