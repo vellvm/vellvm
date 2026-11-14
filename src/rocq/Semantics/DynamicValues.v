@@ -870,7 +870,8 @@ Section DValue.
 
       - A [DVALUE_B] holds a canonical [dvalue_bv] ([dvalue_bv_canonical]).
 
-      [dvalue_has_dtyp] states these invariants, and the reader
+      [dvalue_has_dtyp] states these invariants, [dvalue_is_canonical]
+      checks them, and the reader
       [memory_bytes_to_dvalue] (MemoryBytes.v) produces canonical values, so
       that writing a well-typed value to memory and reading it back is the
       identity.
@@ -947,6 +948,49 @@ Section DValue.
          | DTYPE_Array v _ _ => DVALUE_Array v vs
          | DTYPE_Base _ => DVALUE_Base DVALUE_Poison
          end.
+
+  (** [dvalue_is_canonical dt dv]: the executable statement of the
+      invariants above -- [dv] is a value of type [dt] in canonical form.
+      It decides [dvalue_has_dtyp] ([dvalue_is_canonical_iff], below).
+
+      - Poison is canonical at every non-empty type, and at no empty one.
+      - Any other base value must have the base type, and a byte value must
+        hold a canonical [dvalue_bv].
+      - A struct must carry the type's [packed] flag, must not be a struct
+        that should have been written as poison ([agg_is_poison]), and must
+        have one canonical field per field type.
+      - An array or vector must carry the type's [vector] flag, have the
+        type's length and a non-void element type, must not be one that
+        should have been written as poison, and must have canonical
+        elements.  (At an empty array type -- length 0, or elements of empty
+        type -- nothing is poison.)
+
+      The one value of an empty type is canonical there
+      ([empty_dvalue_of_dtyp]): none of its fields is poison, and
+      [agg_is_poison] is false at an empty type. *)
+  Fixpoint dvalue_is_canonical (dt : dtyp) (dv : dvalue) {struct dv} : bool :=
+    match dv, dt with
+    | DVALUE_Base DVALUE_Poison, _ => negb (dtyp_is_empty dt)
+    | DVALUE_Base b, DTYPE_Base tb =>
+        dvalue_base_has_dtyp_base b tb && dvalue_base_canonical b
+    | DVALUE_Struct p fields, DTYPE_Struct q dts =>
+        let fix go (ts : list dtyp) (vs : list dvalue) {struct vs} : bool :=
+          match ts, vs with
+          | [], [] => true
+          | t :: ts', v :: vs' => dvalue_is_canonical t v && go ts' vs'
+          | _, _ => false
+          end in
+        Bool.eqb p q
+        && negb (agg_is_poison dt fields)
+        && go dts fields
+    | DVALUE_Array v elts, DTYPE_Array w sz t =>
+        Bool.eqb v w
+        && (if NO_VOID_dec t then true else false)
+        && N.eqb (N.of_nat (List.length elts)) sz
+        && negb (agg_is_poison dt elts)
+        && forallb (dvalue_is_canonical t) elts
+    | _, _ => false
+    end.
 
   (** ** Poison at vector type
 
@@ -1532,6 +1576,87 @@ Section DValue.
   Set Elimination Schemes.
 
   Hint Constructors dvalue_has_dtyp : dvalue.
+
+  (** [dvalue_is_canonical] decides [dvalue_has_dtyp]. *)
+
+  (* the struct case of [dvalue_is_canonical], field by field *)
+  Fixpoint fields_canonical (ts : list dtyp) (vs : list dvalue) {struct vs} : bool :=
+    match ts, vs with
+    | [], [] => true
+    | t :: ts', v :: vs' => dvalue_is_canonical t v && fields_canonical ts' vs'
+    | _, _ => false
+    end.
+
+  Lemma dvalue_is_canonical_struct : forall p fields q dts,
+      dvalue_is_canonical (DTYPE_Struct q dts) (DVALUE_Struct p fields)
+      = Bool.eqb p q
+        && negb (agg_is_poison (DTYPE_Struct q dts) fields)
+        && fields_canonical dts fields.
+  Proof.
+    (* the local loop of [dvalue_is_canonical] is [fields_canonical] itself *)
+    intros p fields q dts; cbn [dvalue_is_canonical]; f_equal.
+  Qed.
+
+  Lemma dvalue_is_canonical_sound : forall dv dt,
+      dvalue_is_canonical dt dv = true -> dvalue_has_dtyp dv dt.
+  Proof.
+    induction dv as [b | p fields IH | v elts IH] using dvalue_ind; intros dt H.
+    - destruct b;
+        try (destruct dt as [tb | |]; cbn in H; try discriminate;
+             apply andb_true_iff in H as [H1 H2]; constructor; assumption).
+      apply DVALUE_Poison_typ_agg.
+      cbn in H; apply negb_true_iff in H; exact H.
+    - destruct dt as [| q dts |]; try discriminate.
+      rewrite dvalue_is_canonical_struct in H.
+      apply andb_true_iff in H as [H H3]; apply andb_true_iff in H as [H1 H2].
+      apply Bool.eqb_prop in H1; subst q.
+      apply negb_true_iff in H2.
+      apply DVALUE_Struct_typ; [exact H2 |].
+      clear H2; revert dts H3; induction IH as [| f fs Hf _ IHl]; intros [| t ts] H3;
+        cbn in H3; try discriminate; constructor.
+      + apply andb_true_iff in H3 as [H3 _]; apply Hf, H3.
+      + apply andb_true_iff in H3 as [_ H3]; apply IHl, H3.
+    - destruct dt as [| | w sz t]; try discriminate.
+      cbn [dvalue_is_canonical] in H.
+      apply andb_true_iff in H as [H H5]; apply andb_true_iff in H as [H H4];
+        apply andb_true_iff in H as [H H3]; apply andb_true_iff in H as [H1 H2].
+      apply Bool.eqb_prop in H1; subst w.
+      destruct (NO_VOID_dec t) as [HNV |]; [| discriminate].
+      apply N.eqb_eq in H3; apply negb_true_iff in H4.
+      apply DVALUE_Array_typ; [exact HNV | exact H4 | | subst sz; symmetry; apply Nnat.Nat2N.id].
+      clear H4 H3; induction IH as [| e es He _ IHl]; constructor.
+      + cbn [forallb] in H5; apply andb_true_iff in H5 as [H5 _]; apply He, H5.
+      + cbn [forallb] in H5; apply andb_true_iff in H5 as [_ H5]; apply IHl, H5.
+  Qed.
+
+  Lemma dvalue_is_canonical_complete : forall dv dt,
+      dvalue_has_dtyp dv dt -> dvalue_is_canonical dt dv = true.
+  Proof.
+    induction dv as [b | p fields IH | v elts IH] using dvalue_ind; intros dt H.
+    - inversion H as [b' tb HB HC | t HNE | |]; subst.
+      + destruct b; cbn [dvalue_is_canonical];
+          first [rewrite HB, HC; reflexivity | reflexivity].
+      + cbn; rewrite HNE; reflexivity.
+    - inversion H as [| | p' fs dts HNP HF2 |]; subst.
+      rewrite dvalue_is_canonical_struct, Bool.eqb_reflx, HNP; cbn [negb andb].
+      clear H HNP; revert dts HF2; induction IH as [| f fs Hf _ IHl]; intros dts HF2;
+        inversion HF2; subst; cbn; [reflexivity |].
+      rewrite Hf by assumption; apply IHl; assumption.
+    - inversion H as [| | | v' xs sz t HNV HNP HF HL]; subst.
+      cbn [dvalue_is_canonical].
+      rewrite Bool.eqb_reflx, HNP, HL, Nnat.N2Nat.id, N.eqb_refl.
+      destruct (NO_VOID_dec t) as [| NNV]; [| contradiction]; cbn [negb andb].
+      clear H HNP HL; induction IH as [| e es He _ IHl]; [reflexivity |].
+      inversion HF; subst; cbn [forallb].
+      rewrite He by assumption; apply IHl; assumption.
+  Qed.
+
+  Theorem dvalue_is_canonical_iff : forall dv dt,
+      dvalue_is_canonical dt dv = true <-> dvalue_has_dtyp dv dt.
+  Proof.
+    intros dv dt; split;
+      [apply dvalue_is_canonical_sound | apply dvalue_is_canonical_complete].
+  Qed.
 
   Definition default_dvalue_of_dtyp_i (sz : positive) : dvalue_base :=
     @DVALUE_I sz (repr 0).
