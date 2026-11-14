@@ -814,23 +814,24 @@ Section DValue.
            then raise_ub "Division by poison."
            else ret DVALUE_Poison
        | DVALUE_Poison, _             =>
-           match iop with
-           (* A poison dividend could be INT_MIN, and INT_MIN / -1 is UB for
-              both sdiv and srem. *)
-           | SDiv _ | SRem =>
-               x <- match v2 with
-                   | DVALUE_I sz2 i2 =>
-                       ret (@Integers.signed sz2 i2)
-                   | DVALUE_Iptr i2 =>
-                       ret (to_Z i2)
-                   | _ => raise_error "ill_typed-iop: sdiv/srem"
-                   end;;
-               if Z.eq_dec x (-1)
+           (* A poison dividend does not hide a bad divisor: dividing by 0
+              is UB whatever the dividend.  And the dividend could be
+              INT_MIN, so for sdiv and srem a divisor of -1 is UB too.
+              Otherwise the result is poison. *)
+           if iop_is_div iop
+           then
+             y <- match v2 with
+                 | DVALUE_I sz2 i2 => ret (@Integers.signed sz2 i2)
+                 | DVALUE_Iptr i2 => ret (to_Z i2)
+                 | _ => raise_error "ill_typed-iop: division"
+                 end;;
+             if (y =? 0)%Z
+             then raise_ub "Division of poison by 0."
+             else
+               if (match iop with SDiv _ | SRem => true | _ => false end && (y =? -1))%Z
                then raise_ub "Signed division/remainder poison overflow"
                else ret DVALUE_Poison
-           | _ =>
-               ret DVALUE_Poison 
-           end
+           else ret DVALUE_Poison
        | _, _                           => raise_error "ill_typed-iop"
        end).
     destruct (Pos.eq_dec sz1 sz2); subst.
