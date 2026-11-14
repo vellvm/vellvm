@@ -290,55 +290,10 @@ Section DValue.
     end.
   
 
-  (* We can't, in general, calculate a type from a dvalue.
-      - poison doesn't carry enough type information
-      - zero-size arrays and vectors don't carry enough type information
-     This function therefore fails in those cases:
-   *)
-
-  Definition dtyp_base_of_dvalue_base (v:dvalue_base) : option dtyp_base :=
-    match v with
-    | DVALUE_Pointer a => Some DTYPE_Pointer
-    | DVALUE_I sz x => Some (DTYPE_I sz)
-    | DVALUE_Iptr x => Some (DTYPE_Iptr)
-    | DVALUE_Double x => Some (DTYPE_FP FP_double)
-    | DVALUE_Float x => Some (DTYPE_FP FP_float)
-    | DVALUE_Poison => None
-    | DVALUE_None => Some DTYPE_Void
-    | DVALUE_B sz bits => Some (DTYPE_B sz)
-    end.
-
-  Definition dtyp_of_dvalue_base (v:dvalue_base) : EOU dtyp :=
-    match dtyp_base_of_dvalue_base v with
-    | Some dtb => raise_ret (DTYPE_Base dtb)
-    | None => raise_error "no type"
-    end.
-    
-  Fixpoint dtyp_of_dvalue (v:dvalue) : EOU dtyp :=
-    match v with
-    | DVALUE_Base vb => dtyp_of_dvalue_base vb
-    | DVALUE_Struct p fields =>
-        dts <- map_monad dtyp_of_dvalue fields ;;
-        ret (DTYPE_Struct p dts)
-    | DVALUE_Array p elts =>
-        match elts with
-        | [] =>
-            (* Corner case: what is the dynamic type of an empty array? We use DTYPE_Void as the canonical choice.
-               Note: this means that DVALUE_Array p (DVALUE_Array p []) is "bogus" and should never arise as a dynamic value?
-             *)
-            ret (DTYPE_Array p 0 DTYPE_Void)
-        | e::es =>
-            t <- dtyp_of_dvalue e ;;  (* get the type of elements *)
-            if @NO_VOID_dec t
-            then
-              if forallb (fun e => match dtyp_of_dvalue e with
-                                | raise_ret t' => dtyp_eqb t t'
-                                | _ => false end) es
-              then ret (DTYPE_Array p (N.of_nat (length elts)) t)
-              else raise_error "dtyp_of_dvalue: mismatched element type in array"
-            else raise_error "dtyp_of_dvalue: void in array type"
-        end
-    end.
+  (* A dvalue does not determine its type: poison has every (non-empty)
+     type, and an empty array says nothing about its element type.  Code that
+     needs the type of a value must be given it (see, e.g., the typed
+     arguments of [Call] in LLVMEvents.v). *)
 
   Definition double_to_hex_string (f : float) : string
     := "0x" ++ NilEmpty.string_of_uint (N.to_hex_uint (Z.to_N (unsigned (Float.to_bits f)))).
