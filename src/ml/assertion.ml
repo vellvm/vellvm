@@ -12,8 +12,24 @@ open DV
 open Llvm_printer
 open List
 
+type test =
+  (* expected dvalue, dynamic type, entry, arguments *)
+  | EQTest of DV.dvalue * DynamicTypes.dtyp * function_id * DV.dvalue list
+  | SuccessTest of function_id * DV.dvalue list
+  | FailsTest of function_id * DV.dvalue list
+  | UBTest of int * function_id * DV.dvalue list
+
+let ocaml_of_EOU (c : 'x EOU.coq_EOU) : 'x =
+  match c with
+  | Coq_raise_error err -> failwith @@ Printf.sprintf "ERROR: %s" (Interpreter.ocaml_str err)
+  | Coq_raise_oom err -> failwith @@ Printf.sprintf "OOM: %s" (Interpreter.ocaml_str err)
+  | Coq_raise_ub err -> failwith @@ Printf.sprintf "UB: %s" (Interpreter.ocaml_str err)
+  | Coq_raise_ret x -> x
+
+let typ_to_dtyp t = TypToDtyp.typ_to_dtyp [] t
+
 let texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.dvalue =
-  let t = TypToDtyp.typ_to_dtyp [] typ in
+  let t = typ_to_dtyp typ in
   let e = TypToDtyp.convert_types_closed_exp exp in 
   begin match (Denotation.denote_closed_exp (ParamsV.coq_ParamsV IPtrInfinite.coq_IPZ) t e) with
   | Some v -> v
@@ -21,7 +37,7 @@ let texp_to_dvalue ((typ, exp) : LLVMAst.typ * LLVMAst.typ LLVMAst.exp) : DV.dva
               (Printf.sprintf "Assertion includes unsupported expression:\n\t%s %s"
                  (string_of_typ typ) (string_of_exp exp))
 end
-    
+
 let texp_to_function_id (_, exp) : function_id =
   match exp with
   | EXP_Ident (ID_Global id) -> id
