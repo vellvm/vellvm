@@ -1086,20 +1086,15 @@ Proof.
     eapply I2F_EOU_map_monad2; [exact (I2F_targs_snd Hargs) |].
     intros a1 a2 Ha; apply I2F_dvalue_to_dvalue_base; auto. }
   intros args1' args2' Hargs'.
-  destruct (is_memcpy_name f2).
-  { eapply I2F_memS_bind; [apply I2F_handle_memcpy; auto |].
-    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor. }
-  destruct (is_memmove_name f2).
-  { eapply I2F_memS_bind; [apply I2F_handle_memmove; auto |].
-    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor. }
-  - destruct (is_memset_name f2).
-    + eapply I2F_memS_bind; [apply I2F_handle_memset; auto |].
-      intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
-    + destruct (Rocqlib.proj_sumbool (string_dec f2 "malloc")).
-      * eapply I2F_memS_bind; [apply I2F_handle_malloc; auto |].
-        intros ptr1 ptr2 Hptr; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor; auto.
-      * destruct (Rocqlib.proj_sumbool (string_dec f2 "free")).
-        -- eapply I2F_memS_bind; [apply I2F_handle_free; auto |].
-           intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
-        -- apply I2F_Merr.
+  destruct (lookup_intrinsic f2) as [[] | ]; try apply I2F_Merr.
+  - eapply I2F_memS_bind; [apply I2F_handle_memcpy; auto |].
+    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
+  - eapply I2F_memS_bind; [apply I2F_handle_memmove; auto |].
+    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
+  - eapply I2F_memS_bind; [apply I2F_handle_memset; auto |].
+    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
+  - eapply I2F_memS_bind; [apply I2F_handle_malloc; auto |].
+    intros ptr1 ptr2 Hptr; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor; auto.
+  - eapply I2F_memS_bind; [apply I2F_handle_free; auto |].
+    intros _ _ _; apply I2F_Mret; simp I2FA_Intrinsic; repeat constructor.
 Qed.

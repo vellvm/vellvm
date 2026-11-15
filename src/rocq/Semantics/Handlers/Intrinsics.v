@@ -56,25 +56,12 @@ Section Intrinsics.
   Context {Pa : Params}.
   Context {E} `{FailureE -< E} `{UBE -< E} `{OOME -< E} `{MemoryE -< E} `{IntrinsicE -< E}.
 
-  (* Interprets Call events found in the given association list by their
-     semantic functions.
-   *)
-
-  Definition defs_assoc :=
-    List.map (fun '(a,b) =>
-                match dc_name a with
-                | Name s => (s,b)
-                | _ => ("",b)
-                end
-      ) (defined_intrinsics (E := E)).
-
   Definition handle_intrinsics :
     IntrinsicE ~> itree E :=
-    (* This is a bit hacky: declarations without global names are ignored by mapping them to empty string *)
     fun X (e : IntrinsicE X) =>
       match e in IntrinsicE Y return X = Y -> itree E Y with
-      | Intrinsic _ fname args varargs =>
-          match assoc fname defs_assoc with
+      | Intrinsic t fname args varargs =>
+          match named_intrinsic_semantics t fname with
           | Some f => fun pf => f (List.map snd args) varargs
           | None => fun pf => (eq_rect X (fun a => itree E a) (trigger e)) _ pf
           end

@@ -88,9 +88,9 @@ assertion, and where the result is defined it also compares the native output.
 
 ## Status
 
-As of 2026-11-14 (after the `mul nsw`, `trunc nuw`/`nsw`, `nneg`, GEP index, vector index,
-poison-dividend and `switch` literal fixes), with LLVM 23.1.2: all 1,488 generated
-cases agree with clang and llubi. Vellvm passes 1,305 of them and fails 183. What fails:
+As of 2026-11-14, with LLVM 23.1.2: all 1,488 generated cases agree with clang
+and llubi, and Vellvm passes every assertion in this directory.
 
-- **Intrinsics at `i1`** are almost all uninterpreted calls: `libll` defines
-  them only at wider types. Only `llvm.ushl.sat.i1` is handled.
+The intrinsics are built in at every width (`IntrinsicsDefinitions.v`);
+`../intrinsics/int-intrinsics.ll` checks them against clang at `i8`, `i32` and
+`i64`.

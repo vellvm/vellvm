@@ -182,12 +182,11 @@ Section withParams.
    *)
 
   Definition allocate_declaration (d:declaration dtyp) : MCFGtop unit :=
-    match lookup_intrinsic_declaration (dc_name d) with
-    | Some _ => Ret tt (* Don't allocate pointers for LLVM intrinsics declarations *)
-    | None =>
-        'v <- alloca DTYPE_Pointer 1%N None;;
-        gwrite (dc_name d) v
-    end.
+    if is_intrinsic (dc_name d)
+    then Ret tt (* Don't allocate pointers for LLVM intrinsics declarations *)
+    else
+      'v <- alloca DTYPE_Pointer 1%N None;;
+      gwrite (dc_name d) v.
 
   Definition allocate_declarations (ds:list (declaration dtyp)) : MCFGtop unit :=
     loop_monad allocate_declaration ds.
