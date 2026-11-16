@@ -16,7 +16,8 @@ Section Compare.
     | _ => false
     end.
 
-  Definition eval_icmp_base (samesign:bool) (icmp : icmp) (v1 v2 : dvalue_base) : EOU dvalue_base.
+  (* [icmp] on integers (and poison). *)
+  Definition eval_icmp_int_base (samesign:bool) (icmp : icmp) (v1 v2 : dvalue_base) : EOU dvalue_base.
     refine
       (match v1, v2 with
        | DVALUE_I sz1 i1, DVALUE_I sz2 i2 =>
@@ -25,16 +26,39 @@ Section Compare.
        | DVALUE_Poison, DVALUE_Poison => ret DVALUE_Poison
        | DVALUE_Poison, _ => if is_icmp_operand v2 then ret DVALUE_Poison else raise_error "ill_typed-iop"
        | _, DVALUE_Poison => if is_icmp_operand v1 then ret DVALUE_Poison else raise_error "ill_typed-iop"
-       | DVALUE_Pointer a1, DVALUE_Pointer a2 =>
-           let i1 := ptr_to_int a1 in
-           let i2 := ptr_to_int a2 in
-           eval_int_icmp false icmp i1 i2
        | _, _ => raise_error ("eval_icmp_base: ill_typed-icmp: " ++ show v1 ++ ", " ++ show v2)
        end).
     destruct (Pos.eq_dec sz1 sz2); subst.
     - exact (eval_int_icmp samesign icmp i1 i2).
     - exact (raise_error ("eval_icmp_base: ill_typed-icmp: " ++ show v1 ++ ", " ++ show v2)).
   Defined.
+  Arguments eval_icmp_int_base _ _ _ _ : simpl nomatch.
+
+  (* The address of a pointer, as [ptrtoaddr] gives it: an integer of the
+     pointer's address width (LangRef: "the address type"), which here is
+     the pointer's whole width, [bit_sizeof_dtyp] of the pointer type.  That
+     is a fixed-width [iN], not [iptr]: the address is reduced modulo 2^N
+     whatever the pointer representation, so the signed predicates and
+     [samesign] have a sign bit to look at. *)
+  Definition ptr_to_addr (a : ptr) : EOU dvalue_base :=
+    match bit_sizeof_dtyp (DTYPE_Base DTYPE_Pointer) with
+    | Npos sz => coerce_integer_to_int (Some sz) (ptr_to_int a)
+    | N0 => raise_error "ptr_to_addr: pointers have no address bits"
+    end.
+
+  (* LangRef ('icmp'): "If the operands are pointer typed, the pointer
+     values are compared as if they were integers", i.e. as their
+     [ptrtoaddr]s.  So a pointer comparison is literally that: convert both
+     operands, then compare the integers.  (Poison against a pointer needs
+     no conversion: [eval_icmp_int_base] already gives poison.) *)
+  Definition eval_icmp_base (samesign:bool) (icmp : icmp) (v1 v2 : dvalue_base) : EOU dvalue_base :=
+    match v1, v2 with
+    | DVALUE_Pointer a1, DVALUE_Pointer a2 =>
+        i1 <- ptr_to_addr a1 ;;
+        i2 <- ptr_to_addr a2 ;;
+        eval_icmp_int_base samesign icmp i1 i2
+    | _, _ => eval_icmp_int_base samesign icmp v1 v2
+    end.
   Arguments eval_icmp_base _ _ _ _ : simpl nomatch.
 
   (* [dt] is the operands' type; at a vector type [vector_elts] expands the

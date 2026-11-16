@@ -988,7 +988,42 @@ Proof.
     break_match_goal; repeat constructor.
 Qed.
 
-(** The scalar comparison dispatcher. *)
+(** The integer comparison dispatcher. *)
+Lemma I2F_eval_icmp_int_base : forall samesign icmp v1 v2 v1' v2',
+    I2F_dvalue_base v1 v1' ->
+    I2F_dvalue_base v2 v2' ->
+    I2F_EOU I2F_dvalue_base
+      (@eval_icmp_int_base PInf samesign icmp v1 v2)
+      (@eval_icmp_int_base PFin samesign icmp v1' v2').
+Proof.
+  intros * H1 H2.
+  induction H1; induction H2; cbn; eauto.
+  (* Iptr × Iptr *)
+  all: try solve [apply I2F_eval_int_icmp_iptr; eauto].
+  (* The remaining synchronized row, [I × I] (after eliminating the
+       bitwidth transport), runs the same computation on both sides;
+       close by symbolic execution of the shared tests. *)
+  all: try (match goal with
+         | |- context [Pos.eq_dec ?a ?b] =>
+             destruct (Pos.eq_dec a b) as [e | n]; [destruct e|]
+         end);
+    cbv [eq_rec_r eq_rec eq_rect Logic.eq_sym];
+    destruct icmp; cbn; eauto;
+    repeat (break_goal_fast; cbn); repeat constructor.
+Qed.
+
+(** [ptr_to_addr]: related pointers have the same address, which both
+      sides reduce to the same fixed-width integer. *)
+Lemma I2F_ptr_to_addr : forall a a',
+    I2F_Addr a a' ->
+    I2F_EOU I2F_dvalue_base (@ptr_to_addr PInf a) (@ptr_to_addr PFin a').
+Proof.
+  intros [z p] [i p'] [HI ->]; red in HI; subst.
+  cbn; repeat constructor.
+Qed.
+
+(** The scalar comparison dispatcher: pointers are compared as their
+      addresses, everything else directly. *)
 Lemma I2F_eval_icmp_base : forall samesign icmp v1 v2 v1' v2',
     I2F_dvalue_base v1 v1' ->
     I2F_dvalue_base v2 v2' ->
@@ -997,24 +1032,12 @@ Lemma I2F_eval_icmp_base : forall samesign icmp v1 v2 v1' v2',
       (@eval_icmp_base PFin samesign icmp v1' v2').
 Proof.
   intros * H1 H2.
-  induction H1; induction H2; cbn; eauto.
-  (* Iptr × Iptr *)
-  3:apply I2F_eval_int_icmp_iptr; eauto.
-  (* Remaining synchronized rows: [I × I] (after eliminating the
-       bitwidth transport) and [Pointer × Pointer] (where [ptr_to_int]
-       yields equal integers) run the same computation on both sides;
-       close by symbolic execution of the shared tests. *)
-  all: repeat match goal with
-         | HA : I2F_Addr ?a ?b |- _ =>
-             destruct a, b; destruct HA as [HI ->]; red in HI; subst
-         end;
-    try (match goal with
-         | |- context [Pos.eq_dec ?a ?b] =>
-             destruct (Pos.eq_dec a b) as [e | n]; [destruct e|]
-         end);
-    cbv [eq_rec_r eq_rec eq_rect Logic.eq_sym];
-    destruct icmp; cbn; eauto;
-    repeat (break_goal_fast; cbn); repeat constructor.
+  pose proof (I2F_eval_icmp_int_base samesign icmp H1 H2) as INT.
+  destruct H1; destruct H2; try exact INT.
+  unfold eval_icmp_base.
+  eapply I2F_EOU_bind; [apply I2F_ptr_to_addr; auto | intros].
+  eapply I2F_EOU_bind; [apply I2F_ptr_to_addr; auto | intros].
+  apply I2F_eval_icmp_int_base; auto.
 Qed.
 
 Lemma I2F_eval_icmp a1 a2 b1 b2 samesign cmp dt :
