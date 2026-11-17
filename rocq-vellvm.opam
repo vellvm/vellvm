@@ -22,13 +22,21 @@ depends: [
   "ocaml" {>= "4.14.0"}
   "dune" {>= "3.14.0"}
   "menhir"
-  "rocq-core" {>= "9.0.0" & < "9.2~"}
-  "rocq-stdlib" {>= "9.0.0" & < "9.2~"}
+  "rocq-core" {>= "9.2.0" & < "9.3~"}
+  "rocq-stdlib" {>= "9.2.0" & < "9.3~"}
   "coq-ext-lib" {>= "0.13.0" & < "0.14~"}
   "coq-paco"  {>= "4.2.3" & < "4.3~"}
   "coq-flocq" {>= "4.2.0"}
-  "coq-itree" {>= "5.2.1" & < "5.3~"}
+  "coq-itree" {= "dev"}
+  "rocq-coinduction" {= "dev"}
   "rocq-equations" {>= "1.3.1"}
+]
+
+# itrees ported to rocq-coinduction (branch new-coinduction), built against
+# upstream rocq-coinduction master (pinned to a commit for reproducibility).
+pin-depends: [
+  ["coq-itree.dev" "git+https://github.com/rogerburtonpatel/InteractionTrees.git#new-coinduction"]
+  ["rocq-coinduction.dev" "git+https://github.com/damien-pous/coinduction.git#07d2a09f9cb971209683298e9f5b3f5031d98b3f"]
 ]
 
 tags: [
