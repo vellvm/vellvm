@@ -6,7 +6,7 @@ From Stdlib Require Import
   Numbers.HexadecimalString
   Lists.List. 
 
-Import BinInt.
+From Stdlib Require Import BinInt.
 
 From Flocq.IEEE754 Require Import
   Bits

@@ -29,7 +29,6 @@ From Vellvm Require Import
   Theory.I2F.I2F_exp
   Theory.I2F.I2F_attributes.
 
-From Paco Require Import paco.
 
 Ltac bind_exp := erbind; [apply I2F_denote_exp'| intros].
 
@@ -47,7 +46,7 @@ Hint Unfold I2F_refine_CFG : core.
 
 Lemma I2F_draw_CFG : forall dt,
     I2F_refine_CFG I2F_dvalue (draw dt) (draw dt).
-Proof. intros; unfold I2F_refine_CFG, draw; rstep. Qed.
+Proof. intros; unfold I2F_refine_CFG, draw; rleaf. Qed.
 
 Lemma I2F_freeze_base' dt a b :
   I2F_dvalue_base a b ->
@@ -79,7 +78,7 @@ Lemma I2F_assert_dereferenceable or_null n v1 v2 msg :
     (assert_dereferenceable (Pa := PFin) or_null n v2 msg).
 Proof.
   intros H; pose proof H as H'; unfold I2F_refine_CFG, assert_dereferenceable.
-  inv H; [inv H0 | |]; cbn; try now (rstep; cbnn; try easy; eauto).
+  inv H; [inv H0 | |]; cbn; try now (rleaf; cbnn; try easy; eauto).
   match goal with
   | |- ruttc _ _ _ _ _ (if ?b1 then _ else _) (if ?b2 then _ else _) =>
       assert (EQ : b1 = b2)
@@ -87,7 +86,7 @@ Proof.
       rewrite EQ; destruct b2
   end.
   - apply ruttc_ret; auto.
-  - rbind I2F_dvalue; [unfold load; rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+  - rbind I2F_dvalue; [unfold load; rleaf; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
     apply ruttc_ret; auto.
 Qed.
 
@@ -137,12 +136,12 @@ Proof.
   intros H; revert attrss;
     induction H as [| [t1 v1] [t2 v2] vs1 vs2 Hv _ IH]; intros attrss;
     cbn [apply_args_attrs].
-  - unfold I2F_refine_CFG; rstep; cbnn; constructor.
+  - unfold I2F_refine_CFG; rleaf; cbnn; constructor.
   - inv Hv; cbn in *; subst.
     destruct attrss as [| attrs rest]; cbv beta iota;
       (erbind; [apply I2F_apply_attrs; eauto | intros v1' v2' Hv'];
        erbind; [apply IH | intros vs1' vs2' Hvs'];
-       unfold I2F_refine_CFG; rstep; cbnn; constructor; [constructor; auto | auto]).
+       unfold I2F_refine_CFG; rleaf; cbnn; constructor; [constructor; auto | auto]).
 Qed.
 
 (** How a call ends: the function attributes see related results and
@@ -196,7 +195,7 @@ Ltac i2f_assume_check :=
   repeat (break_match_goal; cbn -[assert_dereferenceable assume_violated assume_malformed]);
   try (apply I2F_assert_dereferenceable; auto);
   try (apply ruttc_ret; auto);
-  unfold assume_violated, assume_malformed; rstep; cbnn; try easy; eauto.
+  unfold assume_violated, assume_malformed; rleaf; cbnn; try easy; eauto.
 
 Lemma I2F_assume_nonnull :
   I2F_assume_bundle_check (assume_nonnull (Pa := PInf)) (assume_nonnull (Pa := PFin)).
@@ -285,7 +284,7 @@ Proof.
   intros [[t op] attrs] _.
   erbind; [apply I2F_denote_exp' | intros].
   erbind; [apply I2F_apply_attrs; eauto | intros].
-  rstep; cbnn; constructor; auto.
+  rleaf; cbnn; constructor; auto.
 Qed.
 
 Lemma I2F_denote_instr :
@@ -293,7 +292,7 @@ Lemma I2F_denote_instr :
     option_rel I2F_Addr va1 va2 ->
       I2F_refine_CFG TT
         (@denote_instr PInf i va1) (@denote_instr PFin i va2).
-  Proof with try now (rstep; cbnn; try (easy); eauto).
+  Proof with try now (rleaf; cbnn; try (easy); eauto).
     intros [[x i] ?] ? ? HR.
     destruct i.
     - cbn; break_match...
@@ -306,17 +305,17 @@ Lemma I2F_denote_instr :
         (rbind I2F_targs; [apply I2F_denote_call_args | intros vs1 vs2 HVS];
          rbind (fun (_ _ : unit) => True); [apply I2F_denote_operand_bundles | intros _ _ _];
          rbind (sum_rel I2F_dvalue I2F_dvalue);
-         [break_match_goal; [| bind_exp]; now (rstep; cbnn; try easy; eauto) | intros * HR'];
+         [break_match_goal; [| bind_exp]; now (rleaf; cbnn; try easy; eauto) | intros * HR'];
          (* the call site's function attributes, !range, and return-value
             attributes *)
          rbind (sum_rel I2F_dvalue I2F_dvalue);
          [apply I2F_check_call_return; auto using I2F_targs_snd | intros * HR''];
          inv HR'').
-      all: try now (rbind (fun _ _ => False); [rstep; cbnn; easy | intros ?? []]).
+      all: try now (rbind (fun _ _ => False); [rleaf; cbnn; easy | intros ?? []]).
       all: rewrite 2 Eqit.bind_ret_l...
 
     - destruct x; cbn[denote_instr].
-      2: rstep; constructor.
+      2: rleaf; constructor.
       break_match_goal.
       + break_goal_fast.
         cbn; rewrite 2 Eqit.bind_bind.
@@ -327,24 +326,24 @@ Lemma I2F_denote_instr :
                              (ITree.bind (if ?b2 then _ else _) _) =>
             assert (EQP : b1 = b2) by (apply I2F_dvalue_is_poison; exact H);
             rewrite EQP; clear EQP; destruct b2;
-            [rbind (fun _ _ => False); [rstep; cbnn; easy | intros ?? []] |]
+            [rbind (fun _ _ => False); [rleaf; cbnn; easy | intros ?? []] |]
         end.
         rewrite ?Eqit.bind_bind.
         rbind I2F_dvalue_base; [apply I2F_refine_lift', I2F_dvalue_to_dvalue_base; auto |].
         intros.
         rewrite 2 Eqit.bind_bind.
         pose proof I2F_dvalue_base_int_unsigned H0 as EQ; rewrite EQ.
-        rbind I2F_dvalue; [rstep | intros]...
-        rbind (fun _ _ => True); [rstep | intros]...
+        rbind I2F_dvalue; [rleaf | intros]...
+        rbind (fun _ _ => True); [rleaf | intros]...
       + cbn; rewrite 2 Eqit.bind_bind.
-        rbind I2F_dvalue; [rstep | intros].
-        rbind (fun _ _ => True); [rstep | intros]...
+        rbind I2F_dvalue; [rleaf | intros].
+        rbind (fun _ _ => True); [rleaf | intros]...
         
     - destruct x; cbn...
       destruct ptr.
       bind_exp.
       rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_alignment; auto | intros _ _ _].
-      rbind I2F_dvalue; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+      rbind I2F_dvalue; [rleaf; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       (* the load's value metadata: !range, then the ones applied like
          attributes, then !dereferenceable *)
       erbind; [apply I2F_refine_lift', I2F_apply_value_attrs, I2F_value_metadata_range; eauto
@@ -359,7 +358,7 @@ Lemma I2F_denote_instr :
       induction H0...
       induction H0...
       6: rbind (fun _ _ => False); [|intros _ _ []]...
-      all: rbind (fun _ _ => True); [rstep; cbnn; simp I2FE_Memory; eauto| intros]...
+      all: rbind (fun _ _ => True); [rleaf; cbnn; simp I2FE_Memory; eauto| intros]...
     - destruct x; cbn...
     - destruct x; cbn...
       unfold denote_cmpxchg.
@@ -367,7 +366,7 @@ Lemma I2F_denote_instr :
       break_match_goal...
       do 3 bind_exp.
       rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_aligned_to; auto | intros _ _ _].
-      erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto |]. 
+      erbind; [rleaf; cbnn; intros; simp I2FA_Memory in *; eauto |]. 
       intros.
       erbind.
       apply I2F_refine_lift', I2F_eval_icmp; eauto.
@@ -376,27 +375,27 @@ Lemma I2F_denote_instr :
       induction H3...
       break_goal_fast...
       break_goal_fast...
-      rbind (fun _ _ => True); [rstep; cbnn; intros; simp I2FA_Memory in *; eauto |].
+      rbind (fun _ _ => True); [rleaf; cbnn; intros; simp I2FA_Memory in *; eauto |].
       intros.
-      rstep; cbnn; simp I2FE_Local; intuition.
-      rstep; cbnn; simp I2FE_Local; intuition.
+      rleaf; cbnn; simp I2FE_Local; intuition.
+      rleaf; cbnn; simp I2FE_Local; intuition.
     - destruct x; cbn...
       unfold denote_atomicrmw.
       repeat break_goal_fast.
       bind_exp.
       bind_exp.
       rbind (fun _ _ => True); [apply I2F_refine_lift', I2F_assert_aligned_to; auto | intros _ _ _].
-      erbind; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+      erbind; [rleaf; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       unfold denote_atomic_rmw_operation.
       break_goal_fast...
       
       cbn; erewrite 2 Eqit.bind_ret_l;
-      rbind (fun _ _ => True); [rstep; cbnn; easy | intros];
-        rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+      rbind (fun _ _ => True); [rleaf; cbnn; easy | intros];
+        rbind (fun _ _ => True); [rleaf; cbnn; easy | intros]...
 
       all: try (cbn; erbind; [apply I2F_refine_lift', I2F_eval_iop; eauto | intros];
-      rbind (fun _ _ => True); [rstep; cbnn; easy | intros];
-        rbind (fun _ _ => True); [rstep; cbnn; easy | intros])...
+      rbind (fun _ _ => True); [rleaf; cbnn; easy | intros];
+        rbind (fun _ _ => True); [rleaf; cbnn; easy | intros])...
 
       2-5: rbind (fun _ _ => False); [|intros _ _ []]...
       4-11: rbind (fun _ _ => False); [|intros _ _ []]...
@@ -404,26 +403,26 @@ Lemma I2F_denote_instr :
         1,3-10: rbind (fun _ _ => False); [|intros _ _ []]...
         rbind I2F_dvalue.
         2: intros;
-        rbind (fun _ _ => True); [rstep; cbnn; easy | intros];
-        rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+        rbind (fun _ _ => True); [rleaf; cbnn; easy | intros];
+        rbind (fun _ _ => True); [rleaf; cbnn; easy | intros]...
         apply I2F_refine_lift'.
         eapply I2F_EOU_bind;
           [apply I2F_eval_iop; [auto | repeat constructor] |].
         intros; apply I2F_eval_iop; [repeat constructor | auto].
       }
       all: erbind; [apply I2F_refine_lift', I2F_eval_fop; eauto | intros].
-      all: rbind (fun _ _ => True); [rstep; cbnn; easy | intros].
-      all: rbind (fun _ _ => True); [rstep; cbnn; easy | intros]...
+      all: rbind (fun _ _ => True); [rleaf; cbnn; easy | intros].
+      all: rbind (fun _ _ => True); [rleaf; cbnn; easy | intros]...
     - destruct x, va_list_and_arg_list; cbn.
       all: bind_exp.
-      all: rbind I2F_dvalue; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
-      all: rbind I2F_dvalue; [rstep; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+      all: rbind I2F_dvalue; [rleaf; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
+      all: rbind I2F_dvalue; [rleaf; cbnn; intros; simp I2FA_Memory in *; eauto | intros].
       all: rewrite 2 Eqit.bind_ret_l.
       all: erbind; [apply I2F_refine_lift', I2F_eval_gep; eauto; repeat constructor | intros].
-      all: rbind (fun _ _ => True); [rstep | intros]...
+      all: rbind (fun _ _ => True); [rleaf | intros]...
     - destruct x; cbn...
       rbind (option_rel I2F_dvalue); [|intros].
-      rstep; cbnn.
+      rleaf; cbnn.
       induction H...
 Qed.
 
@@ -435,7 +434,7 @@ Proof.
   intros.
   unfold denote_code, loop_monad.
   induction c; cbn.
-  - now rstep.
+  - now rleaf.
   - rbind TT; [apply I2F_denote_instr; auto | intros [] [] _].
     apply IHc.
 Qed.
@@ -472,10 +471,10 @@ Qed.
 Lemma I2F_denote_terminator :
   forall t,
     I2F_refine_CFG (sum_rel Logic.eq I2F_dvalue) (@denote_terminator PInf t) (@denote_terminator PFin t).
-Proof with try now (rstep; cbnn; try (easy); eauto).
+Proof with try now (rleaf; cbnn; try (easy); eauto).
   destruct t as [[? []] ?]; cbn...
   - destruct v; bind_exp...
-  - rstep; repeat constructor.
+  - rleaf; repeat constructor.
   - destruct v; bind_exp.
     inv H; [induction H0 | |]...
     repeat break_goal_fast...
@@ -501,7 +500,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
     destruct fn...
     rbind (Forall2 (@Logic.eq (option Z))).
     { apply ruttc_map_monad; intros b _.
-      rbind I2F_dvalue; [unfold gread; rstep | intros v1 v2 HV].
+      rbind I2F_dvalue; [unfold gread; rleaf | intros v1 v2 HV].
       apply ruttc_ret; now apply I2F_dvalue_ptr_address. }
     intros addrs1 addrs2 HA; apply ListUtil.Forall2_eq in HA; subst.
     rewrite (I2F_dvalue_ptr_address H).
@@ -532,7 +531,7 @@ Qed.
 Lemma I2F_denote_phi :
   forall from phi,
     I2F_refine_CFG (prod_rel Logic.eq I2F_dvalue) (@denote_phi PInf from phi) (@denote_phi PFin from phi).
-Proof with try now (rstep; cbnn; try (easy); eauto).
+Proof with try now (rleaf; cbnn; try (easy); eauto).
   intros ? [[? []] ?]; cbn.
   break_goal_fast...
   bind_exp...
@@ -541,7 +540,7 @@ Qed.
 Lemma I2F_denote_phis :
   forall from phis,
     I2F_refine_CFG TT (@denote_phis PInf from phis) (@denote_phis PFin from phis).
-Proof with try now (rstep; cbnn; try (easy); eauto).
+Proof with try now (rleaf; cbnn; try (easy); eauto).
   intros; cbn.
   erbind.
   apply ruttc_map_monad.
@@ -560,7 +559,7 @@ Lemma I2F_denote_block :
   forall from block a1 a2,
     option_rel I2F_Addr a1 a2 ->
     I2F_refine_CFG (sum_rel Logic.eq I2F_dvalue) (@denote_block PInf block from a1) (@denote_block PFin block from a2).
-Proof with try now (rstep; cbnn; try (easy); eauto).
+Proof with try now (rleaf; cbnn; try (easy); eauto).
   intros.
   erbind;[apply I2F_denote_phis| intros ???].
   erbind;[apply I2F_denote_code; auto| intros ???].
@@ -571,7 +570,7 @@ Lemma I2F_denote_ocfg :
   forall ocfg ft a1 a2,
     option_rel I2F_Addr a1 a2 ->
     I2F_refine_CFG (sum_rel Logic.eq I2F_dvalue) (@denote_ocfg PInf ocfg a1 ft) (@denote_ocfg PFin ocfg a2 ft).
-Proof with try now (rstep; cbnn; try (easy); eauto).
+Proof with try now (rleaf; cbnn; try (easy); eauto).
   intros.
   apply ruttc_iter with Logic.eq; auto.
   intros [] ? <-.
@@ -584,7 +583,7 @@ Lemma I2F_denote_cfg :
   forall ocfg a1 a2,
     option_rel I2F_Addr a1 a2 ->
     I2F_refine_CFG I2F_dvalue (@denote_cfg PInf ocfg a1) (@denote_cfg PFin ocfg a2).
-Proof with try now (rstep; cbnn; try (easy); eauto).
+Proof with try now (rleaf; cbnn; try (easy); eauto).
   intros.
   cbn.
   erbind; [apply I2F_denote_ocfg; auto |].
@@ -638,7 +637,7 @@ Qed.
 Lemma I2F_push_call_frame d args1 args2:
     I2F_targs args1 args2 ->
     I2F_refine_CFG I2F_Addr (push_call_frame d args1) (push_call_frame d args2).
-Proof with try now (rstep; cbnn; try (easy); eauto).
+Proof with try now (rleaf; cbnn; try (easy); eauto).
   intros.
   erbind; [apply I2F_refine_lift', I2F_combine_lists_varargs; auto | intros].
   destruct r1, r2; inv H0; cbn in * |-.
@@ -646,12 +645,12 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
   rbind TT...
   intros _ _ _.
   rbind TT.
-  { rstep; cbnn; try easy; simp I2FE_Stack; apply I2F_frame_bindings; auto. }
+  { rleaf; cbnn; try easy; simp I2FE_Stack; apply I2F_frame_bindings; auto. }
   intros _ _ _.
   rbind I2F_dvalue...
   intros ?? HR.
   rbind TT.
-  rstep; cbnn; try easy.
+  rleaf; cbnn; try easy.
   constructor; [reflexivity | split; [exact HR |]].
   apply I2F_canonicalize_agg, I2F_targs_snd; auto.
   intros _ _ _.
@@ -715,35 +714,34 @@ Lemma I2F_run_exc {R1 R2 : Type} {RR : R1 -> R2 -> Prop} t1 t2 :
   ruttc cutUB cutOOM I2FE_CFG I2FA_CFG (sum_rel I2F_dvalue RR) (run_exc t1) (run_exc t2).
 Proof.
   revert t1 t2.
-  ginit; gcofix cih.
+  coinduction c cih.
   intros * HR.
   rewrite 2 unfold_run_exc_strong.
-  punfold HR; red in HR.
-  induction HR; pclearbot.
-  - gstep; constructor; eauto.
-  - gstep. constructor; eauto.
-    gfinal; left; apply cih; auto.
+  rcstep in HR.
+  induction HR.
+  - constructor; eauto.
+  - constructor; now apply cih.
   - pose proof (I2FE_CFG_exc_of_event _ _ H) as EXC.
     destruct (exc_of_event e1), (exc_of_event e2); inv EXC.
-    + gstep; constructor; constructor; auto.
-    + gstep; constructor; auto.
+    + constructor; constructor; auto.
+    + constructor; auto.
       intros a b HAns.
-      gstep; constructor.
-      gfinal; left; apply cih.
+      step; constructor.
+      apply cih.
       now apply H0.
   - rewrite tau_euttge, unfold_run_exc_strong.
     apply IHHR.
   - rewrite tau_euttge, unfold_run_exc_strong.
     apply IHHR.
   - rewrite cutUB_exc_of_event; auto.
-    gstep; constructor; auto.
+    constructor; auto.
   - rewrite cutOOM_exc_of_event; auto.
-    gstep; constructor; auto.
+    constructor; auto.
 Qed.
 
 Lemma I2F_denote_function d :
     I2F_function_denotation (@denote_function PInf d) (@denote_function PFin d).
-Proof with try now (rstep; cbnn; try (easy); eauto).
+Proof with try now (rleaf; cbnn; try (easy); eauto).
   unfold denote_function.
   destruct (dc_param_attrs (df_prototype d)) as [ret_attrs args_attrs].
   intros cc ret_t ???.
@@ -797,7 +795,7 @@ Lemma I2F_denote_mcfg :
       (sum_rel I2F_dvalue I2F_dvalue)
       (@denote_mcfg PInf ctx1 t f1 args1)
       (@denote_mcfg PFin ctx2 t f2 args2).
-Proof with try now (rstep; cbnn; try (easy); eauto).
+Proof with try now (rleaf; cbnn; try (easy); eauto).
   intros * HF Hargs Hctx.
   red; unfold denote_mcfg.
   (* [ruttc_mrec] concludes at the per-call answer relation
@@ -828,7 +826,7 @@ Proof with try now (rstep; cbnn; try (easy); eauto).
       end.
     - (* external call *)
       unfold external_call.
-      rbind I2F_dvalue; [rstep |intros]...
+      rbind I2F_dvalue; [rleaf |intros]...
   }
   (* the four identity inclusions, and [sum_rel] from the [I2FA_Call]
      instance (they are convertible) *)

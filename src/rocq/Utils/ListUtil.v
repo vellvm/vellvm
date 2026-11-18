@@ -1373,7 +1373,8 @@ Section map_monad_itree.
       (map_monad f1 l1)
       (map_monad f2 l2).
   Proof.
-    eapply (eqit_mon _ _ b1 b2 b1 b2); auto; [apply Forall2_eq | apply eqit_map_monad; eauto].
+    eapply (eqit_mono _ _ b1 b2 b1 b2); [auto | auto | | apply eqit_map_monad; eauto].
+    intros ?? H; now apply Forall2_eq.
   Qed.
 
 End map_monad_itree.

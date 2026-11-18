@@ -26,9 +26,8 @@ From Vellvm Require Import
   Theory.MemoryBytesFacts
   Theory.I2F.Refinement.
 
-From Paco Require Import paco.
 
-Ltac rstep :=
+Ltac rleaf :=
   first [apply ruttc_trigger; eauto 10; try easy |
           apply ruttc_trigger_cast |
           apply ruttc_ret; eauto 10 
@@ -352,7 +351,7 @@ Qed.
       event-triggering step of [freeze]/[freeze_base]. *)
 Lemma I2F_draw_MCFG : forall dt,
     I2F_refine_MCFG I2F_dvalue (draw dt) (draw dt).
-Proof. intros; unfold I2F_refine_MCFG, draw; rstep. Qed.
+Proof. intros; unfold I2F_refine_MCFG, draw; rleaf. Qed.
 
 Lemma I2F_freeze_base dt a b :
   I2F_dvalue_base a b ->
@@ -2733,12 +2732,12 @@ Proof.
     break_match_goal_safe.
     apply I2F_refine_lift.
     apply I2F_bitcast_bytes; auto.
-    rstep. constructor.
+    rleaf. constructor.
   - cbn.
     apply I2F_refine_lift.
     apply I2F_convert_pure; auto.
   - cbn.
-    rstep.
+    rleaf.
 Qed.      
 
 
@@ -3204,7 +3203,7 @@ Qed.
     
 Lemma I2F_denote_exp :
   forall (e : exp dtyp) τ, I2F_refine (@denote_exp PInf τ e) (@denote_exp PFin τ e).
-Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
+Proof with try (rleaf || cbnn; simp I2FE_Failure; reflexivity).
   induction e.
   - destruct id; intros; cbn...
   - intros [d|]; cbn...
@@ -3222,16 +3221,16 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
       intros [d e] HIN; now apply (H (d,e)).
     + intros * HF...
   - (* EXP_Undef: poison at the literal's type *)
-    intros [d|]; cbn -[poison_of_dtyp]; [rstep; apply I2F_poison_of_dtyp | idtac]...
+    intros [d|]; cbn -[poison_of_dtyp]; [rleaf; apply I2F_poison_of_dtyp | idtac]...
   - (* EXP_Poison *)
-    intros [d|]; cbn -[poison_of_dtyp]; [rstep; apply I2F_poison_of_dtyp | idtac]...
+    intros [d|]; cbn -[poison_of_dtyp]; [rleaf; apply I2F_poison_of_dtyp | idtac]...
   - (* EXP_Struct: the literal is canonicalised ([canonicalize_agg]), at a
        type read off its fields, the same on both sides *)
     cbn -[canonicalize_agg]; intros.
     erbind.
     + apply ruttc_map_monad.
       intros [d e] HIN; now apply (H (d,e)).
-    + intros * HF; rstep; apply I2F_canonicalize_agg; auto.
+    + intros * HF; rleaf; apply I2F_canonicalize_agg; auto.
   - (* EXP_Packed_struct: the [dtyp] guard is a pure, parameter-free
          computation, related to itself by reflexivity of [I2F_EOU] ---
          no case analysis on the type. *)
@@ -3242,19 +3241,19 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
       erbind.
       * apply ruttc_map_monad.
         intros [d e] HIN; now apply (H (d,e)).
-      * intros * HF; rstep; apply I2F_canonicalize_agg; auto.
+      * intros * HF; rleaf; apply I2F_canonicalize_agg; auto.
   - (* EXP_Array *)
     cbn -[canonicalize_agg]; intros.
     erbind.
     + apply ruttc_map_monad.
       intros [d e] HIN; now apply (H (d,e)).
-    + intros * HF; rstep; apply I2F_canonicalize_agg; auto.
+    + intros * HF; rleaf; apply I2F_canonicalize_agg; auto.
   - (* EXP_Vector *)
     cbn -[canonicalize_agg]; intros.
     erbind.
     + apply ruttc_map_monad.
       intros [d e] HIN; now apply (H (d,e)).
-    + intros * HF; rstep; apply I2F_canonicalize_agg; auto.
+    + intros * HF; rleaf; apply I2F_canonicalize_agg; auto.
   - cbn; intros.
     erbind; [apply IHe1 | intros].
     erbind; [apply IHe2 | intros].
@@ -3315,7 +3314,7 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
     apply I2F_freeze; auto.
   - cbn; intros _...
   - cbn; intros _; destruct m...
-    all: try now rstep; constructor; eauto.
+    all: try now rleaf; constructor; eauto.
     destruct tv; cbn.
     eapply H; eauto.
   - (* EXP_Splat: the vector-type accessor is a pure, parameter-free
@@ -3326,7 +3325,7 @@ Proof with try (rstep || cbnn; simp I2FE_Failure; reflexivity).
     + apply I2F_refine_lift, I2F_EOU_refl.
     + intros [sz t'] ? <-; cbn -[canonicalize_agg].
       erbind; [apply IHe |].
-      intros ? ? HR; rstep.
+      intros ? ? HR; rleaf.
       apply I2F_canonicalize_agg; apply Forall2_repeat; auto.
   - (* EXP_BlockAddress: a global read, like [EXP_Ident] *)
     intros; cbn...

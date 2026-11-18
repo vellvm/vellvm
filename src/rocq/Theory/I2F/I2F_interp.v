@@ -43,7 +43,6 @@ Existing Instance MemoryModelStateV.
 Existing Instance MemoryModelPrimitivesV.
 
 Import Monads State StateFacts.
-From Paco Require Import paco.
 
 (** * Intrinsics (out of the memory model) *)
 
@@ -172,10 +171,10 @@ Proof.
   destruct Hva as [ | vp1 vp2 Hvp]; [i2f_va_fail |].
   destruct Hd as [b1 b2 Hb | p s1 s2 Hs | v1' s1 s2 Hs'].
   - destruct Hb as [p1 p2 Hp | sz i | ip1 ip2 Hip | d | f | | | sz bits bits' Hbits].
-    all: try (rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep]).
-    rstep; easy.
-  - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep].
-  - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rstep].
+    all: try (rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rleaf]).
+    rleaf; easy.
+  - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rleaf].
+  - rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition auto| intros [] [] _; easy] | intros; rleaf].
 Qed.
 
 Lemma I2F_llvm_va_copy : forall args1 args2 va1 va2,
@@ -189,7 +188,7 @@ Proof.
   destruct Hargs; [ | i2f_va_fail].
   erbind;
   [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition | cbnn; intros *; simp I2FA_Memory; eauto] | intros].
-  rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition| intros [] [] _; easy] | intros; rstep].
+  rbind Logic.eq; [eapply ruttc_trigger; [cbnn; simp I2FE_Memory; intuition| intros [] [] _; easy] | intros; rleaf].
 Qed.
 
 Lemma I2F_llvm_va_end : forall args1 args2 va1 va2,
@@ -440,12 +439,12 @@ Proof.
                   | k1 k2 Hget IHget | σ1 σ2 k1 k2 Hσ Hput IHput
                   | c k1 k2 Hc IHc];
     intros s1 s2 HS; cbn.
-  - pstep; constructor; constructor; auto.
+  - rcstep; constructor; constructor; auto.
   - apply ruttc_trigger_cast; constructor.
   - unfold raiseUB, trigger_cast; rewrite bind_trigger.
-    pstep; repeat constructor.
+    rcstep; repeat constructor.
   - unfold raiseOOM, trigger_cast; rewrite bind_trigger.
-    pstep; repeat constructor.
+    rcstep; repeat constructor.
   - now apply IHget.
   - now apply IHput.
   - destruct c; cbn.
@@ -480,7 +479,7 @@ Proof.
   cbn in *.
   eapply ruttc_bind.
   apply I2F_memM_interp; [apply I2F_handle_memoryM; auto |]; auto.
-  intros [] [] []; pstep; do 2 constructor; cbn; auto.
+  intros [] [] []; rcstep; do 2 constructor; cbn; auto.
   constructor; auto.
 Qed.
 
@@ -500,7 +499,7 @@ Proof.
   cbn.
   eapply ruttc_bind.
   apply I2F_memM_interp; [apply I2F_handle_intrinsicM; auto |]; auto.
-  intros [] [] []; pstep; do 2 constructor; cbn; auto.
+  intros [] [] []; rcstep; do 2 constructor; cbn; auto.
   constructor; auto.
 Qed.
 
@@ -565,25 +564,21 @@ Proof.
       apply ruttc_trigger;
       [cbnn; simp I2FE_ExternalCall; auto |
       intros a b Hab; cbnn in Hab; simp I2FA_ExternalCall in Hab].
-      intros r1 r2 Hr; rstep.
+      intros r1 r2 Hr; rleaf.
     - (* IO_stdout *)
       rbind Logic.eq.
       apply ruttc_trigger;
       [cbnn; simp I2FE_ExternalCall; auto |
       intros [] [] Hab; cbnn in Hab; simp I2FA_ExternalCall in Hab;
                   simp I2FA_ExternalCall; auto].
-      intros r1 r2 <-; rstep.
-      constructor; auto.
-      cbn; simp I2FA_ExternalCall; auto.
+      intros r1 r2 <-; rleaf.
     - (* IO_stderr *)
       rbind Logic.eq.
       apply ruttc_trigger;
       [cbnn; simp I2FE_ExternalCall; auto |
       intros [] [] Hab; cbnn in Hab; simp I2FA_ExternalCall in Hab;
       simp I2FA_ExternalCall; auto].
-      intros r1 r2 <-; rstep.
-      constructor; auto.
-      cbn; simp I2FA_ExternalCall; auto.
+      intros r1 r2 <-; rleaf.
   }
   destruct e1 as [e1|e1]; destruct e2 as [e2|e2]; cbn in H; cbn; try easy;
     [apply I2F_fused_intrinsic; auto |].
@@ -619,25 +614,21 @@ Lemma ruttc_interp_state_specialized {R1 R2} (RR : R1 -> R2 -> Prop) t1 t2
       (interp_state interp_vellvm_h t1 s1)
       (interp_state interp_vellvm_h t2 s2).
 Proof.
-  ginit.
   revert t1 t2 HR.
-  gcofix cih; intros.
+  coinduction c cih; intros.
   rewrite 2 unfold_interp_state.
-  punfold HR; red in HR.
-  induction HR; pclearbot.
-  - cbn; gstep; constructor; auto.
-  - cbn; gstep; constructor.
-    gfinal; left; auto.
+  rcstep in HR.
+  induction HR.
+  - cbn; constructor; auto.
+  - cbn; constructor.
+    now apply cih.
   - cbn.
-    (* TODO fix *)
-    guclo (@ruttc_clo_bind
-             (@MCFGEbot PInf) (@MCFGEbot PFin) (@FusedS PInf * R1) (@FusedS PFin * R2)).
-    econstructor.
+    eapply ruttc_bind_bchain.
     apply I2F_interp_vellvm_h; auto.
     intros [] [] []; cbn in *.
-    gstep; constructor.
-    gfinal; left; apply cih; auto.
-    apply H1; auto.
+    constructor.
+    apply cih; auto.
+    apply H0; auto.
   - cbn. rewrite tau_euttge.
     rewrite unfold_interp_state.
     apply IHHR.
@@ -648,12 +639,12 @@ Proof.
     generalize H; intros tmp.
     dependent induction H.
     cbnn; rewrite Eqit.bind_bind,bind_trigger.
-    gstep; constructor; auto; constructor.
+    constructor; auto; constructor.
    - cbn.
     generalize H; intros tmp.
     dependent induction H.
     cbnn; rewrite Eqit.bind_bind,bind_trigger.
-    gstep; constructor; auto; constructor.
+    constructor; auto; constructor.
 Qed.
 
 

@@ -35,7 +35,7 @@ depends: [
 # itrees ported to rocq-coinduction (branch new-coinduction), built against
 # upstream rocq-coinduction master (pinned to a commit for reproducibility).
 pin-depends: [
-  ["coq-itree.dev" "git+https://github.com/rogerburtonpatel/InteractionTrees.git#new-coinduction"]
+  ["coq-itree.dev" "git+https://github.com/rogerburtonpatel/InteractionTrees.git#post-bugfix"]
   ["rocq-coinduction.dev" "git+https://github.com/damien-pous/coinduction.git#07d2a09f9cb971209683298e9f5b3f5031d98b3f"]
 ]
 

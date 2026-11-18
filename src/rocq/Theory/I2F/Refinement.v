@@ -1,5 +1,4 @@
 From Equations Require Import Equations.
-From Paco Require Import paco.
 From ITree Require Import ITree Eq HeterogeneousRelations.
 
 From Vellvm Require Import
@@ -569,11 +568,11 @@ Lemma I2F_refine_lift_gen {E1 E2}
   ruttc cutUB cutOOM REv RAns RR (EOU_to_itree m1) (EOU_to_itree m2).
 Proof.
   intros []; cbn.
-  - pfold; constructor; auto.
+  - rcstep; constructor; auto.
   - apply ruttc_trigger_cast; apply HThrow.
-  - pfold; red; cbn.
+  - rcstep; cbn.
     apply EqCutL; constructor.
-  - pfold; red; cbn.
+  - rcstep; cbn.
     apply EqCutR; constructor.
 Qed.
 

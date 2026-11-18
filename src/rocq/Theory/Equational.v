@@ -43,11 +43,15 @@ Section withParams.
   #[local] Hint Rewrite @translate_trigger : rwexp.
   #[local] Ltac go := autorewrite with rwexp.
   #[local] Tactic Notation "go!" := repeat go.
+  (* Up-to-bind on a guarded goal [b (elem c) t u] of a coinductive [eutt]
+     proof, with [eq] on the prefix (closed by reflexivity). *)
+  #[local] Ltac gbind c :=
+    eapply (eqit_bind_chain _ _ _ (tower.chain_b c)) with (UU := eq); [reflexivity |].
   #[local] Ltac solve := go; easy.
   #[local] Ltac eqbind :=
     first [
         apply eutt_eq_bind; intros |
-        eapply eq_itree_clo_bind with (UU := eq); [reflexivity | intros ? ? ->]
+        eapply eq_itree_bind with (UU := eq); [reflexivity | intros ? ? ->]
       ].
   
   (** [denote_code] *)
@@ -484,24 +488,23 @@ Section withParams.
   Proof.
     intros * NOBACK.
     revert fto.
-    einit.
-    ecofix CIH.
+    coinduction c CIH.
     intros [f to].
     destruct (find_block bks1 to) eqn:FIND.
     - unfold denote_ocfg, denote_ocfg_map.
       setoid_rewrite unfold_iter.
-      cbn. go.
+      cbn -[lattice.body]. go.
       rewrite 2 ocfg_map_find_block, !FIND.
       go.
       pose proof find_block_some_app bks1 bks2 to FIND as FIND_APP.
       rewrite FIND_APP.
-      cbn; go.
-      ebind; econstructor; [reflexivity | intros ? ? <-].
-      break_match_goal; [| go; estep].
+      cbn -[lattice.body]; go.
+      gbind c; intros ? ? <-.
+      break_match_goal; [| go; reflexivity].
       go.
       rewrite bind_tau.
       etau.
-    - efinal.
+    - base.
       rewrite denote_ocfg_app_no_edges; auto.
       rewrite denote_ocfg_unfold_not_in with (bks := bks1); auto.
       rewrite bind_ret_l; reflexivity.
@@ -557,14 +560,12 @@ Section withParams.
   .
   Proof.
     intros * ->; revert from to.
-    einit.
-    ecofix CIH.
-    clear CIHH.
+    coinduction c CIH.
     intros * WF.
     destruct (find_block bks' to) as [bk |] eqn:EQ.
     - unfold denote_ocfg at 1 3.
       setoid_rewrite KTreeFacts.unfold_iter_ktree.
-      cbn; rewrite !bind_bind.
+      cbn -[lattice.body]; rewrite !bind_bind.
       assert (find_block (prefix ++ bks' ++ postfix) to = Some bk).
       {
         erewrite find_block_app_r_wf; eauto.
@@ -574,11 +575,11 @@ Section withParams.
       rewrite 2 ocfg_map_find_block.
       do 2 match_rewrite.
       go.
-      ebind; econstructor; [reflexivity | intros [] ? <-].
+      gbind c; intros [] ? <-.
       + go.
         rewrite bind_tau; etau.
       + go; reflexivity.
-    - edrop.
+    - base.
       rewrite (denote_ocfg_unfold_not_in vararg bks'); auto.
       rewrite bind_ret_l.
       reflexivity.

@@ -77,8 +77,8 @@ Proof.
   destruct (g_alias g).
   - apply ruttc_ret; auto.
   - rbind I2F_dvalue.
-    + unfold alloca; rstep.
-    + intros v1 v2 Hv; unfold gwrite; rstep.
+    + unfold alloca; rleaf.
+    + intros v1 v2 Hv; unfold gwrite; rleaf.
 Qed.
 
 Lemma I2F_allocate_globals : forall (gs : list (global dtyp)),
@@ -99,8 +99,8 @@ Proof.
   destruct (is_intrinsic (dc_name d)).
   - apply ruttc_ret; auto.
   - rbind I2F_dvalue.
-    + unfold alloca; rstep.
-    + intros v1 v2 Hv; unfold gwrite; rstep.
+    + unfold alloca; rleaf.
+    + intros v1 v2 Hv; unfold gwrite; rleaf.
 Qed.
 
 Lemma I2F_allocate_declarations : forall (ds : list (declaration dtyp)),
@@ -119,8 +119,8 @@ Lemma I2F_allocate_block_address : forall (fb : function_id * block_id),
 Proof.
   intros [f b]; unfold allocate_block_address.
   rbind I2F_dvalue.
-  - unfold alloca; rstep.
-  - intros v1 v2 Hv; unfold gwrite; rstep.
+  - unfold alloca; rleaf.
+  - intros v1 v2 Hv; unfold gwrite; rleaf.
 Qed.
 
 Lemma I2F_allocate_block_addresses : forall (fbs : list (function_id * block_id)),
@@ -143,18 +143,18 @@ Proof.
     + destruct e; try (apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto).
       destruct id; try (apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto).
       rbind I2F_dvalue.
-      * unfold gread; rstep.
-      * intros p1 p2 Hp; unfold gwrite; rstep.
+      * unfold gread; rleaf.
+      * intros p1 p2 Hp; unfold gwrite; rleaf.
     + apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto.
   - rbind I2F_dvalue.
-    + unfold gread; rstep.
+    + unfold gread; rleaf.
     + intros a1 a2 Ha.
       rbind I2F_dvalue.
       * destruct (g_exp g).
         -- apply I2F_denote_exp.
         -- (* no initializer: poison at the global's type *)
            apply ruttc_ret, I2F_poison_of_dtyp.
-      * intros uv1 uv2 Huv; unfold store; rstep.
+      * intros uv1 uv2 Huv; unfold store; rleaf.
 Qed.
 
 Lemma I2F_initialize_globals : forall (gs : list (global dtyp)),
@@ -202,7 +202,7 @@ Proof.
   intros arg; unfold allocate_arg.
   pose proof (I2F_i8_array_of_string arg) as Harr.
   rbind I2F_dvalue.
-  - unfold alloca; rstep.
+  - unfold alloca; rleaf.
   - intros v1 v2 Hv.
     rbind (fun (_ _ : unit) => True).
     + unfold store.
@@ -217,7 +217,7 @@ Lemma I2F_allocate_args : forall (args : list string),
 Proof.
   intros args; unfold allocate_args.
   rbind I2F_dvalue.
-  - unfold alloca; rstep.
+  - unfold alloca; rleaf.
   - intros v1 v2 Hv.
     rbind (Forall2 I2F_dvalue).
     + apply ruttc_map_monad; intros; apply I2F_allocate_arg.
@@ -247,7 +247,7 @@ Lemma I2F_address_one_function : forall (df : definition dtyp (CFG.cfg dtyp)),
 Proof.
   intros df; unfold address_one_function.
   rbind I2F_dvalue.
-  - unfold gread; rstep.
+  - unfold gread; rleaf.
   - intros fv1 fv2 Hfv.
     destruct Hfv as [b1 b2 Hb | | ];
       try (apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto).
@@ -267,7 +267,7 @@ Lemma I2F_address_one_library_function :
 Proof.
   intros fid d1 d2 Hd; unfold address_one_library_function.
   rbind I2F_dvalue.
-  - unfold gread; rstep.
+  - unfold gread; rleaf.
   - intros fv1 fv2 Hfv.
     destruct Hfv as [b1 b2 Hb | | ];
       try (apply ruttc_trigger_cast; cbnn; simp I2FE_Failure; auto).
@@ -293,8 +293,8 @@ Proof.
   destruct Hb as [p1 p2 Hp | sz i | p1 p2 Hp | d | f | | | sz bits1 bits2 Hbits]; try (rbind (fun _ _ => False); [apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto | intros ?? []]); [].
   destruct (Pos.eq_dec 32 sz); cbn.
   - rewrite 2 Eqit.bind_bind.
-    rbind TT; [rstep | intros [] [] _].
-    rewrite 2 Eqit.bind_ret_l; rstep.
+    rbind TT; [rleaf | intros [] [] _].
+    rewrite 2 Eqit.bind_ret_l; rleaf.
   - try (rbind (fun _ _ => False); [apply ruttc_trigger_cast; cbnn; simp I2FE_UB; auto | intros ?? []]).
 Qed.
 
@@ -350,17 +350,17 @@ Proof.
     rbind Logic.eq.
     + apply ruttc_iter with (II := Logic.eq).
       * intros [[c1' bytes1] off1] ? <-.
-        break_match_goal; [rstep |].
+        break_match_goal; [rleaf |].
         rbind Logic.eq.
         apply I2F_i8_str_index; auto.
-        intros nc1 nc2 <-; rstep.
+        intros nc1 nc2 <-; rleaf.
       * reflexivity.
     + intros bytes1 bytes2 <-.
       rewrite !Eqit.bind_bind.
       rbind (fun (_ _ : unit) => True).
       * apply ruttc_trigger; [cbnn; simp I2FE_ExternalCall; auto | intros [] [] _; auto].
       * intros [] [] _.
-        rewrite !Eqit.bind_ret_l; rstep.
+        rewrite !Eqit.bind_ret_l; rleaf.
 Qed.
 
 Lemma I2F_LIBRARIES :
@@ -425,7 +425,7 @@ Proof.
       constructor; [apply I2F_address_one_library_function; auto | apply IH].
   - intros libs1 libs2 Hlibs.
     rbind I2F_dvalue.
-    + unfold gread; rstep.
+    + unfold gread; rleaf.
     + intros addr1 addr2 Haddr.
       rbind (sum_rel I2F_dvalue I2F_dvalue).
       * apply I2F_denote_mcfg; [auto | auto | apply I2F_ctx_of_list, Forall2_app; auto].
